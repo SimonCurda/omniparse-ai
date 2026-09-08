@@ -143,10 +143,10 @@ Summary:
   - Duplicates detected: ${duplicateCount}
 
 By Vendor:
-${vendorSummary}
-${duplicateSection}
+ ${vendorSummary}
+ ${duplicateSection}
 All Invoices:
-${invoiceList}`;
+ ${invoiceList}`;
 }
 
 /**
@@ -579,10 +579,15 @@ export async function POST(req: NextRequest) {
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Unknown error during AI processing';
+    // Log full error to server logs (Vercel function logs) for debugging
+    console.error('[chat] Error:', msg);
     // Give user-friendly error for rate limits / model failures
     if (msg.includes('temporarily busy') || msg.includes('429') || msg.includes('rate_limit')) {
+      // Extract the "Tried: ..." part if present, so user knows which models failed
+      const triedMatch = msg.match(/\(Tried: ([^)]+)\)/);
+      const triedInfo = triedMatch ? ` (Tried: ${triedMatch[1]})` : '';
       return NextResponse.json({
-        error: 'AI is temporarily busy — please wait 30 seconds and try again.',
+        error: `AI is temporarily busy — please wait 30 seconds and try again.${triedInfo}`,
       }, { status: 503 });
     }
     return NextResponse.json({ error: msg }, { status: 500 });
