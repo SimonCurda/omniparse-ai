@@ -1,0 +1,192 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String
+  plan      String   @default("free")  // free, pro, plus, business, enterprise
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  stripePriceId        String?
+  stripeCurrentPeriodEnd DateTime?
+  // User settings as JSON
+  settings   Json?
+  // Data retention: days (null = forever), 90, 365
+  retentionDays Int?
+  // Active entity for multi-entity (Business+)
+  activeEntityId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  invoices       Invoice[]
+  chatSessions   ChatSession[]
+  approvalRules  ApprovalRule[]
+  customRules    CustomRule[]
+  auditLogs      AuditLog[]
+  exportTemplates ExportTemplate[]
+  customStatuses CustomStatus[]
+  entities       Entity[]
+}
+
+model Entity {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  // Optional: separate vendor mappings, rules, etc.
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([userId])
+}
+
+model ExportTemplate {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  // Column definitions: [{key: 'vendor', label: 'Vendor Name', width: 30}, ...]
+  columns   Json
+  format    String   @default("csv")  // csv, json, excel
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([userId])
+}
+
+model CustomStatus {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  color     String   @default("#6b7280")  // hex color
+  // Order in workflow (0 = first)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([userId])
+}
+
+model Invoice {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entityId    String?  // multi-entity (Business+)
+  filename    String?
+  vendor      String?
+  invNumber   String?
+  invDate     String?
+  dueDate     String?
+  amount      Float?
+  vatAmount   Float?
+  total       Float?
+  currency    String   @default("USD")
+  status      String   @default("pending")
+  isDuplicate Boolean  @default(false)
+  confidence  Float?
+  fieldConfidence Json?
+  rawExtraction Json?
+  lineItems   Json?
+  errorMessage String?
+  // Validation engine results
+  validationResults Json?
+  validationStatus  String   @default("pending")  // pass, warning, fail
+  // Normalized data
+  normalizedVendor  String?
+  normalizedInvDate String?
+  normalizedDueDate String?
+  normalizedAmount  Float?
+  normalizedTotal   Float?
+  normalizedCurrency String?
+  // PDF metadata for tampering detection
+  pdfMetadata  Json?
+  // Processing metrics
+  processingTime Float?
+  // Custom fields extracted per user template
+  customFields  Json?
+  // Stored uploaded file for viewing (base64)
+  fileData    String?
+  fileType    String?
+  // Auto-purge: fileData is deleted after this timestamp (saves DB storage)
+  fileDataExpiresAt DateTime?
+  // Approval workflow
+  approvalStatus    String   @default("none")  // none, auto_approved, pending_review, blocked, approved, rejected
+  approvalRuleId    String?
+  approvedBy        String?
+  approvedAt        DateTime?
+  approvalNote      String?
+  // Invoice lifecycle status (Pro+: pending/approved/exported; Plus+: custom statuses)
+  lifecycleStatus   String   @default("pending")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@index([userId])
+  @@index([approvalStatus])
+  @@index([vendor])
+}
+
+model ApprovalRule {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  // Condition: amount threshold ranges
+  minAmount Float?
+  maxAmount Float?
+  // Action: auto_approve, flag_for_review, block
+  action    String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([userId])
+}
+
+model CustomRule {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name          String
+  conditionJson Json     // stores IF logic: {type: "and", conditions: [{field, operator, value}]}
+  action        String   // flag_as_warning, flag_as_error, block
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  @@index([userId])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invoiceId String?
+  action    String   // viewed, edited, approved, rejected, uploaded, deleted, exported, status_changed
+  details   Json?    // {field, oldValue, newValue} or {note}
+  createdAt DateTime @default(now())
+  @@index([userId])
+  @@index([invoiceId])
+}
+
+model ChatSession {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String?
+  messages  ChatMessage[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  sessionId String
+  session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  role      String
+  content   String
+  artifact  Json?
+  createdAt DateTime @default(now())
+  @@index([sessionId])
+}
