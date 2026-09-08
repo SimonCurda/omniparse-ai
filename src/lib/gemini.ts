@@ -32,8 +32,15 @@ const CHAT_MODEL_FALLBACK_3 = 'qwen/qwen3.6-27b'; // last resort — reasoning m
 const MAX_TOKENS_HIGH = 4096;    // llama-3.1-8b-instant, llama-4-scout, llama-3.3-70b
 const MAX_TOKENS_LOW = 900;      // qwen — 1k OTPM limit, keep under (artifacts may truncate)
 
-const RETRY_DELAY_MS = 2500;     // wait 2.5s before retrying a rate-limited model
-const MAX_RETRIES = 1;           // retry each model once on 429
+const RETRY_DELAY_MS = 2000;            // base delay before retrying a rate-limited model (doubles each retry)
+const MAX_RETRIES = 2;                  // retry each model up to 2 times on 429 (was 1)
+const CASCADE_RETRY_DELAY_MS = 10000;  // wait 10s before retrying the whole cascade
+const MAX_CASCADE_RETRIES = 1;          // retry the whole cascade once after all 4 models fail
+
+function getRetryDelay(attempt: number): number {
+  // Exponential backoff: 2s, 4s for attempts 1 and 2
+  return RETRY_DELAY_MS * Math.pow(2, attempt - 1);
+}
 
 function getApiKey(): string {
   const key = process.env.GROQ_API_KEY;
@@ -125,66 +132,78 @@ export async function geminiChatCall(
 
   const triedModels: string[] = [];
 
-  for (const { model, maxTokens } of modelConfigs) {
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-      try {
-        if (attempt > 0) {
-          console.warn(`[gemini] Retrying ${model} after rate limit (attempt ${attempt})...`);
-          await sleep(RETRY_DELAY_MS);
-        }
+  // ─── Cascade retry loop ────────────────────────────────────────────────────
+  // If all 4 models fail with 429 in the first pass, we wait 10s and try the
+  // whole cascade once more. This recovers from transient Groq outages without
+  // showing the user an error message.
+  for (let cascadeAttempt = 0; cascadeAttempt <= MAX_CASCADE_RETRIES; cascadeAttempt++) {
+    if (cascadeAttempt > 0) {
+      console.warn(`[gemini] All models failed in previous cascade. Retrying in ${CASCADE_RETRY_DELAY_MS}ms (cascade attempt ${cascadeAttempt + 1}/${MAX_CASCADE_RETRIES + 1})...`);
+      await sleep(CASCADE_RETRY_DELAY_MS);
+    }
 
-        const res = await fetch(GROQ_API_URL, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model,
-            messages: openaiMessages,
-            max_tokens: maxTokens,
-            temperature: 0.3,
-          }),
-        });
-
-        if (res.status === 404 || res.status === 422) {
-          const errText = await res.text();
-          console.warn(`[gemini] Model ${model} unavailable (${res.status}), trying next...`);
-          triedModels.push(model);
-          break; // break retry loop, try next model
-        }
-
-        if (res.status === 429) {
-          const errText = await res.text();
-          console.warn(`[gemini] Model ${model} rate limited (429), attempt ${attempt + 1}/${MAX_RETRIES + 1}`);
-          if (attempt < MAX_RETRIES) {
-            continue; // retry same model after delay
+    for (const { model, maxTokens } of modelConfigs) {
+      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        try {
+          if (attempt > 0) {
+            const delay = getRetryDelay(attempt);
+            console.warn(`[gemini] Retrying ${model} after rate limit (attempt ${attempt}/${MAX_RETRIES}, waiting ${delay}ms)...`);
+            await sleep(delay);
           }
-          triedModels.push(model);
-          break; // exhausted retries, try next model
-        }
 
-        if (!res.ok) {
-          const err = await res.text();
-          throw new Error(`Groq API error (${res.status}): ${err}`);
-        }
+          const res = await fetch(GROQ_API_URL, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${apiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model,
+              messages: openaiMessages,
+              max_tokens: maxTokens,
+              temperature: 0.7,
+            }),
+          });
 
-        const data = await res.json();
-        const content = data.choices?.[0]?.message?.content || '';
-        if (content) return content;
+          if (res.status === 404 || res.status === 422) {
+            const errText = await res.text();
+            console.warn(`[gemini] Model ${model} unavailable (${res.status}), trying next...`);
+            triedModels.push(model);
+            break; // break retry loop, try next model
+          }
 
-        // Empty response — try next model
-        console.warn(`[gemini] Model ${model} returned empty response, trying next...`);
-        triedModels.push(model);
-        break;
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        if (msg.includes('404') || msg.includes('429') || msg.includes('model_not_found') || msg.includes('does not exist') || msg.includes('rate_limit')) {
-          console.warn(`[gemini] Model ${model} error, trying next...`, msg);
+          if (res.status === 429) {
+            const errText = await res.text();
+            console.warn(`[gemini] Model ${model} rate limited (429), attempt ${attempt + 1}/${MAX_RETRIES + 1}`);
+            if (attempt < MAX_RETRIES) {
+              continue; // retry same model after delay
+            }
+            triedModels.push(model);
+            break; // exhausted retries, try next model
+          }
+
+          if (!res.ok) {
+            const err = await res.text();
+            throw new Error(`Groq API error (${res.status}): ${err}`);
+          }
+
+          const data = await res.json();
+          const content = data.choices?.[0]?.message?.content || '';
+          if (content) return content;
+
+          // Empty response — try next model
+          console.warn(`[gemini] Model ${model} returned empty response, trying next...`);
           triedModels.push(model);
           break;
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          if (msg.includes('404') || msg.includes('429') || msg.includes('model_not_found') || msg.includes('does not exist') || msg.includes('rate_limit')) {
+            console.warn(`[gemini] Model ${model} error, trying next...`, msg);
+            triedModels.push(model);
+            break;
+          }
+          throw err;
         }
-        throw err;
       }
     }
   }
