@@ -92,6 +92,40 @@ export async function openRouterChatCall(
     throw new Error(`OpenRouter auth error (${res.status}): ${errText}`);
   }
 
+  // 400 with json_validate_failed — same as Groq. The model accepted JSON mode
+  // but couldn't produce valid JSON. Retry WITHOUT response_format.
+  if (res.status === 400) {
+    const errText = await res.text();
+    if (errText.includes('json_validate_failed')) {
+      console.warn('[openrouter] JSON validation failed (400). Retrying WITHOUT response_format...');
+      const fallbackBody: Record<string, unknown> = {
+        model: OPENROUTER_PRIMARY_MODEL,
+        fallbacks: OPENROUTER_FALLBACK_MODELS,
+        messages: openaiMessages,
+        max_tokens: MAX_TOKENS,
+        temperature: TEMPERATURE,
+        // No response_format — free-text mode
+      };
+      const fallbackRes = await fetch(OPENROUTER_API_URL, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': appUrl,
+          'X-Title': 'OmniParse AI',
+        },
+        body: JSON.stringify(fallbackBody),
+      });
+      if (fallbackRes.ok) {
+        const fallbackData = await fallbackRes.json();
+        return fallbackData.choices?.[0]?.message?.content || '';
+      }
+      const fbErrText = await fallbackRes.text().catch(() => '');
+      throw new Error(`OpenRouter API error after JSON-validate fallback (${fallbackRes.status}): ${fbErrText}`);
+    }
+    throw new Error(`OpenRouter API error (400): ${errText}`);
+  }
+
   if (res.status === 422) {
     // OpenRouter returned 422 — likely JSON mode not supported by the chosen model(s).
     // Retry WITHOUT response_format. Free-text mode + regex cleanup in chat/route.ts

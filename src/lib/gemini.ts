@@ -232,6 +232,44 @@ export async function geminiChatCall(
             break;
           }
 
+          // 400 with json_validate_failed — the model accepted JSON mode but
+          // couldn't generate valid JSON (usually ran out of tokens or went into
+          // a reasoning loop). Retry the SAME model WITHOUT JSON mode (one extra
+          // attempt). Free-text mode + the regex cleanup layer in chat/route.ts
+          // will handle any thinking leak.
+          if (res.status === 400 && jsonModeEnabled) {
+            const errText = await res.text();
+            if (errText.includes('json_validate_failed')) {
+              console.warn(`[gemini] Model ${model} failed JSON validation (400). Retrying WITHOUT response_format...`);
+              jsonModeEnabled = false;
+              const fallbackBody: Record<string, unknown> = {
+                model,
+                messages: openaiMessages,
+                max_tokens: maxTokens,
+                temperature: 0.7,
+                // No response_format — free-text mode
+              };
+              const fallbackRes = await fetch(GROQ_API_URL, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${apiKey}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(fallbackBody),
+              });
+              if (fallbackRes.ok) {
+                const fallbackData = await fallbackRes.json();
+                const fallbackContent = fallbackData.choices?.[0]?.message?.content || '';
+                if (fallbackContent) return fallbackContent;
+              }
+              // If fallback also failed, fall through to next model
+              triedModels.push(model);
+              break;
+            }
+            // Other 400 errors (not json_validate_failed) — throw immediately
+            throw new Error(`Groq API error (400): ${errText}`);
+          }
+
           if (res.status === 429) {
             const errText = await res.text();
             console.warn(`[gemini] Model ${model} rate limited (429), attempt ${attempt + 1}/${MAX_RETRIES + 1}`);
