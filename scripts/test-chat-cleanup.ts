@@ -88,9 +88,25 @@ const THINKING_PATTERNS = [
   /^\s*columns\s*[:.]/i,
   /^\s*rows\s*[:.]/i,
   /^\s*metrics\s*[:.]\s*$/i,
+  // More structured analysis (qwen reasoning style)
+  /^\s*data\s+analysis\s*[:.]/i,
+  /^\s*duplicate\s+groups\s*[:.]/i,
+  /^\s*confidence\s+scores\s*[:.]/i,
+  /^\s*suspicious\s+items\s+identified\s*[:.]/i,
+  /^\s*amounts\s*[:.]/i,
+  /^\s*dates\s*[:.]\s*$/i,
+  // Self-instructions
+  /^\s*highlight\s/i,
+  /^\s*format\s+the\s+response\s/i,
+  /^\s*i\s+will\s/i,
+  /^\s*if\s+i\s+want\s+to\s+show\s/i,
+  /^\s*but\s+it'?s?\s+safer\s/i,
+  /^\s*did\s+the\s+user\s+ask\s/i,
+  /^\s*strict\s+rules\s+say\s/i,
+  /^\s*they\s+asked\s/i,
 ];
 
-const ANSWER_PREFIX_PATTERN = /^\s*(output|answer|response|final\s+answer|final\s+response|final\s+output|result|conclusion|text\s+construction)\s*[:.]\s*/i;
+const ANSWER_PREFIX_PATTERN = /^\s*(output|answer|response|final\s+answer|final\s+response|final\s+output|result|conclusion|text\s+construction|text\s*[:.]\s*")\s*(?:[:.]\s*)?/i;
 
 const THINKING_PATTERNS_ANYWHERE = [
   /no\s+artifact\s+is\s+needed/i,
@@ -164,7 +180,7 @@ function cleanReplyText(reply: string): string {
 interface Artifact { type: string; data: Record<string, unknown>; title?: string }
 
 function findLastAnswerPrefixIndex(text: string): number {
-  const re = /(?:^|\n)([ \t]*(?:output|answer|response|final\s+answer|final\s+response|final\s+output|result|conclusion|text\s+construction)\s*[:.]\s*\S)/gi;
+  const re = /(?:^|\n)([ \t]*(?:output|answer|response|final\s+answer|final\s+response|final\s+output|result|conclusion|text\s+construction|text\s*[:.]\s*")(?:[:.]\s*)?\S)/gi;
   let lastIdx = -1;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text)) !== null) {
@@ -620,6 +636,79 @@ check('reply is the prose summary', r13.reply.includes('18 invoices totaling $67
 check('artifact is summary', r13.artifact?.type === 'summary');
 check('artifact has 2 metrics', (r13.artifact?.data.metrics as unknown[])?.length === 2);
 console.log(`  → Final reply: "${r13.reply}"`);
+
+// Case 14: User's "do you see anything suspicious?" paste — qwen went into
+// huge analysis mode in free-text (after JSON validation failed). Pattern:
+// "Data Analysis:", "Vendor Breakdown:", "Suspicious items identified:",
+// "Highlight the...", "Format the response as...", "Wait, the prompt says...",
+// "I will stick to text..." — model ran out of tokens before producing answer.
+// We should show the fallback message because there's no "Text: ..." answer.
+const suspiciousAnalysisPaste = `Data Analysis:
+
+Total Amount: $67,723,512.87. This is a very large sum.
+Vendor Breakdown:
+Elite Auto Care & Performance: 8 invoices, total $67,703,278.10. This vendor accounts for 99.97% of the total value.
+ABC s.r.o.: 1 invoice, $12,100.00.
+Unknown: 8 invoices, total $6,666.65.
+exact company name: 1 invoice, $1,468.12.
+Duplicate Groups:
+Elite Auto Care & Performance | INV-2026-0702-001: 8 copies.
+Amounts: One is $67,676,767.00. Seven are $3,787.30.
+This is a massive outlier. The single invoice is worth ~17,800 times the others.
+The total for this vendor is driven almost entirely by this one outlier.
+Confidence Scores:
+Most Elite Auto Care invoices have high confidence (96-98%).
+Some "Unknown" invoices have 0% or 10% confidence.
+Dates:
+Elite Auto Care invoices are dated 2026-07-02.
+Unknown invoices are dated 2022-02-15 or 2022-01-01.
+Suspicious items identified:
+
+Massive Outlier: The $67,676,767.00 invoice from Elite Auto Care is extremely suspicious.
+Concentration: One vendor holds almost the entire value of the dataset.
+Future Date: The date 2026-07-02 might be suspicious if not expected.
+Duplicate Amount Mismatch: The duplicates have a huge amount discrepancy.
+
+Highlight the massive outlier amount ($67.6M vs $3.7k).
+Mention the date anomaly (2026).
+Mention the concentration of value in a single vendor.
+Format the response as JSON with text and a summary artifact (or just text if summary isn't explicitly requested, but the prompt asks for "anything suspicious" which implies a summary of findings is useful. However, strict rules say artifact is null unless asked for table/chart/summary. The user asked "do you see anything suspicious?". This is a question, not a request for a summary table. I will stick to text response, maybe a list in the text field. Wait, the prompt says "You help with... Summaries...". It doesn't say I must generate an artifact for every analysis, only "if the user asked for one". Did the user ask for a summary? No. They asked "do you see anything suspicious?". I will provide the answer in text. If I want to show the invoice, I could generate a table, but it's safer to stick to text unless I explicitly interpret "show me" or "table" in the prompt. I will stick to text to`;
+console.log('\nTest 14: qwen free-text analysis — no "Text:" answer (truncated)');
+const r14 = extractArtifact(suspiciousAnalysisPaste);
+check('reply has no "Data Analysis:"', !r14.reply.includes('Data Analysis'));
+check('reply has no "Vendor Breakdown:"', !r14.reply.includes('Vendor Breakdown'));
+check('reply has no "Suspicious items identified:"', !r14.reply.includes('Suspicious items identified'));
+check('reply has no "Highlight the"', !r14.reply.includes('Highlight the'));
+check('reply has no "Format the response"', !r14.reply.includes('Format the response'));
+check('reply has no "I will stick to text"', !r14.reply.includes('I will stick to text'));
+check('reply has no "Wait, the prompt says"', !r14.reply.includes('Wait, the prompt says'));
+// When the model produces a long analysis but no "Text: ..." answer, we keep the
+// analysis findings (bullet list of suspicious items) — that's better than a
+// "I had trouble..." fallback because the user gets useful information.
+check('reply preserves the findings (Massive Outlier)', r14.reply.includes('Massive Outlier'));
+check('reply preserves the findings (Concentration)', r14.reply.includes('Concentration'));
+check('reply preserves the findings (Future Date)', r14.reply.includes('Future Date'));
+check('reply preserves the findings (Duplicate Amount Mismatch)', r14.reply.includes('Duplicate Amount Mismatch'));
+console.log(`  → Final reply (first 300 chars):\n${r14.reply.slice(0, 300).split('\n').map(l => '    ' + l).join('\n')}...`);
+
+// Case 15: User's "Show duplicate invoices" paste — qwen free-text mode produced
+// pseudo-JSON + Text: "..." answer at the end. We should slice from "Text:" and
+// keep the actual answer.
+const duplicateTextAnswerPaste = `"Duplicate Groups: - Elite Auto Care & Performance | INV-2026-0702-001 | 2026-07-02: 8 copies (amounts: $67676767.00, $3787.30, $3787.30, $3787.30, $3787.30, $3787.30, $3787.30, $3787.30) ⚠️ AMOUNT MISMATCH"
+The columns should be Vendor, Invoice #, Date, Amount, Count, IDs. "columns": ["Vendor", "Invoice #", "Date", "Amount", "Count", "IDs"] "rows": [ { "Vendor": "Elite Auto Care & Performance", "Invoice #": "INV-2026-0702-001", "Date": "2026-07-02", "Amount": "$3,787.30 (1x $67,676,767.00)", "Count": "8", "IDs": "cmtfqxbyy0001l50431ak5o9x, cmtfp0gef0001l904g6i4f6tg, ..." } ]
+
+cmtfqxbyy0001l50431ak5o9x ($67676767.00) cmtfp0gef0001l904g6i4f6tg ($3787.30) cmsuthi5a0001jx04fndn7l5j ($3787.30) cmstkp3i60001ib04u44nyppy ($3787.30) cmstiqw4u0001kw045t4qypan ($3787.30) cmsswovr90001jn04ctpkqnd9 ($3787.30) cmss4s5hy0001ju04c4fz0lw8 ($3787.30) cmss4h3ck0001js04omlsa418 ($3787.30)
+
+Text: "I found 1 duplicate group containing 8 invoices from Elite Auto Care & Performance for invoice #INV-2026-0702-001 dated 2026-07-02. There is an amount mismatch in this group: 7 copies are for $3,787.30, while 1 copy is for $67,676,767.00."`;
+console.log('\nTest 15: qwen free-text with "Text: \\"...\\"" answer marker');
+const r15 = extractArtifact(duplicateTextAnswerPaste);
+check('reply does NOT include "The columns should be"', !r15.reply.includes('The columns should be'));
+check('reply does NOT include raw IDs listing', !r15.reply.includes('cmtfqxbyy0001l50431ak5o9x ($67676767.00)'));
+check('reply does NOT include "Duplicate Groups:"', !r15.reply.includes('Duplicate Groups:'));
+check('reply starts with the actual answer', r15.reply.includes('I found 1 duplicate group containing 8 invoices'));
+check('reply preserves the amount mismatch detail', r15.reply.includes('amount mismatch in this group'));
+check('reply preserves the $67,676,767.00 outlier', r15.reply.includes('$67,676,767.00'));
+console.log(`  → Final reply:\n${r15.reply.split('\n').map(l => '    ' + l).join('\n')}`);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail > 0 ? 1 : 0);

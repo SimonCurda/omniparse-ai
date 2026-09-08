@@ -121,7 +121,8 @@ Response:
 - Use exact amounts from the data, round to 2 decimal places.
 - **Bold** key numbers in the text field using markdown.
 - When asked about duplicates: group by vendor + invoice number + date, note amount discrepancies.
-- Never narrate your thought process. The JSON structure enforces this — just fill in "text" and "artifact".`;
+- Never narrate your thought process. The JSON structure enforces this — just fill in "text" and "artifact".
+- Today's date is September 9, 2026. The current year is 2026. Do NOT flag 2026 dates as "future" or "suspicious" — they are current dates. Only flag dates that are genuinely anomalous (e.g. year 2099, year 1990 for a recent vendor).`;
 
 function buildInvoiceContext(invoices: Array<Record<string, unknown>>): string {
   if (invoices.length === 0) return 'No invoices have been parsed yet. Upload documents to get started.';
@@ -335,6 +336,22 @@ const THINKING_PATTERNS = [
   /^\s*columns\s*[:.]/i,                       // "Columns: ..."
   /^\s*rows\s*[:.]/i,                          // "Rows: ..."
   /^\s*metrics\s*[:.]\s*$/i,                   // "Metrics:" alone on a line
+  // ─── More structured analysis section headers (qwen reasoning style) ─────
+  /^\s*data\s+analysis\s*[:.]/i,                 // "Data Analysis:"
+  /^\s*duplicate\s+groups\s*[:.]/i,              // "Duplicate Groups:"
+  /^\s*confidence\s+scores\s*[:.]/i,             // "Confidence Scores:"
+  /^\s*suspicious\s+items\s+identified\s*[:.]/i, // "Suspicious items identified:"
+  /^\s*amounts\s*[:.]/i,                          // "Amounts:" (analysis header)
+  /^\s*dates\s*[:.]\s*$/i,                        // "Dates:" alone on a line (analysis header)
+  // ─── Self-instructions (continued) ─────────────────────────────────────
+  /^\s*highlight\s/i,                            // "Highlight the massive outlier amount"
+  /^\s*format\s+the\s+response\s/i,              // "Format the response as JSON..."
+  /^\s*i\s+will\s/i,                             // "I will stick to text..."
+  /^\s*if\s+i\s+want\s+to\s+show\s/i,             // "If I want to show the invoice..."
+  /^\s*but\s+it'?s?\s+safer\s/i,                  // "but it's safer to..."
+  /^\s*did\s+the\s+user\s+ask\s/i,                // "Did the user ask for a summary?"
+  /^\s*strict\s+rules\s+say\s/i,                 // "strict rules say artifact is null unless..."
+  /^\s*they\s+asked\s/i,                          // "They asked 'do you see anything suspicious?'"
 ];
 
 // Patterns for "answer lead-in" prefixes that the model adds to the actual
@@ -342,7 +359,13 @@ const THINKING_PATTERNS = [
 // e.g. "Output: You have 18 invoices" → "You have 18 invoices"
 // "Text Construction:" is included because llama-3.3 sometimes labels the
 // final prose answer with that header (the rest is thinking preamble).
-const ANSWER_PREFIX_PATTERN = /^\s*(output|answer|response|final\s+answer|final\s+response|final\s+output|result|conclusion|text\s+construction)\s*[:.]\s*/i;
+// "Text:\"" is included (with a quote after) because qwen sometimes writes
+// the answer as `Text: "..."` when in free-text mode after JSON validation
+// failure. The quote requirement avoids matching "Text: Summary" headings.
+// The trailing `(?:[:.]\s*)?` is OPTIONAL — for the `text\s*[:.]\s*"` alternative
+// the colon is already inside; for the other alternatives we need to consume
+// the colon (or period) and following whitespace.
+const ANSWER_PREFIX_PATTERN = /^\s*(output|answer|response|final\s+answer|final\s+response|final\s+output|result|conclusion|text\s+construction|text\s*[:.]\s*")\s*(?:[:.]\s*)?/i;
 
 // Patterns that match ANYWHERE in a line (not just start). Used for cases where
 // the model mixes thinking and content on the same line. If ANY of these match,
@@ -586,9 +609,10 @@ function extractArtifact(text: string): { reply: string; artifact: Artifact | un
  */
 function findLastAnswerPrefixIndex(text: string): number {
   // Match a line that starts with an answer-prefix keyword, followed by
-  // ":" or ".", followed by at least one non-whitespace character (the actual answer).
+  // ":" or "." (required for most keywords, but `text:..."` already includes it
+  // in the alternative), followed by at least one non-whitespace character.
   // Anchored to start of line (^ or after \n).
-  const re = /(?:^|\n)([ \t]*(?:output|answer|response|final\s+answer|final\s+response|final\s+output|result|conclusion|text\s+construction)\s*[:.]\s*\S)/gi;
+  const re = /(?:^|\n)([ \t]*(?:output|answer|response|final\s+answer|final\s+response|final\s+output|result|conclusion|text\s+construction|text\s*[:.]\s*")(?:[:.]\s*)?\S)/gi;
   let lastIdx = -1;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text)) !== null) {
