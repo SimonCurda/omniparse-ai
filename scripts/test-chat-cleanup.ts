@@ -31,7 +31,7 @@ const THINKING_PATTERNS = [
   /^\s*according to\s/i,
   /^\s*to answer\s/i,
   /^\s*to (show|find|identify|list|generate|create|provide|format|construct|build|prepare)\s/i,
-  /^\s*the (data|context|information|prompt|instructions?|response|answer)\s+(shows?|says?|provides?|contains?|indicates?|tells|asks?|wants?)\s/i,
+  /^\s*the (data|context|information|prompt|instructions?|response|answer|summary|text)\s+(shows?|says?|provides?|contains?|indicates?|tells|asks?|wants?|states?)\b/i,
   /^\s*from the\s/i,
   /^\s*in the\s+(data|list|provided|invoice|context|prompt)\s/i,
   /^\s*there (is|are)\s/i,
@@ -43,6 +43,70 @@ const THINKING_PATTERNS = [
   /^\s*prepare\s+the\s+artifact/i,
   /^\s*construct\s+the\s+/i,
   /^\s*format\s+the\s+(table|chart|artifact)/i,
+  // Structured planning
+  /^\s*plan\s*[:.]\s*$/i,
+  /^\s*draft\s*[:.]/i,
+  /^\s*refining\s/i,
+  /^\s*refine\s/i,
+  /^\s*final\s+check\s/i,
+  /^\s*step\s+\d+\s*[:.]/i,
+  // Self-instructions
+  /^\s*state\s+the\s/i,
+  /^\s*mention\s/i,
+  /^\s*keep\s+it\s+to\s/i,
+  /^\s*no\s+artifact\s+is\s+needed/i,
+  /^\s*the\s+question\s+is\s/i,
+  /^\s*correct\s*\.?\s*$/i,
+  /^\s*the\s+draft\s+(looks?|is|seems)\s/i,
+  // "Thinking Process:" style headers
+  /^\s*thinking\s+process\s*[:.]/i,
+  /^\s*my\s+thinking\s*[:.]/i,
+  /^\s*reasoning\s*[:.]/i,
+  /^\s*chain\s+of\s+thought\s*[:.]/i,
+  /^\s*analysis\s*[:.]\s*$/i,
+  /^\s*my\s+analysis\s*[:.]/i,
+  // Structured analysis section headers
+  /^\s*analyze\s+the\s+request\s*[:.]/i,
+  /^\s*analyze\s+the\s+data\s*[:.]/i,
+  /^\s*determine\s+output\s+format\s*[:.]/i,
+  /^\s*artifact\s+type\s*[:.]/i,
+  /^\s*metrics\s+to\s+include\s*[:.]/i,
+  /^\s*draft\s+the\s+artifact\s*[:.]/i,
+  /^\s*draft\s+the\s+text\s+response\s*[:.]/i,
+  /^\s*drafting\s+the\s+artifact\s*[:.]/i,
+  /^\s*refine\s+text\s*[:.]/i,
+  /^\s*final\s+output\s+construction\s*[:.]/i,
+  /^\s*self[- ]correction\s+during\s+drafting\s*[:.]/i,
+  /^\s*artifact\s+construction\s*[:.]/i,
+  /^\s*final\s+polish\s*[:.]/i,
+  /^\s*synthesize\s+the\s+findings\s*[:.]/i,
+  /^\s*scan\s+the\s+data\s+for\s/i,
+  /^\s*suspicion\s*[:.]/i,
+  /^\s*vendor\s+breakdown\s*[:.]/i,
+  /^\s*title\s*[:.]\s/i,
+  /^\s*type\s*[:.]\s+(table|chart|summary|chart-bar|chart-line|chart-pie)\s/i,
+  /^\s*columns\s*[:.]/i,
+  /^\s*rows\s*[:.]/i,
+  /^\s*metrics\s*[:.]\s*$/i,
+];
+
+const ANSWER_PREFIX_PATTERN = /^\s*(output|answer|response|final\s+answer|final\s+response|final\s+output|result|conclusion|text\s+construction)\s*[:.]\s*/i;
+
+const THINKING_PATTERNS_ANYWHERE = [
+  /no\s+artifact\s+is\s+needed/i,
+  /sum\s*[:=]\s*\d+\s*[+\-*/]\s*\d/i,
+  /\d+\s*[+\-*/]\s*\d+\s*=\s*\d+\s*\.\s*correct/i,
+  /the\s+draft\s+(looks?|is|seems)\s+(good|fine|acceptable|correct|reasonable)/i,
+  /no\s+(modifications|changes|edits)\s+(needed|required|necessary)/i,
+];
+
+const THINKING_PROCESS_HEADER_PATTERNS = [
+  /^\s*thinking\s+process\s*[:.]/im,
+  /^\s*my\s+thinking\s*[:.]/im,
+  /^\s*reasoning\s*[:.]/im,
+  /^\s*chain\s+of\s+thought\s*[:.]/im,
+  /^\s*step[- ]by[- ]step\s+(?:reasoning|analysis|thinking)\s*[:.]/im,
+  /^\s*my\s+analysis\s*[:.]/im,
 ];
 
 function stripThinkingLines(reply: string): string {
@@ -53,6 +117,12 @@ function stripThinkingLines(reply: string): string {
     const trimmed = line.trim();
     if (!trimmed) { kept.push(line); continue; }
     if (trimmed.startsWith('<<<ARTIFACT>>>') || trimmed.startsWith('<<<END_ARTIFACT>>>')) { kept.push(line); continue; }
+    const prefixMatch = line.match(ANSWER_PREFIX_PATTERN);
+    if (prefixMatch) {
+      const stripped = line.replace(ANSWER_PREFIX_PATTERN, '');
+      if (stripped.trim()) kept.push(stripped);
+      continue;
+    }
     const isContent =
       /^[-*•]\s/.test(trimmed) ||
       /^\d+[.)]\s/.test(trimmed) ||
@@ -64,6 +134,7 @@ function stripThinkingLines(reply: string): string {
       trimmed.startsWith('<<<');
     if (isContent) { kept.push(line); continue; }
     if (THINKING_PATTERNS.some((p) => p.test(trimmed))) continue;
+    if (THINKING_PATTERNS_ANYWHERE.some((p) => p.test(trimmed))) continue;
     kept.push(line);
   }
   let result = kept.join('\n');
@@ -92,7 +163,56 @@ function cleanReplyText(reply: string): string {
 
 interface Artifact { type: string; data: Record<string, unknown>; title?: string }
 
+function findLastAnswerPrefixIndex(text: string): number {
+  const re = /(?:^|\n)([ \t]*(?:output|answer|response|final\s+answer|final\s+response|final\s+output|result|conclusion|text\s+construction)\s*[:.]\s*\S)/gi;
+  let lastIdx = -1;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    const lineStart = m.index + (m[0].startsWith('\n') ? 1 : 0);
+    const wsMatch = text.slice(lineStart).match(/^[ \t]*/);
+    lastIdx = wsMatch ? lineStart + wsMatch[0].length : lineStart;
+  }
+  return lastIdx;
+}
+
+function findThinkingProcessHeader(text: string): number {
+  for (const pattern of THINKING_PROCESS_HEADER_PATTERNS) {
+    const match = text.match(pattern);
+    if (match && match.index !== undefined) {
+      return match.index;
+    }
+  }
+  return -1;
+}
+
 function extractArtifact(text: string): { reply: string; artifact: Artifact | undefined } {
+  // ─── PRIMARY PATH: JSON-mode structured response ──────────────────────────
+  try {
+    const trimmed = text.trim();
+    const fenceMatch = trimmed.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/);
+    const jsonStr = fenceMatch ? fenceMatch[1].trim() : trimmed;
+    const parsed = JSON.parse(jsonStr) as { text?: unknown; artifact?: unknown };
+
+    if (parsed && typeof parsed === 'object' && 'text' in parsed) {
+      const text_field = typeof parsed.text === 'string' ? parsed.text : '';
+      const artifact_field = parsed.artifact;
+
+      let artifact: Artifact | undefined;
+      if (artifact_field && typeof artifact_field === 'object' && artifact_field !== null) {
+        const a = artifact_field as Record<string, unknown>;
+        if (a.type && a.data && typeof a.type === 'string' && typeof a.data === 'object') {
+          artifact = a as unknown as Artifact;
+        }
+      }
+
+      const reply = text_field.trim() || (artifact ? 'Here you go.' : 'I had trouble generating a clean response — please try again.');
+      return { reply, artifact };
+    }
+  } catch {
+    // Not valid JSON — fall through to legacy regex path
+  }
+
+  // ─── FALLBACK PATH: legacy regex cleanup (for qwen + free-text models) ────
   let artifact: Artifact | undefined;
 
   // Strategy 1
@@ -158,6 +278,21 @@ function extractArtifact(text: string): { reply: string; artifact: Artifact | un
   }
 
   let reply = cleanReplyText(text);
+
+  // ─── Find the LAST answer-prefix and keep only content from there onward ──
+  const lastAnswerIdx = findLastAnswerPrefixIndex(reply);
+  if (lastAnswerIdx >= 0) {
+    reply = reply.slice(lastAnswerIdx).replace(ANSWER_PREFIX_PATTERN, '').trim();
+  } else {
+    // No answer-prefix found. Check if the model went into explicit "Thinking
+    // Process:" mode. If so, the model didn't deliver a clean answer — strip
+    // everything (the fallback message will be shown).
+    const thinkingHeaderIdx = findThinkingProcessHeader(reply);
+    if (thinkingHeaderIdx >= 0) {
+      reply = reply.slice(0, thinkingHeaderIdx).trim();
+    }
+  }
+
   reply = stripThinkingLines(reply);
   if (!reply) {
     reply = artifact ? 'Here you go.' : 'I had trouble generating a clean response — please try again.';
@@ -247,6 +382,244 @@ check('reply has no leaked JSON', !r6.reply.includes('"type": "chart-bar"'));
 check('artifact extracted via Strategy 5', r6.artifact !== undefined);
 check('artifact is chart-bar', r6.artifact?.type === 'chart-bar');
 check('artifact has 2 data points', (r6.artifact?.data.data as unknown[])?.length === 2);
+
+// Case 7: User's exact failing paste — llama-3.3 structured planning format
+// The model says "The summary states:", "Plan:", "Draft:", "Refining:", "Final check:", "Output:"
+// before delivering the actual answer. We need to strip ALL of that and just keep
+// the actual answer ("You have 18 invoices..." + the bullets).
+const llama33PlanningLeak = ` The summary states: "Current invoice data (18 total)". No artifact is needed for a simple count.
+Plan:
+
+State the total number of invoices.
+Mention the breakdown by vendor if helpful, but the question is simple "How many".
+Keep it to 1-2 sentences.
+Draft: You have 18 invoices in total. This includes 8 from Elite Auto Care & Performance, 8 from Unknown vendors, 1 from ABC s.r.o., and 1 from exact company name.
+
+Refining based on "Short answers: 2-4 sentences for simple questions". The draft looks good.
+
+Final check of the data: Total: 18. Vendors:
+
+Elite Auto Care & Performance: 8
+ABC s.r.o.: 1
+Unknown: 8
+exact company name: 1 Sum: 8+1+8+1 = 18. Correct.
+Output: You have 18 invoices in total. The breakdown by vendor is:
+
+Elite Auto Care & Performance: 8
+Unknown: 8
+ABC s.r.o.: 1
+exact company name: 1`;
+console.log('\nTest 7: llama-3.3 structured planning leak (user\'s exact case)');
+const r7 = extractArtifact(llama33PlanningLeak);
+check('reply starts with actual answer (not "The summary")', r7.reply.startsWith('You have 18 invoices'));
+check('reply has no "The summary states"', !r7.reply.includes('The summary states'));
+check('reply has no "Plan"', !r7.reply.includes('Plan'));
+check('reply has no "Draft"', !r7.reply.includes('Draft'));
+check('reply has no "Refining"', !r7.reply.includes('Refining'));
+check('reply has no "Final check"', !r7.reply.includes('Final check'));
+check('reply has no "Output:"', !r7.reply.includes('Output:'));
+check('reply has no "State the total"', !r7.reply.includes('State the total'));
+check('reply has no "Mention the breakdown"', !r7.reply.includes('Mention the breakdown'));
+check('reply has no "Keep it to"', !r7.reply.includes('Keep it to'));
+check('reply has no "Correct."', !r7.reply.includes('Correct.'));
+check('reply has no "Sum: 8+1+8+1"', !r7.reply.includes('Sum: 8+1+8+1'));
+check('reply preserves vendor breakdown bullets', r7.reply.includes('Elite Auto Care & Performance: 8'));
+check('reply preserves "Unknown: 8" line', r7.reply.includes('Unknown: 8'));
+check('reply preserves "ABC s.r.o.: 1" line', r7.reply.includes('ABC s.r.o.: 1'));
+check('reply preserves "exact company name: 1" line', r7.reply.includes('exact company name: 1'));
+check('reply does NOT include "The draft looks good"', !r7.reply.includes('The draft looks good'));
+check('reply does NOT include "No artifact is needed"', !r7.reply.includes('No artifact is needed'));
+console.log(`  → Final reply:\n${r7.reply.split('\n').map(l => '    ' + l).join('\n')}`);
+
+// Case 8: User's "give me summary of my invoices" paste — model uses "Thinking Process:"
+// header followed by structured analysis, then "Text Construction:" as the answer marker.
+// The artifact IS extracted correctly, but the thinking preamble leaked before it.
+// We need to slice from the LAST "Text Construction:" marker to keep only the prose answer.
+const summaryThinkingPaste = `Thinking Process:
+Analyze the Request: The user wants a summary of their invoices.
+Analyze the Data:
+Total Invoices: 18
+Total Amount: $67,723,512.87
+Average Confidence: 80.0%
+Duplicates: 3 (specifically one group of 8 duplicates for Elite Auto Care & Performance).
+Vendor Breakdown:
+Elite Auto Care & Performance: 8 invoices, $67,703,278.10
+ABC s.r.o.: 1 invoice, $12,100.00
+Unknown: 8 invoices, $6,666.65
+exact company name: 1 invoice, $1,468.12
+Determine Output Format: The user asked for a summary. The instructions specify generating an artifact for summaries.
+Artifact Type: summary
+Metrics to include: Total Amount, Total Invoices, Average Confidence, Duplicate Count.
+Draft the Artifact:
+Title: Invoice Summary
+Metrics:
+Total Amount: $67,723,512.87
+Total Invoices: 18
+Average Confidence: 80.0%
+Duplicates Detected: 3
+Draft the Text Response:
+State the total amount and invoice count.
+Mention the vendor breakdown.
+Mention the duplicate issue (Elite Auto Care & Performance).
+Refine Text:
+"Your invoice data contains 18 invoices totaling $67,723,512.87 with an average confidence score of 80.0%."
+"Elite Auto Care & Performance is the primary vendor, accounting for 8 invoices and the vast majority of the total amount."
+"There are 3 duplicate groups detected, primarily involving Elite Auto Care & Performance."
+Final Output Construction: Combine text and artifact.
+Self-Correction during drafting: Ensure I don't use "Here is" or "Sure". Start directly with the answer.
+
+Artifact Construction:
+
+Text Construction: Your invoice data contains 18 invoices totaling $67,723,512.87 with an average confidence score of 80.0%.
+
+Elite Auto Care & Performance is the dominant vendor, representing 8 invoices and $67,703,278.10 of the total value. The remaining invoices are split between ABC s.r.o. ($12,100.00), Unknown vendors ($6,666.65), and exact company name ($1,468.12).
+
+Final Polish: Check constraints. No "Here is`;
+console.log('\nTest 8: "Thinking Process:" + "Text Construction:" answer marker');
+const r8 = extractArtifact(summaryThinkingPaste);
+check('reply does NOT include "Thinking Process:"', !r8.reply.includes('Thinking Process'));
+check('reply does NOT include "Analyze the Request"', !r8.reply.includes('Analyze the Request'));
+check('reply does NOT include "Analyze the Data"', !r8.reply.includes('Analyze the Data'));
+check('reply does NOT include "Vendor Breakdown"', !r8.reply.includes('Vendor Breakdown'));
+check('reply does NOT include "Draft the Artifact"', !r8.reply.includes('Draft the Artifact'));
+check('reply does NOT include "Self-Correction"', !r8.reply.includes('Self-Correction'));
+check('reply does NOT include "Final Polish"', !r8.reply.includes('Final Polish'));
+check('reply does NOT include "Text Construction:"', !r8.reply.includes('Text Construction'));
+check('reply starts with actual prose answer', r8.reply.startsWith('Your invoice data contains 18 invoices'));
+check('reply preserves vendor breakdown prose', r8.reply.includes('Elite Auto Care & Performance is the dominant vendor'));
+check('reply preserves ABC s.r.o. mention', r8.reply.includes('ABC s.r.o. ($12,100.00)'));
+console.log(`  → Final reply:\n${r8.reply.split('\n').map(l => '    ' + l).join('\n')}`);
+
+// Case 9: User's "are any of them suspicious?" paste — model went into thinking mode
+// and ran out of tokens mid-analysis. No artifact, no answer marker, just truncated thinking.
+// We should show the fallback message instead of leaking the analysis.
+const suspiciousTruncatedPaste = `Thinking Process:
+Analyze the Request: The user is asking "are any of them suspicious?" based on the provided invoice data.
+
+Scan the Data for Anomalies/Suspicious Indicators:
+
+Vendor: Elite Auto Care & Performance
+Total: $67,703,278.10 (Huge amount for a single vendor, especially an auto care shop).
+Duplicates: 8 copies of INV-2026-0702-001.
+Amount Mismatch: One copy is $67,676,767.00 (ID: cmtfqxbyy0001l50431ak5o9x), while the other 7 are $3,787.30.
+Suspicion: The $67M invoice is likely a parsing error or a fraudulent alteration of the $3,787.30 invoice. The repetition of the exact same invoice number 8 times is also highly suspicious (potential duplicate payment fraud or system glitch).
+Vendor: Unknown
+8 invoices total.
+4 invoices have $0.00 amount (IDs: cmstig4yb0001l104dnbzpkh3, cmstiezrv0001i604l3awke9l, cmst9pfyb0001jp04ci4us0fe).
+4 invoices are identical: INV001, 2022-02-15, $1333.33 (IDs: cmst7tmqj0001lc04xufczk9m, cmst6xgnc0001jr04l9mo29ao, cmst5n9uc0005jr042yehnlnc, cmst5m7sh0001jr04i5s50cyc).
+Suspicion: $0.00 invoices are often parsing failures or placeholders. The four identical $1333.33 invoices from "Unknown" with the same invoice number and date are likely duplicates or test data.
+Vendor: exact company name
+Invoice number: exact number. Date: YYYY-MM-DD.
+Suspicion: This looks like a template or placeholder invoice, not real data.
+Synthesize the Findings:
+
+Elite Auto Care & Performance: Massive outlier amount ($67.6M vs $3.7k) for the same invoice number. High volume of duplicates (8 copies).
+Unknown: Multiple $0.00 invoices (parsing errors). Four identical invoices ($1333.33, INV001).
+exact company name: Placeholder data ("exact number", "YYYY-MM-DD").
+Format the Output:
+
+Direct answer.
+Bullet points for the specific suspicious items.
+Bold key numbers.
+Generate a table artifact highlighting the suspicious invoices.
+Drafting the Artifact:
+
+Type: table
+Title: "Suspicious Invoices"
+Columns: ID, Vendor, Invoice #, Amount, Reason
+Rows:
+cmtfqxbyy0001l50431ak5o9x, Elite Auto Care..., INV-2026-0702-001, $67,676,767.00, Massive outlier vs duplicates
+cmstig4yb0001l104dnbzpkh3, Unknown, N/A, $0.00, Zero amount
+\`cmstiezrv000`;
+console.log('\nTest 9: Truncated thinking — model ran out of tokens mid-analysis');
+const r9 = extractArtifact(suspiciousTruncatedPaste);
+check('reply does NOT include "Thinking Process:"', !r9.reply.includes('Thinking Process'));
+check('reply does NOT include "Analyze the Request"', !r9.reply.includes('Analyze the Request'));
+check('reply does NOT include "Scan the Data"', !r9.reply.includes('Scan the Data'));
+check('reply does NOT include "Synthesize the Findings"', !r9.reply.includes('Synthesize the Findings'));
+check('reply does NOT include "Format the Output"', !r9.reply.includes('Format the Output'));
+check('reply does NOT include "Drafting the Artifact"', !r9.reply.includes('Drafting the Artifact'));
+check('reply does NOT include "Vendor: Elite Auto Care"', !r9.reply.includes('Vendor: Elite Auto Care'));
+check('reply does NOT include "Suspicion:"', !r9.reply.includes('Suspicion:'));
+check('reply does NOT include the truncated row data', !r9.reply.includes('cmstiezrv000'));
+check('reply is the fallback message (no artifact, no clean answer)', r9.reply === 'I had trouble generating a clean response — please try again.');
+check('no artifact was extracted', r9.artifact === undefined);
+console.log(`  → Final reply: "${r9.reply}"`);
+
+// Case 10: JSON-mode structured response — the NEW primary path.
+// When the model supports JSON mode, it returns a single JSON object with
+// { "text": "...", "artifact": {...}|null }. This should parse cleanly with
+// no thinking leak, no regex needed.
+console.log('\nTest 10: JSON-mode structured response (primary path, no artifact)');
+const jsonModeNoArtifact = JSON.stringify({
+  text: "You have 18 invoices in total. The breakdown by vendor is:\n\n- Elite Auto Care & Performance: 8\n- Unknown: 8\n- ABC s.r.o.: 1\n- exact company name: 1",
+  artifact: null,
+});
+const r10 = extractArtifact(jsonModeNoArtifact);
+check('reply is the text field verbatim', r10.reply.includes('You have 18 invoices in total'));
+check('reply preserves bullets', r10.reply.includes('- Elite Auto Care & Performance: 8'));
+check('no artifact', r10.artifact === undefined);
+check('reply has no JSON braces', !r10.reply.includes('{') && !r10.reply.includes('}'));
+check('reply has no "text" key', !r10.reply.includes('"text"'));
+console.log(`  → Final reply:\n${r10.reply.split('\n').map(l => '    ' + l).join('\n')}`);
+
+// Case 11: JSON-mode structured response WITH artifact
+console.log('\nTest 11: JSON-mode structured response (with table artifact)');
+const jsonModeWithArtifact = JSON.stringify({
+  text: "Here are the duplicate invoices I found. Acme Corp has 3 copies of INV-100 all dated 2026-07-02.",
+  artifact: {
+    type: "table",
+    title: "Duplicate Invoices",
+    data: {
+      columns: ["Vendor", "Invoice #", "Date", "Amount", "Count", "IDs"],
+      rows: [
+        { Vendor: "Acme Corp", "Invoice #": "INV-100", Date: "2026-07-02", Amount: "$1,234.56", Count: "3", IDs: "abc, def, ghi" },
+      ],
+    },
+  },
+});
+const r11 = extractArtifact(jsonModeWithArtifact);
+check('reply is the prose text', r11.reply.includes('Here are the duplicate invoices'));
+check('reply has no leaked JSON', !r11.reply.includes('"type":"table"') && !r11.reply.includes('"type": "table"'));
+check('reply has no artifact markers', !r11.reply.includes('<<<ARTIFACT>>>'));
+check('artifact was extracted', r11.artifact !== undefined);
+check('artifact is a table', r11.artifact?.type === 'table');
+check('artifact has correct title', r11.artifact?.title === 'Duplicate Invoices');
+check('artifact has 1 row', (r11.artifact?.data.rows as unknown[])?.length === 1);
+console.log(`  → Final reply:\n${r11.reply.split('\n').map(l => '    ' + l).join('\n')}`);
+
+// Case 12: JSON-mode response wrapped in markdown fence (some models do this despite instructions)
+console.log('\nTest 12: JSON-mode response wrapped in ```json fence (defensive)');
+const jsonModeFenced = '```json\n' + JSON.stringify({
+  text: "You have 18 invoices in total.",
+  artifact: null,
+}, null, 2) + '\n```';
+const r12 = extractArtifact(jsonModeFenced);
+check('reply extracts text despite fence wrapper', r12.reply === 'You have 18 invoices in total.');
+check('reply has no fence markers', !r12.reply.includes('```'));
+check('no artifact', r12.artifact === undefined);
+console.log(`  → Final reply: "${r12.reply}"`);
+
+// Case 13: JSON-mode response with summary artifact
+console.log('\nTest 13: JSON-mode response with summary artifact');
+const jsonModeSummary = JSON.stringify({
+  text: "Your invoice portfolio contains 18 invoices totaling $67,723. Average confidence is 80%.",
+  artifact: {
+    type: "summary",
+    title: "Invoice Summary",
+    data: {
+      metrics: [
+        { label: "Total Amount", value: "$67,723", description: "Sum of all invoices" },
+        { label: "Total Invoices", value: "18", description: "Number of invoices processed" },
+      ],
+    },
+  },
+});
+const r13 = extractArtifact(jsonModeSummary);
+check('reply is the prose summary', r13.reply.includes('18 invoices totaling $67,723'));
+check('artifact is summary', r13.artifact?.type === 'summary');
+check('artifact has 2 metrics', (r13.artifact?.data.metrics as unknown[])?.length === 2);
+console.log(`  → Final reply: "${r13.reply}"`);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail > 0 ? 1 : 0);

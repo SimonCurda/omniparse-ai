@@ -33,9 +33,17 @@ function detectPromptInjection(message: string): boolean {
   return INJECTION_PATTERNS.some((pattern) => pattern.test(message));
 }
 
-// ─── System Prompt (purely positive framing) ────────────────────────────────
-// KEY: No negative language ("only", "must not", "refuse", "cannot").
-// Small models obey positive instructions far better than restrictions.
+// ─── System Prompt (structured JSON output mode) ─────────────────────────────
+// The chat route calls Groq with `response_format: { type: "json_object" }` for
+// models that support it (llama-3.1, llama-3.3, llama-4-scout). JSON mode forces
+// the model to output valid JSON only — it cannot leak "Thinking Process:" or
+// "Output:" or any other free-text thinking. The model MUST respond as:
+//   { "text": "<prose answer>", "artifact": <optional artifact object or null> }
+//
+// For models that DON'T support JSON mode (qwen3.6-27b), we send the same
+// prompt but without response_format, and the regex cleanup layer below
+// (stripThinkingLines / cleanReplyText / findLastAnswerPrefixIndex) handles
+// any thinking leak as a fallback.
 
 const SYSTEM_PROMPT = `You are OmniParse Invoice Assistant. You answer questions about the user's invoice data and generate tables, charts, and summaries when asked.
 
@@ -46,43 +54,73 @@ You help with:
 - Identifying and grouping duplicate invoices
 - Any question that references the user's invoices, vendors, amounts, or data
 
-When the user asks for a table, chart, or summary, generate an artifact:
+═══ OUTPUT FORMAT — STRICT ═══
+You MUST respond as a single JSON object with this exact schema:
+{
+  "text": "<your prose answer to the user, in markdown. Use **bold** for key numbers, bullet lists for breakdowns. 2-4 sentences for simple questions.>",
+  "artifact": <artifact object OR null>
+}
 
-<<<ARTIFACT>>>  {json}  <<<END_ARTIFACT>>>
+The "artifact" field:
+- Set to null if the user didn't ask for a table/chart/summary.
+- Set to a valid artifact object if the user asked for one.
 
-Artifact types:
-- { "type": "table", "title": "...", "data": { "columns": [...], "rows": [{...}] } }
-- { "type": "chart-bar", "title": "...", "data": { "data": [{...}], "xKey": "...", "yKeys": [...], "colors": [...] } }
-- { "type": "chart-line", "title": "...", "data": { "data": [{...}], "xKey": "...", "yKeys": [...], "colors": [...] } }
-- { "type": "chart-pie", "title": "...", "data": { "data": [{...}], "nameKey": "...", "valueKey": "...", "colors": [...] } }
-- { "type": "summary", "title": "...", "data": { "metrics": [{"label":"...","value":"...","description":"..."}] } }
+Artifact object schema (pick ONE type):
+  { "type": "table", "title": "...", "data": { "columns": [...], "rows": [{...}] } }
+  { "type": "chart-bar", "title": "...", "data": { "data": [{...}], "xKey": "...", "yKeys": [...], "colors": [...] } }
+  { "type": "chart-line", "title": "...", "data": { "data": [{...}], "xKey": "...", "yKeys": [...], "colors": [...] } }
+  { "type": "chart-pie", "title": "...", "data": { "data": [{...}], "nameKey": "...", "valueKey": "...", "colors": [...] } }
+  { "type": "summary", "title": "...", "data": { "metrics": [{"label":"...","value":"...","description":"..."}] } }
 
-When asked about duplicates:
-- Group invoices that share the same vendor + invoice number + date
-- List each group with all matching invoice IDs and amounts
-- Note any amount discrepancies within a group (likely parsing errors)
-- Generate a table artifact with columns: Vendor, Invoice #, Date, Amount, Count, IDs
+═══ EXAMPLES ═══
 
-Style:
-- **Bold** key numbers, use bullet lists for breakdowns
-- Short answers: 2-4 sentences for simple questions, bullet list for summaries
-- Give the answer directly — skip "Here is" or "Sure"
-- Use exact amounts from the data, round to 2 decimal places
+User: "How many invoices do I have?"
+Response:
+{
+  "text": "You have 18 invoices in total.",
+  "artifact": null
+}
 
-OUTPUT FORMAT — CRITICAL:
-- Start with the answer immediately. Never write your reasoning, planning, or thinking process.
-- Do NOT write things like "The user wants...", "I need to look at...", "Let me check...", "I should generate...", "Let's prepare the artifact.", "Wait, the prompt says...".
-- Do NOT write structured planning labels like "Plan:", "Draft:", "Refining:", "Final check:", "Output:", "Thinking Process:", "Analyze the Request:", "Analyze the Data:", "Text Construction:", "Final Polish:", "Artifact Construction:", "Self-Correction:", "Draft the Artifact:", "Refine Text:".
-- If generating an artifact, output ONLY the artifact block (with <<<ARTIFACT>>> markers) and an optional one-sentence intro. Nothing else.
+User: "Show duplicate invoices"
+Response:
+{
+  "text": "Here are the duplicate invoices I found. Acme Corp has 3 copies of INV-100 all dated 2026-07-02 with the same amount.",
+  "artifact": {
+    "type": "table",
+    "title": "Duplicate Invoices",
+    "data": {
+      "columns": ["Vendor", "Invoice #", "Date", "Amount", "Count", "IDs"],
+      "rows": [
+        { "Vendor": "Acme Corp", "Invoice #": "INV-100", "Date": "2026-07-02", "Amount": "$1,234.56", "Count": "3", "IDs": "abc, def, ghi" }
+      ]
+    }
+  }
+}
 
-GOOD example:
-  Here are the duplicates:
-  <<<ARTIFACT>>>{"type":"table","title":"Duplicate Invoices","data":{"columns":["Vendor","Invoice #","Date","Amount","Count","IDs"],"rows":[{"Vendor":"Acme Corp","Invoice #":"INV-100","Date":"2026-07-02","Amount":"$1,234.56","Count":"3","IDs":"abc, def, ghi"}]}}<<<END_ARTIFACT>>>
+User: "Give me a summary"
+Response:
+{
+  "text": "Your invoice portfolio contains 18 invoices totaling $67,723. Average confidence is 80%.",
+  "artifact": {
+    "type": "summary",
+    "title": "Invoice Summary",
+    "data": {
+      "metrics": [
+        { "label": "Total Amount", "value": "$67,723", "description": "Sum of all invoices" },
+        { "label": "Total Invoices", "value": "18", "description": "Number of invoices processed" }
+      ]
+    }
+  }
+}
 
-BAD example (NEVER do this):
-  Thinking Process: The user wants to see duplicates. Analyze the Data: ... Draft the Artifact: ... Text Construction: ... Final Polish: ...
-
-If you cannot answer, say so briefly. Never narrate your thought process. Never use labels like "Output:", "Answer:", "Text Construction:", or "Final Polish:" — just write the answer directly.`;
+═══ RULES ═══
+- Output ONLY the JSON object. No prose before or after it. No markdown fences.
+- The "text" field contains your prose answer. Never put thinking, planning, or reasoning in it.
+- The "artifact" field is null unless the user explicitly asked for a table/chart/summary.
+- Use exact amounts from the data, round to 2 decimal places.
+- **Bold** key numbers in the text field using markdown.
+- When asked about duplicates: group by vendor + invoice number + date, note amount discrepancies.
+- Never narrate your thought process. The JSON structure enforces this — just fill in "text" and "artifact".`;
 
 function buildInvoiceContext(invoices: Array<Record<string, unknown>>): string {
   if (invoices.length === 0) return 'No invoices have been parsed yet. Upload documents to get started.';
@@ -144,10 +182,10 @@ Summary:
   - Duplicates detected: ${duplicateCount}
 
 By Vendor:
- ${vendorSummary}
- ${duplicateSection}
+${vendorSummary}
+${duplicateSection}
 All Invoices:
- ${invoiceList}`;
+${invoiceList}`;
 }
 
 /**
@@ -347,7 +385,7 @@ function stripThinkingLines(reply: string): string {
       continue;
     }
 
-    // Strip "Output: " / "Answer: " / "Final answer: " / "Text Construction: " prefixes but KEEP the
+    // Strip "Output: " / "Answer: " / "Final answer: " prefixes but KEEP the
     // answer text that follows. Reasoning models (llama-3.3, etc.) often label
     // the final answer line as "Output: <actual answer>".
     const prefixMatch = line.match(ANSWER_PREFIX_PATTERN);
@@ -403,6 +441,42 @@ function stripThinkingLines(reply: string): string {
 }
 
 function extractArtifact(text: string): { reply: string; artifact: Artifact | undefined } {
+  // ─── PRIMARY PATH: JSON-mode structured response ──────────────────────────
+  // When the chat model supports JSON mode (llama-3.1, llama-3.3, llama-4-scout),
+  // the response will be a single JSON object: { "text": "...", "artifact": {...}|null }
+  // Try parsing that first — it's the clean path with no thinking leak.
+  try {
+    const trimmed = text.trim();
+    // JSON mode responses may sometimes be wrapped in markdown fences by some
+    // models despite the instruction not to. Strip a single surrounding fence
+    // before parsing.
+    const fenceMatch = trimmed.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/);
+    const jsonStr = fenceMatch ? fenceMatch[1].trim() : trimmed;
+    const parsed = JSON.parse(jsonStr) as { text?: unknown; artifact?: unknown };
+
+    if (parsed && typeof parsed === 'object' && 'text' in parsed) {
+      const text_field = typeof parsed.text === 'string' ? parsed.text : '';
+      const artifact_field = parsed.artifact;
+
+      // Validate the artifact field
+      let artifact: Artifact | undefined;
+      if (artifact_field && typeof artifact_field === 'object' && artifact_field !== null) {
+        const a = artifact_field as Record<string, unknown>;
+        if (a.type && a.data && typeof a.type === 'string' && typeof a.data === 'object') {
+          artifact = a as unknown as Artifact;
+        }
+      }
+
+      const reply = text_field.trim() || (artifact ? 'Here you go.' : 'I had trouble generating a clean response — please try again.');
+      return { reply, artifact };
+    }
+  } catch {
+    // Not valid JSON — fall through to the legacy regex cleanup path below.
+    // This happens for models that don't support JSON mode (qwen3.6-27b) or
+    // when the model wrapped its output in some unexpected way.
+  }
+
+  // ─── FALLBACK PATH: legacy regex cleanup (for qwen + free-text models) ────
   let artifact: Artifact | undefined;
 
   // Strategy 1: Proper markers <<<ARTIFACT>>>...<<<END_ARTIFACT>>>
@@ -459,9 +533,6 @@ function extractArtifact(text: string): { reply: string; artifact: Artifact | un
     const typeIdx = text.search(/\{\s*"type"\s*:\s*"(chart-bar|chart-line|chart-pie|table|summary)"/);
     if (typeIdx >= 0) {
       const candidate = text.slice(typeIdx);
-      // Greedy: take everything from the opening `{` to the last `}` in the
-      // response. JSON.parse will reject if the candidate isn't balanced, so
-      // we try progressively shorter slices (last 1, 2, 3... `}` chars).
       const lastBraceIdx = candidate.lastIndexOf('}');
       if (lastBraceIdx > 0) {
         for (let end = lastBraceIdx; end > 0; end = candidate.lastIndexOf('}', end - 1)) {
@@ -478,38 +549,21 @@ function extractArtifact(text: string): { reply: string; artifact: Artifact | un
     }
   }
 
-  // Always clean the reply — even when artifact was found, there may be leftover
-  // JSON/markers in the text that we don't want showing in the chat
+  // Clean the reply — strip thinking patterns (only used for non-JSON-mode models)
   let reply = cleanReplyText(text);
 
-  // ─── Find the LAST answer-prefix and keep only content from there onward ──
-  // Reasoning models (llama-3.3, qwen) sometimes output a long thinking preamble
-  // followed by "Output: <actual answer>" or "Text Construction: <answer>".
-  // If we find such a prefix, we drop everything before it — the preamble is
-  // thinking, the answer is what follows. We use the LAST occurrence in case
-  // the model mentions "output" mid-thinking.
   const lastAnswerIdx = findLastAnswerPrefixIndex(reply);
   if (lastAnswerIdx >= 0) {
     reply = reply.slice(lastAnswerIdx).replace(ANSWER_PREFIX_PATTERN, '').trim();
   } else {
-    // No answer-prefix found. Check if the model went into explicit "Thinking
-    // Process:" mode. If so, it means the model didn't deliver a clean answer —
-    // either it ran out of tokens, or it wrote a structured analysis without
-    // a final answer section. In either case, the text BEFORE the thinking
-    // header is the only "real" content (usually empty). Strip everything else
-    // so the fallback message can kick in (or the artifact renders alone).
     const thinkingHeaderIdx = findThinkingProcessHeader(reply);
     if (thinkingHeaderIdx >= 0) {
-      // Keep only text BEFORE the thinking header (usually empty or a brief intro)
       reply = reply.slice(0, thinkingHeaderIdx).trim();
     }
   }
 
-  // Strip AI "thinking out loud" lines from the entire reply (aggressive)
   reply = stripThinkingLines(reply);
 
-  // If after cleaning the reply is empty (the model emitted 100% thinking),
-  // fall back to a brief acknowledgment so the UI doesn't show a blank bubble.
   if (!reply) {
     reply = artifact
       ? 'Here you go.'
@@ -524,7 +578,7 @@ function extractArtifact(text: string): { reply: string; artifact: Artifact | un
  * Returns -1 if no answer-prefix is found.
  *
  * An answer-prefix is a line that starts with: "Output:", "Answer:", "Response:",
- * "Final answer:", "Result:", "Conclusion:", "Text Construction:", etc. followed by content.
+ * "Final answer:", "Result:", "Conclusion:", etc. followed by content.
  *
  * We return the index of the start of the line (after any leading whitespace),
  * so the caller can slice from there and strip the prefix.

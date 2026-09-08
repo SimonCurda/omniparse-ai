@@ -124,10 +124,16 @@ export async function geminiChatCall(
   ];
 
   const modelConfigs = [
-    { model: CHAT_MODEL, maxTokens: MAX_TOKENS_HIGH },            // llama-3.1-8b-instant: 30k OTPM → 4096 output tokens
-    { model: CHAT_MODEL_FALLBACK_1, maxTokens: MAX_TOKENS_HIGH }, // llama-4-scout: 6k OTPM → 4096 output tokens
-    { model: CHAT_MODEL_FALLBACK_2, maxTokens: MAX_TOKENS_HIGH }, // llama-3.3-70b-versatile: high quality, no thinking leak
-    { model: CHAT_MODEL_FALLBACK_3, maxTokens: MAX_TOKENS_LOW }, // qwen3.6-27b: reasoning model — last resort, cleanup handles thinking
+    // `supportsJsonMode` controls whether we set `response_format: { type: "json_object" }`
+    // in the request body. JSON mode forces the model to output valid JSON only,
+    // eliminating the "Thinking Process:" / "Output:" / "Draft:" leak class entirely.
+    // JSON mode is supported by all current llama-3.x and llama-4 models on Groq;
+    // qwen3.6-27b is uncertain and falls back to free-text mode (with the existing
+    // regex cleanup layer in chat/route.ts handling any thinking leak).
+    { model: CHAT_MODEL, maxTokens: MAX_TOKENS_HIGH, supportsJsonMode: true },            // llama-3.1-8b-instant
+    { model: CHAT_MODEL_FALLBACK_1, maxTokens: MAX_TOKENS_HIGH, supportsJsonMode: true }, // llama-4-scout-17b-16e-instruct
+    { model: CHAT_MODEL_FALLBACK_2, maxTokens: MAX_TOKENS_HIGH, supportsJsonMode: true }, // llama-3.3-70b-versatile
+    { model: CHAT_MODEL_FALLBACK_3, maxTokens: MAX_TOKENS_LOW, supportsJsonMode: false }, // qwen3.6-27b (uncertain — fall back to free text)
   ];
 
   const triedModels: string[] = [];
@@ -142,7 +148,7 @@ export async function geminiChatCall(
       await sleep(CASCADE_RETRY_DELAY_MS);
     }
 
-    for (const { model, maxTokens } of modelConfigs) {
+    for (const { model, maxTokens, supportsJsonMode } of modelConfigs) {
       for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
         try {
           if (attempt > 0) {
@@ -151,18 +157,27 @@ export async function geminiChatCall(
             await sleep(delay);
           }
 
+          // Build the request body. For JSON-mode-capable models, set response_format
+          // so the API forces valid JSON output (eliminates thinking leak at the API level).
+          // For non-JSON-mode models (qwen), send a plain text request and rely on the
+          // regex cleanup layer in chat/route.ts to handle any thinking leak.
+          const requestBody: Record<string, unknown> = {
+            model,
+            messages: openaiMessages,
+            max_tokens: maxTokens,
+            temperature: 0.7,
+          };
+          if (supportsJsonMode) {
+            requestBody.response_format = { type: 'json_object' };
+          }
+
           const res = await fetch(GROQ_API_URL, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${apiKey}`,
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-              model,
-              messages: openaiMessages,
-              max_tokens: maxTokens,
-              temperature: 0.7,
-            }),
+            body: JSON.stringify(requestBody),
           });
 
           if (res.status === 404 || res.status === 422) {
