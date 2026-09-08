@@ -161,10 +161,25 @@ export function ChatTab() {
   const [input, setInput] = useState('');
   const [error, setError] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current?.scrollHeight, behavior: 'smooth' });
   }, [chatHistory]);
+
+  // Focus the input when the chat tab first mounts
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  // Re-focus the input when the AI finishes loading its response — this catches
+  // cases where focus was lost during loading (e.g. user clicked elsewhere).
+  useEffect(() => {
+    if (!chatLoading) {
+      const t = setTimeout(() => inputRef.current?.focus(), 0);
+      return () => clearTimeout(t);
+    }
+  }, [chatLoading]);
 
   const sendMessage = async () => {
     if (!input.trim() || chatLoading) return;
@@ -212,6 +227,10 @@ export function ChatTab() {
       addChatMessage({ role: 'assistant', content: 'Network error. Please check your connection and try again.' });
     } finally {
       setChatLoading(false);
+      // Re-focus the input immediately after sending so the user can type
+      // the next message without clicking the input bar again.
+      // setTimeout(0) ensures we focus AFTER React re-renders with chatLoading=false.
+      setTimeout(() => inputRef.current?.focus(), 0);
     }
   };
 
@@ -303,7 +322,7 @@ export function ChatTab() {
 
         <div className="border-t p-4">
           <form onSubmit={(e) => { e.preventDefault(); sendMessage(); }} className="flex gap-2">
-            <Input placeholder="Ask about your invoices..." value={input} onChange={(e) => setInput(e.target.value)} disabled={chatLoading} className="flex-1" />
+            <Input ref={inputRef} placeholder="Ask about your invoices..." value={input} onChange={(e) => setInput(e.target.value)} disabled={chatLoading} className="flex-1" />
             <Button type="submit" size="icon" disabled={!input.trim() || chatLoading}>
               <Send className="h-4 w-4" />
             </Button>
