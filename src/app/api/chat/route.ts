@@ -5,6 +5,7 @@ import { chatSchema, getClientIp } from '@/lib/validation';
 import { rateLimit } from '@/lib/rate-limit';
 import type { Artifact } from '@/stores/app-store';
 import { geminiChatCall } from '@/lib/gemini';
+import { openRouterChatCall, isOpenRouterConfigured } from '@/lib/openrouter';
 
 // ─── Prompt Injection Detection ─────────────────────────────────────────────
 // Only catches clear, unambiguous attacks on the system prompt.
@@ -786,7 +787,44 @@ export async function POST(req: NextRequest) {
       { role: 'user', content: message },
     ];
 
-    const responseText = await geminiChatCall(systemMessage, messages);
+    // ─── Call AI: Groq first, OpenRouter as fallback ─────────────────────────
+    // Try Groq's 4-model cascade (llama-3.1, llama-4-scout, llama-3.3-70b, qwen).
+    // If ALL of Groq is rate-limited, try OpenRouter's fallbacks (Ling 3.0 Flash Fin,
+    // Nemotron). OpenRouter is a separate quota pool, so this recovers from Groq
+    // daily-quota exhaustion. If OpenRouter is not configured (no API key), we skip
+    // it and let the error surface as before.
+    let responseText: string;
+    try {
+      responseText = await geminiChatCall(systemMessage, messages);
+    } catch (groqErr) {
+      const groqMsg = groqErr instanceof Error ? groqErr.message : String(groqErr);
+      // Only fall through to OpenRouter if Groq is genuinely rate-limited or all
+      // models failed. Other errors (auth, network) should surface immediately.
+      const isGroqExhausted = groqMsg.includes('temporarily busy')
+        || groqMsg.includes('429')
+        || groqMsg.includes('rate_limit')
+        || groqMsg.includes('all models');
+
+      if (!isGroqExhausted || !isOpenRouterConfigured()) {
+        throw groqErr;
+      }
+
+      // Groq exhausted — try OpenRouter
+      console.warn('[chat] Groq exhausted, falling back to OpenRouter...', groqMsg);
+      try {
+        responseText = await openRouterChatCall(
+          systemMessage,
+          messages as Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
+        );
+      } catch (openRouterErr) {
+        const orMsg = openRouterErr instanceof Error ? openRouterErr.message : String(openRouterErr);
+        // Both providers failed. Throw a combined error that includes both provider
+        // names so the user knows the situation is "everyone is busy", not just Groq.
+        throw new Error(
+          `AI is temporarily busy across all providers. (Groq: ${groqMsg}. OpenRouter: ${orMsg})`,
+        );
+      }
+    }
 
     if (!responseText) {
       return NextResponse.json({ error: 'AI returned an empty response. Please try again.' }, { status: 500 });

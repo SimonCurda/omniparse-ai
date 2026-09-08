@@ -1,0 +1,146 @@
+// ============================================================================
+// OpenRouter API helper — Server-only module
+// Uses OpenRouter's OpenAI-compatible API as a fallback when Groq is
+// rate-limited. OpenRouter provides a separate quota pool, diversifying
+// our AI supply so the chat keeps working even when Groq's daily quota
+// is exhausted.
+//
+// OpenRouter supports a `fallbacks` array — we send ONE API call with a
+// primary model and a list of fallbacks, and OpenRouter routes internally
+// to whichever model is available. This is more efficient than us calling
+// each model separately (1 API call vs N API calls).
+// ============================================================================
+
+const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
+
+// Model cascade on OpenRouter (tried in order via `fallbacks` array):
+//   1. inclusionai/ling-3.0-flash-fin:free — finance-focused MoE model,
+//      124B total / 5.1B active. Should be excellent for invoice analysis.
+//   2. nvidia/llama-3.1-nemotron-70b-instruct:free — NVIDIA's instruction-tuned
+//      Llama 3.1, reliable for chat and structured output.
+//
+// Both are free on OpenRouter. If Ling fails (rate-limited or down),
+// OpenRouter automatically tries Nemotron. If both fail, OpenRouter returns
+// an error and the chat route shows the "AI is temporarily busy" message.
+const OPENROUTER_PRIMARY_MODEL = 'inclusionai/ling-3.0-flash-fin:free';
+const OPENROUTER_FALLBACK_MODELS = [
+  'nvidia/llama-3.1-nemotron-70b-instruct:free',
+];
+
+const MAX_TOKENS = 4096;       // enough for chat + medium-sized artifacts
+const TEMPERATURE = 0.7;       // matches Groq chat temperature
+
+function getApiKey(): string {
+  const key = process.env.OPENROUTER_API_KEY;
+  if (!key) {
+    throw new Error('OPENROUTER_API_KEY is not configured. Add it to your Vercel environment variables.');
+  }
+  return key;
+}
+
+export interface OpenRouterMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
+
+/**
+ * Call OpenRouter with text-only chat, using JSON mode + automatic fallbacks.
+ *
+ * If OPENROUTER_API_KEY is not set, this throws immediately so the caller can
+ * show a graceful error rather than making a doomed API call.
+ *
+ * @returns The model's response text (JSON-mode structured response as a string)
+ */
+export async function openRouterChatCall(
+  systemPrompt: string,
+  messages: OpenRouterMessage[],
+): Promise<string> {
+  const apiKey = getApiKey();
+
+  const openaiMessages: Array<{ role: string; content: string }> = [
+    { role: 'system', content: systemPrompt },
+    ...messages.map((m) => ({ role: m.role, content: m.content })),
+  ];
+
+  const requestBody: Record<string, unknown> = {
+    model: OPENROUTER_PRIMARY_MODEL,
+    fallbacks: OPENROUTER_FALLBACK_MODELS,
+    messages: openaiMessages,
+    max_tokens: MAX_TOKENS,
+    temperature: TEMPERATURE,
+    response_format: { type: 'json_object' },
+  };
+
+  // OpenRouter requires HTTP-Referer and X-Title headers for analytics/attribution
+  // (optional but recommended). We use the Vercel URL if available, fall back to
+  // a generic string otherwise.
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://omniparse-ai.vercel.app';
+
+  const res = await fetch(OPENROUTER_API_URL, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': appUrl,
+      'X-Title': 'OmniParse AI',
+    },
+    body: JSON.stringify(requestBody),
+  });
+
+  if (res.status === 401 || res.status === 403) {
+    const errText = await res.text();
+    throw new Error(`OpenRouter auth error (${res.status}): ${errText}`);
+  }
+
+  if (res.status === 422) {
+    // OpenRouter returned 422 — likely JSON mode not supported by the chosen model(s).
+    // Retry WITHOUT response_format. Free-text mode + regex cleanup in chat/route.ts
+    // will handle any thinking leak.
+    console.warn('[openrouter] JSON mode rejected (422). Retrying WITHOUT response_format...');
+    const fallbackBody: Record<string, unknown> = {
+      model: OPENROUTER_PRIMARY_MODEL,
+      fallbacks: OPENROUTER_FALLBACK_MODELS,
+      messages: openaiMessages,
+      max_tokens: MAX_TOKENS,
+      temperature: TEMPERATURE,
+      // No response_format — free-text mode
+    };
+    const fallbackRes = await fetch(OPENROUTER_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': appUrl,
+        'X-Title': 'OmniParse AI',
+      },
+      body: JSON.stringify(fallbackBody),
+    });
+    if (!fallbackRes.ok) {
+      const errText = await fallbackRes.text();
+      throw new Error(`OpenRouter API error after JSON-mode fallback (${fallbackRes.status}): ${errText}`);
+    }
+    const fallbackData = await fallbackRes.json();
+    return fallbackData.choices?.[0]?.message?.content || '';
+  }
+
+  if (res.status === 429) {
+    const errText = await res.text();
+    throw new Error(`OpenRouter rate limited (429): ${errText}`);
+  }
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`OpenRouter API error (${res.status}): ${errText}`);
+  }
+
+  const data = await res.json();
+  return data.choices?.[0]?.message?.content || '';
+}
+
+/**
+ * Quick check whether OpenRouter is configured (API key present).
+ * Used by the chat route to decide whether to call OpenRouter at all.
+ */
+export function isOpenRouterConfigured(): boolean {
+  return !!process.env.OPENROUTER_API_KEY;
+}
