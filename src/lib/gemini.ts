@@ -127,13 +127,14 @@ export async function geminiChatCall(
     // `supportsJsonMode` controls whether we set `response_format: { type: "json_object" }`
     // in the request body. JSON mode forces the model to output valid JSON only,
     // eliminating the "Thinking Process:" / "Output:" / "Draft:" leak class entirely.
-    // JSON mode is supported by all current llama-3.x and llama-4 models on Groq;
-    // qwen3.6-27b is uncertain and falls back to free-text mode (with the existing
-    // regex cleanup layer in chat/route.ts handling any thinking leak).
+    // All 4 chat models now try JSON mode first. If a model returns 422 (JSON mode
+    // not supported for that model), the request is automatically retried WITHOUT
+    // response_format — the model falls back to free-text mode and the regex cleanup
+    // layer in chat/route.ts handles any thinking leak.
     { model: CHAT_MODEL, maxTokens: MAX_TOKENS_HIGH, supportsJsonMode: true },            // llama-3.1-8b-instant
     { model: CHAT_MODEL_FALLBACK_1, maxTokens: MAX_TOKENS_HIGH, supportsJsonMode: true }, // llama-4-scout-17b-16e-instruct
     { model: CHAT_MODEL_FALLBACK_2, maxTokens: MAX_TOKENS_HIGH, supportsJsonMode: true }, // llama-3.3-70b-versatile
-    { model: CHAT_MODEL_FALLBACK_3, maxTokens: MAX_TOKENS_LOW, supportsJsonMode: false }, // qwen3.6-27b (uncertain — fall back to free text)
+    { model: CHAT_MODEL_FALLBACK_3, maxTokens: MAX_TOKENS_LOW, supportsJsonMode: true }, // qwen3.6-27b — try JSON mode, 422 fallback handles unsupported
   ];
 
   const triedModels: string[] = [];
@@ -161,13 +162,16 @@ export async function geminiChatCall(
           // so the API forces valid JSON output (eliminates thinking leak at the API level).
           // For non-JSON-mode models (qwen), send a plain text request and rely on the
           // regex cleanup layer in chat/route.ts to handle any thinking leak.
+          // `jsonModeEnabled` is true by default if supportsJsonMode is true, but can be
+          // flipped to false by the 422 handler below for a single retry without JSON mode.
+          let jsonModeEnabled = supportsJsonMode;
           const requestBody: Record<string, unknown> = {
             model,
             messages: openaiMessages,
             max_tokens: maxTokens,
             temperature: 0.7,
           };
-          if (supportsJsonMode) {
+          if (jsonModeEnabled) {
             requestBody.response_format = { type: 'json_object' };
           }
 
@@ -180,11 +184,52 @@ export async function geminiChatCall(
             body: JSON.stringify(requestBody),
           });
 
-          if (res.status === 404 || res.status === 422) {
+          if (res.status === 404) {
             const errText = await res.text();
-            console.warn(`[gemini] Model ${model} unavailable (${res.status}), trying next...`);
+            console.warn(`[gemini] Model ${model} unavailable (404), trying next...`);
             triedModels.push(model);
-            break; // break retry loop, try next model
+            break; // model doesn't exist, try next model
+          }
+
+          // 422 = Unprocessable Entity. Often means the model doesn't support
+          // `response_format: json_object`. Retry the SAME model WITHOUT JSON mode
+          // (one extra attempt) before falling through to the next model.
+          // This handles qwen3.6-27b and any future model with uncertain JSON support.
+          if (res.status === 422 && jsonModeEnabled) {
+            const errText = await res.text();
+            console.warn(`[gemini] Model ${model} rejected JSON mode (422). Retrying WITHOUT response_format...`);
+            jsonModeEnabled = false;
+            const fallbackBody: Record<string, unknown> = {
+              model,
+              messages: openaiMessages,
+              max_tokens: maxTokens,
+              temperature: 0.7,
+              // No response_format — free-text mode
+            };
+            const fallbackRes = await fetch(GROQ_API_URL, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(fallbackBody),
+            });
+            if (fallbackRes.ok) {
+              const fallbackData = await fallbackRes.json();
+              const fallbackContent = fallbackData.choices?.[0]?.message?.content || '';
+              if (fallbackContent) return fallbackContent;
+            }
+            // If fallback also failed, fall through to next model
+            triedModels.push(model);
+            break;
+          }
+
+          // 422 for non-JSON-mode reasons (other validation errors) — try next model
+          if (res.status === 422) {
+            const errText = await res.text();
+            console.warn(`[gemini] Model ${model} rejected request (422), trying next...`, errText);
+            triedModels.push(model);
+            break;
           }
 
           if (res.status === 429) {
