@@ -72,6 +72,7 @@ Style:
 OUTPUT FORMAT — CRITICAL:
 - Start with the answer immediately. Never write your reasoning, planning, or thinking process.
 - Do NOT write things like "The user wants...", "I need to look at...", "Let me check...", "I should generate...", "Let's prepare the artifact.", "Wait, the prompt says...".
+- Do NOT write "Plan:", "Draft:", "Refining:", "Final check:", "Output:" labels.
 - If generating an artifact, output ONLY the artifact block (with <<<ARTIFACT>>> markers) and an optional one-sentence intro. Nothing else.
 
 GOOD example:
@@ -81,7 +82,7 @@ GOOD example:
 BAD example (NEVER do this):
   The user wants to see duplicates. I need to look at the duplicate groups. There is one group: Acme Corp. Let me prepare the artifact. { "type": "table", ...
 
-If you cannot answer, say so briefly. Never narrate your thought process.`;
+If you cannot answer, say so briefly. Never narrate your thought process. Never use labels like "Output:" or "Answer:" — just write the answer.`;
 
 function buildInvoiceContext(invoices: Array<Record<string, unknown>>): string {
   if (invoices.length === 0) return 'No invoices have been parsed yet. Upload documents to get started.';
@@ -194,15 +195,8 @@ function cleanReplyText(reply: string): string {
 }
 
 // ─── Strip AI "thinking out loud" ──────────────────────────────────────────
-// Small models sometimes leak their reasoning/thinking into the response:
-// "The user wants to see duplicates. I need to look at... Let's prepare the artifact."
-// This function aggressively strips ALL lines that match thinking patterns,
-// not just leading paragraphs (which is what the previous version did).
-//
-// Strategy: scan every line; drop any line that matches a thinking-out-loud
-// pattern. Then collapse resulting blank-line gaps. If what's left is mostly
-// empty, the model was 100% thinking — return empty string and let the
-// caller decide what to do (e.g. show a "AI got cut off" fallback).
+// Small models sometimes leak their reasoning/thinking into the response.
+// This function aggressively strips ALL lines that match thinking patterns.
 
 const THINKING_PATTERNS = [
   // First-person reasoning
@@ -234,7 +228,7 @@ const THINKING_PATTERNS = [
   /^\s*according to\s/i,
   /^\s*to answer\s/i,
   /^\s*to (show|find|identify|list|generate|create|provide|format|construct|build|prepare)\s/i,
-  /^\s*the (data|context|information|prompt|instructions?|response|answer)\s+(shows?|says?|provides?|contains?|indicates?|tells|asks?|wants?)\s/i,
+  /^\s*the (data|context|information|prompt|instructions?|response|answer|summary|text)\s+(shows?|says?|provides?|contains?|indicates?|tells|asks?|wants?|states?)\b/i,
   /^\s*from the\s/i,
   /^\s*in the\s+(data|list|provided|invoice|context|prompt)\s/i,
   /^\s*there (is|are)\s/i,
@@ -247,15 +241,42 @@ const THINKING_PATTERNS = [
   /^\s*prepare\s+the\s+artifact/i,
   /^\s*construct\s+the\s+/i,
   /^\s*format\s+the\s+(table|chart|artifact)/i,
+  // Structured planning patterns (llama-3.3-style explicit planning)
+  /^\s*plan\s*[:.]\s*$/i,                      // "Plan:" alone on a line
+  /^\s*draft\s*[:.]/i,                          // "Draft:" or "Draft: ..."
+  /^\s*refining\s/i,                            // "Refining based on..."
+  /^\s*refine\s/i,                              // "Refine the..."
+  /^\s*final\s+check\s/i,                       // "Final check of the data:"
+  /^\s*step\s+\d+\s*[:.]/i,                     // "Step 1:", "Step 2:"
+  // Self-instructions (the model telling itself what to do)
+  /^\s*state\s+the\s/i,                         // "State the total number..."
+  /^\s*mention\s/i,                            // "Mention the breakdown..."
+  /^\s*keep\s+it\s+to\s/i,                     // "Keep it to 1-2 sentences"
+  /^\s*no\s+artifact\s+is\s+needed/i,           // "No artifact is needed for..."
+  /^\s*the\s+question\s+is\s/i,                // "The question is simple..."
+  /^\s*correct\s*\.?\s*$/i,                    // "Correct." alone on a line
+  /^\s*the\s+draft\s+(looks?|is|seems)\s/i,     // "The draft looks good"
+];
+
+// Patterns for "answer lead-in" prefixes that the model adds to the actual
+// answer line. We strip the prefix but KEEP the answer text that follows.
+// e.g. "Output: You have 18 invoices" → "You have 18 invoices"
+const ANSWER_PREFIX_PATTERN = /^\s*(output|answer|response|final\s+answer|final\s+response|final\s+output|result|conclusion)\s*[:.]\s*/i;
+
+// Patterns that match ANYWHERE in a line (not just start). Used for cases where
+// the model mixes thinking and content on the same line. If ANY of these match,
+// the whole line is dropped.
+const THINKING_PATTERNS_ANYWHERE = [
+  /no\s+artifact\s+is\s+needed/i,                       // "No artifact is needed for a simple count"
+  /sum\s*[:=]\s*\d+\s*[+\-*/]\s*\d/i,                  // "Sum: 8+1+8+1 = 18" arithmetic verification
+  /\d+\s*[+\-*/]\s*\d+\s*=\s*\d+\s*\.\s*correct/i,      // "8+1+8+1 = 18. Correct."
+  /the\s+draft\s+(looks?|is|seems)\s+(good|fine|acceptable|correct|reasonable)/i,  // "The draft looks good"
+  /no\s+(modifications|changes|edits)\s+(needed|required|necessary)/i,            // "No modifications needed"
 ];
 
 /**
  * Aggressively strip AI "thinking out loud" from the entire reply.
- *
- * Previous version only stripped leading paragraphs. That failed when the
- * entire reply was thinking (which happens with reasoning models like qwen3).
- * This version scans every line and drops any that match a thinking pattern.
- *
+ * Scans every line and drops any that match a thinking pattern.
  * Preserves bullets, bold lines, numbered lines, currency lines, and short
  * lines (which are typically real content like "Yes." or "No duplicates found.").
  */
@@ -280,6 +301,19 @@ function stripThinkingLines(reply: string): string {
       continue;
     }
 
+    // Strip "Output: " / "Answer: " / "Final answer: " prefixes but KEEP the
+    // answer text that follows. Reasoning models (llama-3.3, etc.) often label
+    // the final answer line as "Output: <actual answer>".
+    const prefixMatch = line.match(ANSWER_PREFIX_PATTERN);
+    if (prefixMatch) {
+      const stripped = line.replace(ANSWER_PREFIX_PATTERN, '');
+      // Only keep if there's actual answer text after the prefix
+      if (stripped.trim()) {
+        kept.push(stripped);
+      }
+      continue;
+    }
+
     // Don't strip real content (bullets, bold, numbers, currency, headings, code fences)
     const isContent =
       /^[-*•]\s/.test(trimmed) ||       // bullet list
@@ -296,8 +330,13 @@ function stripThinkingLines(reply: string): string {
       continue;
     }
 
-    // Drop lines that match thinking patterns
+    // Drop lines that match thinking patterns (start-of-line)
     if (THINKING_PATTERNS.some((p) => p.test(trimmed))) {
+      continue;
+    }
+
+    // Drop lines that match thinking patterns (anywhere in line)
+    if (THINKING_PATTERNS_ANYWHERE.some((p) => p.test(trimmed))) {
       continue;
     }
 
@@ -314,6 +353,33 @@ function stripThinkingLines(reply: string): string {
   result = result.replace(/^\n+/, '');
 
   return result.trim();
+}
+
+/**
+ * Find the index of the LAST answer-prefix line in the text.
+ * Returns -1 if no answer-prefix is found.
+ *
+ * An answer-prefix is a line that starts with: "Output:", "Answer:", "Response:",
+ * "Final answer:", "Result:", "Conclusion:", etc. followed by content.
+ *
+ * We return the index of the start of the line (after any leading whitespace),
+ * so the caller can slice from there and strip the prefix.
+ */
+function findLastAnswerPrefixIndex(text: string): number {
+  // Match a line that starts with an answer-prefix keyword, followed by
+  // ":" or ".", followed by at least one non-whitespace character (the actual answer).
+  // Anchored to start of line (^ or after \n).
+  const re = /(?:^|\n)([ \t]*(?:output|answer|response|final\s+answer|final\s+response|final\s+output|result|conclusion)\s*[:.]\s*\S)/gi;
+  let lastIdx = -1;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    // m.index points to either the start of the string OR the \n before the line.
+    const lineStart = m.index + (m[0].startsWith('\n') ? 1 : 0);
+    // Skip leading whitespace within the line
+    const wsMatch = text.slice(lineStart).match(/^[ \t]*/);
+    lastIdx = wsMatch ? lineStart + wsMatch[0].length : lineStart;
+  }
+  return lastIdx;
 }
 
 function extractArtifact(text: string): { reply: string; artifact: Artifact | undefined } {
@@ -373,9 +439,6 @@ function extractArtifact(text: string): { reply: string; artifact: Artifact | un
     const typeIdx = text.search(/\{\s*"type"\s*:\s*"(chart-bar|chart-line|chart-pie|table|summary)"/);
     if (typeIdx >= 0) {
       const candidate = text.slice(typeIdx);
-      // Greedy: take everything from the opening `{` to the last `}` in the
-      // response. JSON.parse will reject if the candidate isn't balanced, so
-      // we try progressively shorter slices (last 1, 2, 3... `}` chars).
       const lastBraceIdx = candidate.lastIndexOf('}');
       if (lastBraceIdx > 0) {
         for (let end = lastBraceIdx; end > 0; end = candidate.lastIndexOf('}', end - 1)) {
@@ -395,6 +458,16 @@ function extractArtifact(text: string): { reply: string; artifact: Artifact | un
   // Always clean the reply — even when artifact was found, there may be leftover
   // JSON/markers in the text that we don't want showing in the chat
   let reply = cleanReplyText(text);
+
+  // ─── Find the LAST answer-prefix and keep only content from there onward ──
+  // Reasoning models (llama-3.3, qwen) sometimes output a long thinking preamble
+  // followed by "Output: <actual answer>". If we find such a prefix, we drop
+  // everything before it — the preamble is thinking, the answer is what follows.
+  // We use the LAST occurrence in case the model mentions "output" mid-thinking.
+  const lastAnswerIdx = findLastAnswerPrefixIndex(reply);
+  if (lastAnswerIdx >= 0) {
+    reply = reply.slice(lastAnswerIdx).replace(ANSWER_PREFIX_PATTERN, '').trim();
+  }
 
   // Strip AI "thinking out loud" lines from the entire reply (aggressive)
   reply = stripThinkingLines(reply);
