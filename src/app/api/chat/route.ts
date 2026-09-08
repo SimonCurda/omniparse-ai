@@ -72,7 +72,7 @@ Style:
 OUTPUT FORMAT — CRITICAL:
 - Start with the answer immediately. Never write your reasoning, planning, or thinking process.
 - Do NOT write things like "The user wants...", "I need to look at...", "Let me check...", "I should generate...", "Let's prepare the artifact.", "Wait, the prompt says...".
-- Do NOT write "Plan:", "Draft:", "Refining:", "Final check:", "Output:" labels.
+- Do NOT write structured planning labels like "Plan:", "Draft:", "Refining:", "Final check:", "Output:", "Thinking Process:", "Analyze the Request:", "Analyze the Data:", "Text Construction:", "Final Polish:", "Artifact Construction:", "Self-Correction:", "Draft the Artifact:", "Refine Text:".
 - If generating an artifact, output ONLY the artifact block (with <<<ARTIFACT>>> markers) and an optional one-sentence intro. Nothing else.
 
 GOOD example:
@@ -80,9 +80,9 @@ GOOD example:
   <<<ARTIFACT>>>{"type":"table","title":"Duplicate Invoices","data":{"columns":["Vendor","Invoice #","Date","Amount","Count","IDs"],"rows":[{"Vendor":"Acme Corp","Invoice #":"INV-100","Date":"2026-07-02","Amount":"$1,234.56","Count":"3","IDs":"abc, def, ghi"}]}}<<<END_ARTIFACT>>>
 
 BAD example (NEVER do this):
-  The user wants to see duplicates. I need to look at the duplicate groups. There is one group: Acme Corp. Let me prepare the artifact. { "type": "table", ...
+  Thinking Process: The user wants to see duplicates. Analyze the Data: ... Draft the Artifact: ... Text Construction: ... Final Polish: ...
 
-If you cannot answer, say so briefly. Never narrate your thought process. Never use labels like "Output:" or "Answer:" — just write the answer.`;
+If you cannot answer, say so briefly. Never narrate your thought process. Never use labels like "Output:", "Answer:", "Text Construction:", or "Final Polish:" — just write the answer directly.`;
 
 function buildInvoiceContext(invoices: Array<Record<string, unknown>>): string {
   if (invoices.length === 0) return 'No invoices have been parsed yet. Upload documents to get started.';
@@ -195,8 +195,15 @@ function cleanReplyText(reply: string): string {
 }
 
 // ─── Strip AI "thinking out loud" ──────────────────────────────────────────
-// Small models sometimes leak their reasoning/thinking into the response.
-// This function aggressively strips ALL lines that match thinking patterns.
+// Small models sometimes leak their reasoning/thinking into the response:
+// "The user wants to see duplicates. I need to look at... Let's prepare the artifact."
+// This function aggressively strips ALL lines that match thinking patterns,
+// not just leading paragraphs (which is what the previous version did).
+//
+// Strategy: scan every line; drop any line that matches a thinking-out-loud
+// pattern. Then collapse resulting blank-line gaps. If what's left is mostly
+// empty, the model was 100% thinking — return empty string and let the
+// caller decide what to do (e.g. show a "AI got cut off" fallback).
 
 const THINKING_PATTERNS = [
   // First-person reasoning
@@ -256,12 +263,47 @@ const THINKING_PATTERNS = [
   /^\s*the\s+question\s+is\s/i,                // "The question is simple..."
   /^\s*correct\s*\.?\s*$/i,                    // "Correct." alone on a line
   /^\s*the\s+draft\s+(looks?|is|seems)\s/i,     // "The draft looks good"
+  // ─── "Thinking Process:" style explicit reasoning headers ──────────────
+  // When the model writes one of these, it has gone into structured-reasoning
+  // mode. The text BEFORE the header is the only "real" content; everything
+  // after is thinking until an answer marker or the artifact.
+  /^\s*thinking\s+process\s*[:.]/i,
+  /^\s*my\s+thinking\s*[:.]/i,
+  /^\s*reasoning\s*[:.]/i,
+  /^\s*chain\s+of\s+thought\s*[:.]/i,
+  /^\s*analysis\s*[:.]\s*$/i,                  // "Analysis:" alone on a line
+  /^\s*my\s+analysis\s*[:.]/i,
+  // ─── Structured analysis section headers (qwen/llama-3.3 planning style) ─
+  /^\s*analyze\s+the\s+request\s*[:.]/i,       // "Analyze the Request:"
+  /^\s*analyze\s+the\s+data\s*[:.]/i,           // "Analyze the Data:"
+  /^\s*determine\s+output\s+format\s*[:.]/i,    // "Determine Output Format:"
+  /^\s*artifact\s+type\s*[:.]/i,                // "Artifact Type: summary"
+  /^\s*metrics\s+to\s+include\s*[:.]/i,         // "Metrics to include:"
+  /^\s*draft\s+the\s+artifact\s*[:.]/i,          // "Draft the Artifact:"
+  /^\s*draft\s+the\s+text\s+response\s*[:.]/i,   // "Draft the Text Response:"
+  /^\s*drafting\s+the\s+artifact\s*[:.]/i,       // "Drafting the Artifact:"
+  /^\s*refine\s+text\s*[:.]/i,                  // "Refine Text:"
+  /^\s*final\s+output\s+construction\s*[:.]/i,   // "Final Output Construction:"
+  /^\s*self[- ]correction\s+during\s+drafting\s*[:.]/i,  // "Self-Correction during drafting:"
+  /^\s*artifact\s+construction\s*[:.]/i,         // "Artifact Construction:"
+  /^\s*final\s+polish\s*[:.]/i,                 // "Final Polish:"
+  /^\s*synthesize\s+the\s+findings\s*[:.]/i,    // "Synthesize the Findings:"
+  /^\s*scan\s+the\s+data\s+for\s/i,             // "Scan the Data for Anomalies/Suspicious Indicators:"
+  /^\s*suspicion\s*[:.]/i,                     // "Suspicion: ..."
+  /^\s*vendor\s+breakdown\s*[:.]/i,             // "Vendor Breakdown:"
+  /^\s*title\s*[:.]\s/i,                       // "Title: ..." (artifact drafting)
+  /^\s*type\s*[:.]\s+(table|chart|summary|chart-bar|chart-line|chart-pie)\s/i,  // "Type: table"
+  /^\s*columns\s*[:.]/i,                       // "Columns: ..."
+  /^\s*rows\s*[:.]/i,                          // "Rows: ..."
+  /^\s*metrics\s*[:.]\s*$/i,                   // "Metrics:" alone on a line
 ];
 
 // Patterns for "answer lead-in" prefixes that the model adds to the actual
 // answer line. We strip the prefix but KEEP the answer text that follows.
 // e.g. "Output: You have 18 invoices" → "You have 18 invoices"
-const ANSWER_PREFIX_PATTERN = /^\s*(output|answer|response|final\s+answer|final\s+response|final\s+output|result|conclusion)\s*[:.]\s*/i;
+// "Text Construction:" is included because llama-3.3 sometimes labels the
+// final prose answer with that header (the rest is thinking preamble).
+const ANSWER_PREFIX_PATTERN = /^\s*(output|answer|response|final\s+answer|final\s+response|final\s+output|result|conclusion|text\s+construction)\s*[:.]\s*/i;
 
 // Patterns that match ANYWHERE in a line (not just start). Used for cases where
 // the model mixes thinking and content on the same line. If ANY of these match,
@@ -276,7 +318,11 @@ const THINKING_PATTERNS_ANYWHERE = [
 
 /**
  * Aggressively strip AI "thinking out loud" from the entire reply.
- * Scans every line and drops any that match a thinking pattern.
+ *
+ * Previous version only stripped leading paragraphs. That failed when the
+ * entire reply was thinking (which happens with reasoning models like qwen3).
+ * This version scans every line and drops any that match a thinking pattern.
+ *
  * Preserves bullets, bold lines, numbered lines, currency lines, and short
  * lines (which are typically real content like "Yes." or "No duplicates found.").
  */
@@ -301,7 +347,7 @@ function stripThinkingLines(reply: string): string {
       continue;
     }
 
-    // Strip "Output: " / "Answer: " / "Final answer: " prefixes but KEEP the
+    // Strip "Output: " / "Answer: " / "Final answer: " / "Text Construction: " prefixes but KEEP the
     // answer text that follows. Reasoning models (llama-3.3, etc.) often label
     // the final answer line as "Output: <actual answer>".
     const prefixMatch = line.match(ANSWER_PREFIX_PATTERN);
@@ -336,6 +382,7 @@ function stripThinkingLines(reply: string): string {
     }
 
     // Drop lines that match thinking patterns (anywhere in line)
+    // These catch cases where the model mixed thinking and content on one line
     if (THINKING_PATTERNS_ANYWHERE.some((p) => p.test(trimmed))) {
       continue;
     }
@@ -353,33 +400,6 @@ function stripThinkingLines(reply: string): string {
   result = result.replace(/^\n+/, '');
 
   return result.trim();
-}
-
-/**
- * Find the index of the LAST answer-prefix line in the text.
- * Returns -1 if no answer-prefix is found.
- *
- * An answer-prefix is a line that starts with: "Output:", "Answer:", "Response:",
- * "Final answer:", "Result:", "Conclusion:", etc. followed by content.
- *
- * We return the index of the start of the line (after any leading whitespace),
- * so the caller can slice from there and strip the prefix.
- */
-function findLastAnswerPrefixIndex(text: string): number {
-  // Match a line that starts with an answer-prefix keyword, followed by
-  // ":" or ".", followed by at least one non-whitespace character (the actual answer).
-  // Anchored to start of line (^ or after \n).
-  const re = /(?:^|\n)([ \t]*(?:output|answer|response|final\s+answer|final\s+response|final\s+output|result|conclusion)\s*[:.]\s*\S)/gi;
-  let lastIdx = -1;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(text)) !== null) {
-    // m.index points to either the start of the string OR the \n before the line.
-    const lineStart = m.index + (m[0].startsWith('\n') ? 1 : 0);
-    // Skip leading whitespace within the line
-    const wsMatch = text.slice(lineStart).match(/^[ \t]*/);
-    lastIdx = wsMatch ? lineStart + wsMatch[0].length : lineStart;
-  }
-  return lastIdx;
 }
 
 function extractArtifact(text: string): { reply: string; artifact: Artifact | undefined } {
@@ -439,6 +459,9 @@ function extractArtifact(text: string): { reply: string; artifact: Artifact | un
     const typeIdx = text.search(/\{\s*"type"\s*:\s*"(chart-bar|chart-line|chart-pie|table|summary)"/);
     if (typeIdx >= 0) {
       const candidate = text.slice(typeIdx);
+      // Greedy: take everything from the opening `{` to the last `}` in the
+      // response. JSON.parse will reject if the candidate isn't balanced, so
+      // we try progressively shorter slices (last 1, 2, 3... `}` chars).
       const lastBraceIdx = candidate.lastIndexOf('}');
       if (lastBraceIdx > 0) {
         for (let end = lastBraceIdx; end > 0; end = candidate.lastIndexOf('}', end - 1)) {
@@ -461,12 +484,25 @@ function extractArtifact(text: string): { reply: string; artifact: Artifact | un
 
   // ─── Find the LAST answer-prefix and keep only content from there onward ──
   // Reasoning models (llama-3.3, qwen) sometimes output a long thinking preamble
-  // followed by "Output: <actual answer>". If we find such a prefix, we drop
-  // everything before it — the preamble is thinking, the answer is what follows.
-  // We use the LAST occurrence in case the model mentions "output" mid-thinking.
+  // followed by "Output: <actual answer>" or "Text Construction: <answer>".
+  // If we find such a prefix, we drop everything before it — the preamble is
+  // thinking, the answer is what follows. We use the LAST occurrence in case
+  // the model mentions "output" mid-thinking.
   const lastAnswerIdx = findLastAnswerPrefixIndex(reply);
   if (lastAnswerIdx >= 0) {
     reply = reply.slice(lastAnswerIdx).replace(ANSWER_PREFIX_PATTERN, '').trim();
+  } else {
+    // No answer-prefix found. Check if the model went into explicit "Thinking
+    // Process:" mode. If so, it means the model didn't deliver a clean answer —
+    // either it ran out of tokens, or it wrote a structured analysis without
+    // a final answer section. In either case, the text BEFORE the thinking
+    // header is the only "real" content (usually empty). Strip everything else
+    // so the fallback message can kick in (or the artifact renders alone).
+    const thinkingHeaderIdx = findThinkingProcessHeader(reply);
+    if (thinkingHeaderIdx >= 0) {
+      // Keep only text BEFORE the thinking header (usually empty or a brief intro)
+      reply = reply.slice(0, thinkingHeaderIdx).trim();
+    }
   }
 
   // Strip AI "thinking out loud" lines from the entire reply (aggressive)
@@ -481,6 +517,73 @@ function extractArtifact(text: string): { reply: string; artifact: Artifact | un
   }
 
   return { reply, artifact };
+}
+
+/**
+ * Find the index of the LAST answer-prefix line in the text.
+ * Returns -1 if no answer-prefix is found.
+ *
+ * An answer-prefix is a line that starts with: "Output:", "Answer:", "Response:",
+ * "Final answer:", "Result:", "Conclusion:", "Text Construction:", etc. followed by content.
+ *
+ * We return the index of the start of the line (after any leading whitespace),
+ * so the caller can slice from there and strip the prefix.
+ */
+function findLastAnswerPrefixIndex(text: string): number {
+  // Match a line that starts with an answer-prefix keyword, followed by
+  // ":" or ".", followed by at least one non-whitespace character (the actual answer).
+  // Anchored to start of line (^ or after \n).
+  const re = /(?:^|\n)([ \t]*(?:output|answer|response|final\s+answer|final\s+response|final\s+output|result|conclusion|text\s+construction)\s*[:.]\s*\S)/gi;
+  let lastIdx = -1;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    // m.index points to either the start of the string OR the \n before the line.
+    const lineStart = m.index + (m[0].startsWith('\n') ? 1 : 0);
+    // Skip leading whitespace within the line
+    const wsMatch = text.slice(lineStart).match(/^[ \t]*/);
+    lastIdx = wsMatch ? lineStart + wsMatch[0].length : lineStart;
+  }
+  return lastIdx;
+}
+
+// ─── "Thinking Process:" header detection ──────────────────────────────────
+// When the model writes a "Thinking Process:" style header anywhere in its
+// response, it has gone into explicit reasoning mode. This usually means
+// the entire response is structured thinking — the actual answer (if any)
+// appears under a label like "Output:" or "Text Construction:".
+//
+// If we DON'T find an answer-prefix after the thinking header, the model
+// ran out of tokens before delivering an answer — we return empty (which
+// triggers the fallback message).
+const THINKING_PROCESS_HEADER_PATTERNS = [
+  /^\s*thinking\s+process\s*[:.]/im,
+  /^\s*my\s+thinking\s*[:.]/im,
+  /^\s*reasoning\s*[:.]/im,
+  /^\s*chain\s+of\s+thought\s*[:.]/im,
+  /^\s*step[- ]by[- ]step\s+(?:reasoning|analysis|thinking)\s*[:.]/im,
+  /^\s*my\s+analysis\s*[:.]/im,
+];
+
+/**
+ * Find the index of the FIRST thinking-process header in the text.
+ * Returns -1 if no thinking-process header is found.
+ *
+ * Returns the index of the start of the line containing the header (so the
+ * caller can slice(0, idx) to keep only what's BEFORE the thinking).
+ */
+function findThinkingProcessHeader(text: string): number {
+  for (const pattern of THINKING_PROCESS_HEADER_PATTERNS) {
+    const match = text.match(pattern);
+    if (match && match.index !== undefined) {
+      // The pattern uses ^ which (with /m flag) matches start of line,
+      // so match.index is the start of the line (after any leading \n).
+      // If the regex matched leading whitespace as part of ^\s*, then
+      // match.index is the start of that whitespace. Either way, slice(0, idx)
+      // gives us everything before this line.
+      return match.index;
+    }
+  }
+  return -1;
 }
 
 // ─── Refusal loop detection ─────────────────────────────────────────────────
