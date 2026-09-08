@@ -5,30 +5,32 @@
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
-// Model hierarchy: primary → fallback1 → fallback2
-// All three are NON-reasoning chat models (no leaked chain-of-thought).
+// Model hierarchy: primary → fallback1 → fallback2 → fallback3
 // Order by reliability for artifact generation (charts/tables need lots of tokens):
-//   llama-3.1-8b-instant:    30k OTPM, very reliable, smaller model
-//   llama-4-scout:            6k OTPM, better quality, sometimes rate-limited
-//   llama-3.3-70b-versatile:  generous free-tier limits, high quality, no thinking leak
-// Previous fallback `qwen/qwen3.6-27b` was REMOVED — it is a reasoning model that
-// leaks its chain-of-thought into the visible response, breaking the chat UX.
-// (qwen3.6-27b is still used for vision below; vision reasoning does not surface
-//  to the user, so it is acceptable there.)
+//   llama-3.1-8b-instant:    30k OTPM, very reliable, smaller model (no thinking leak)
+//   llama-4-scout:            6k OTPM, better quality, sometimes rate-limited (no thinking leak)
+//   llama-3.3-70b-versatile:  high quality, generous free-tier limits (no thinking leak)
+//   qwen/qwen3.6-27b:         1k OTPM, REASONING MODEL (leaks thinking) — kept as last resort
+//                            because it is the most accessible model on Groq free tier.
+//                            The chat route's stripThinkingLines + cleanReplyText handle
+//                            the thinking leak, so even when qwen is used the user sees
+//                            a clean response (just potentially truncated artifacts).
 const VISION_MODEL = 'qwen/qwen3.6-27b';
 
 const CHAT_MODEL = 'llama-3.1-8b-instant';
 const CHAT_MODEL_FALLBACK_1 = 'llama-4-scout-17b-16e-instruct';
 const CHAT_MODEL_FALLBACK_2 = 'llama-3.3-70b-versatile';
+const CHAT_MODEL_FALLBACK_3 = 'qwen/qwen3.6-27b'; // last resort — reasoning model, cleanup handles leak
 
 // Groq free tier (on_demand) output token limits per minute:
 //   llama-3.1-8b-instant:     ~30,000 OTPM  (highest, most reliable)
 //   llama-4-scout:             ~6,000 OTPM
 //   llama-3.3-70b-versatile:   generous (no hard cap observed in practice)
+//   qwen/qwen3.6-27b:          ~1,000 OTPM  (lowest, but always available)
 // Max tokens per request: stay well under the per-minute limit.
 // Responses with artifacts (tables/charts) need more tokens for the JSON.
 const MAX_TOKENS_HIGH = 4096;    // llama-3.1-8b-instant, llama-4-scout, llama-3.3-70b
-const MAX_TOKENS_LOW = 900;      // qwen (vision only) — 1k OTPM limit, keep under
+const MAX_TOKENS_LOW = 900;      // qwen — 1k OTPM limit, keep under (artifacts may truncate)
 
 const RETRY_DELAY_MS = 2500;     // wait 2.5s before retrying a rate-limited model
 const MAX_RETRIES = 1;           // retry each model once on 429
@@ -101,7 +103,7 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
 /**
  * Call Groq with text-only chat.
  * Tries models in order with retry on 429 rate limits.
- * Model cascade: llama-3.1-8b-instant → llama-4-scout → qwen/qwen3.6-27b
+ * Model cascade: llama-3.1-8b-instant → llama-4-scout → llama-3.3-70b → qwen/qwen3.6-27b
  */
 export async function geminiChatCall(
   systemPrompt: string,
@@ -118,6 +120,7 @@ export async function geminiChatCall(
     { model: CHAT_MODEL, maxTokens: MAX_TOKENS_HIGH },            // llama-3.1-8b-instant: 30k OTPM → 4096 output tokens
     { model: CHAT_MODEL_FALLBACK_1, maxTokens: MAX_TOKENS_HIGH }, // llama-4-scout: 6k OTPM → 4096 output tokens
     { model: CHAT_MODEL_FALLBACK_2, maxTokens: MAX_TOKENS_HIGH }, // llama-3.3-70b-versatile: high quality, no thinking leak
+    { model: CHAT_MODEL_FALLBACK_3, maxTokens: MAX_TOKENS_LOW }, // qwen3.6-27b: reasoning model — last resort, cleanup handles thinking
   ];
 
   const triedModels: string[] = [];
