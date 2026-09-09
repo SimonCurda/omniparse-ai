@@ -21,7 +21,7 @@ const THINKING_PATTERNS = [
   /^\s*so[,:]\s/i,
   /^\s*now\s+(i|let|we|the)\s/i,
   /^\s*wait[,:]\s/i,
-  /^\s*actually[,:]\s/i,
+  // /^\s*actually[,:]\s/i,  // REMOVED — also matches legitimate answer "Actually, there are..."
   /^\s*hmm[,:]\s/i,
   /^\s*ok[,:]\s/i,
   /^\s*alright[,:]\s/i,
@@ -104,9 +104,25 @@ const THINKING_PATTERNS = [
   /^\s*did\s+the\s+user\s+ask\s/i,
   /^\s*strict\s+rules\s+say\s/i,
   /^\s*they\s+asked\s/i,
+  // Verification / schema check lines
+  /^\s*check\s+artifact\s+schema/i,
+  /^\s*verifying\s+(the\s+)?(schema|artifact|json|response)/i,
+  /^\s*schema\s+check/i,
+  /^\s*artifact\s+check/i,
+  /^\s*check\s+the\s+(schema|artifact|json|response)/i,
+  /^\s*validating\s+(the\s+)?(schema|artifact|json|response)/i,
+  // More "discussion of user's question" patterns
+  /^\s*this\s+implies\s/i,
+  /^\s*the\s+user'?s?\s+(question|phrasing|intent|request|message)/i,
+  /^\s*also[,:]\s+(the|they|there)/i,
+  /^\s*i\s+need\s+to\s+correct\s/i,
+  /^\s*structure\s*[:.]\s*(text|json|artifact)/i,
+  // More self-instruction lines
+  /^\s*clarify\s+that\s+/i,
+  /^\s*correct\s+them\s*\.?\s*$/i,
 ];
 
-const ANSWER_PREFIX_PATTERN = /^\s*(output|answer|response|final\s+answer|final\s+response|final\s+output|result|conclusion|text\s+construction|text\s*[:.]\s*")\s*(?:[:.]\s*)?/i;
+const ANSWER_PREFIX_PATTERN = /^\s*(output|answer|response|final\s+answer|final\s+response|final\s+output|result|conclusion|text\s+construction|text\s*[:.]\s*(?!summary|introduction|notes?|draft|plan|outline|artifact\s+type))(?:[:.]\s*)?/i;
 
 const THINKING_PATTERNS_ANYWHERE = [
   /no\s+artifact\s+is\s+needed/i,
@@ -180,7 +196,7 @@ function cleanReplyText(reply: string): string {
 interface Artifact { type: string; data: Record<string, unknown>; title?: string }
 
 function findLastAnswerPrefixIndex(text: string): number {
-  const re = /(?:^|\n)([ \t]*(?:output|answer|response|final\s+answer|final\s+response|final\s+output|result|conclusion|text\s+construction|text\s*[:.]\s*")(?:[:.]\s*)?\S)/gi;
+  const re = /(?:^|\n)([ \t]*(?:output|answer|response|final\s+answer|final\s+response|final\s+output|result|conclusion|text\s+construction|text\s*[:.]\s*(?!summary|introduction|notes?|draft|plan|outline|artifact\s+type))(?:[:.]\s*)?\S)/gi;
   let lastIdx = -1;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text)) !== null) {
@@ -757,6 +773,45 @@ check('artifact was extracted correctly', r16.artifact !== undefined);
 check('artifact is a table', r16.artifact?.type === 'table');
 check('artifact has 1 row', (r16.artifact?.data.rows as unknown[])?.length === 1);
 console.log(`  → Final reply:\n${r16.reply.split('\n').map(l => '    ' + l).join('\n')}`);
+
+// Case 17: User's "that is the only suspicious one?" paste — qwen went into
+// free-text analysis with patterns like "This implies...", "There is...",
+// "The user's question...", "Structure: Text:", "Mention the...", then wrote
+// "Text: Actually, there are a few other suspicious entries..." at the end.
+// We should slice from "Text:" and keep only the actual answer.
+const suspiciousFollowupPaste = `This implies a previous turn or context where "suspicious" invoices were discussed, or they are referring to the "Duplicate Groups" or "Unknown" vendors in the data provided. - There is a duplicate group for "Elite Auto Care & Performance" with an amount mismatch (one huge amount vs many small ones). - There are many "Unknown" vendors, which might be considered suspicious or just low confidence. - There is an invoice [cmstfoq7w0001l904nyqw6dqu] with vendor "exact company name" and invoice number "exact number", date "YYYY-MM-DD". This looks like a placeholder or test data, definitely suspicious. - There are invoices with 0% or 10% confidence.
+The user's question "that is the only suspicious one?" suggests they might be referring to the duplicate group I just showed (hypothetically) or the "Unknown" ones. Also, the "exact company name" / "exact number" / "YYYY-MM-DD" is definitely suspicious (placeholder data). The "Unknown" vendors are suspicious due to lack of data.
+
+The Elite Auto Care duplicate group has an amount mismatch.
+The "exact company name" invoice has placeholder text.
+Several invoices have 0% confidence.
+The user's phrasing "that is the only suspicious one?" implies they think there's only one. I need to correct them.
+
+Elite Auto Care duplicate group (amount mismatch)
+"exact company name" (placeholder data)
+Low confidence invoices (0%)
+Structure: Text: Clarify that there are actually a few suspicious items. Mention the Elite Auto Care outlier, the placeholder invoice, and the zero-confidence ones.
+
+The Elite Auto Care outlier ($67M)
+The placeholder invoice ($1468.12)
+The 0% confidence ones ($0.00)
+[cmtfqxbyy0001l50431ak5o9x] Elite Auto Care... $67676767.00 - Amount mismatch in duplicate group
+[cmstfoq7w0001l904nyqw6dqu] exact company name... YYYY-MM-DD - Placeholder/test data
+[cmstig4yb0001l104dnbzpkh3] Unknown... $0.00 - 10% confidence
+[cmstiezrv0001i604l3awke9l] Unknown... $0.00 - 0% confidence
+[cmst9pfyb0001jp04ci4us0fe] Unknown... $0.00 - 0% confidence
+Text: Actually, there are a few other suspicious entries beyond the duplicate group. The invoice from exact company name contains placeholder text like "YYYY-MM-DD". Additionally, there are three invoices with 0% or 10% confidence from unknown vendors.`;
+console.log('\nTest 17: qwen free-text followup with "This implies..." analysis');
+const r17 = extractArtifact(suspiciousFollowupPaste);
+check('reply does NOT include "This implies"', !r17.reply.includes('This implies'));
+check('reply does NOT include "The user\'s question"', !r17.reply.includes("The user's question"));
+check('reply does NOT include "The user\'s phrasing"', !r17.reply.includes("The user's phrasing"));
+check('reply does NOT include "I need to correct them"', !r17.reply.includes('I need to correct them'));
+check('reply does NOT include "Structure: Text"', !r17.reply.includes('Structure: Text'));
+check('reply does NOT include raw invoice IDs', !r17.reply.includes('cmtfqxbyy0001l50431ak5o9x'));
+check('reply starts with the actual answer', r17.reply.startsWith('Actually, there are a few'));
+check('reply preserves the placeholder text mention', r17.reply.includes('exact company name contains placeholder text'));
+console.log(`  → Final reply:\n${r17.reply.split('\n').map(l => '    ' + l).join('\n')}`);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail > 0 ? 1 : 0);

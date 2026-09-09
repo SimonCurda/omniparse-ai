@@ -92,12 +92,22 @@ export async function openRouterChatCall(
     throw new Error(`OpenRouter auth error (${res.status}): ${errText}`);
   }
 
-  // 400 with json_validate_failed — same as Groq. The model accepted JSON mode
-  // but couldn't produce valid JSON. Retry WITHOUT response_format.
+  // 400 errors from OpenRouter. Two cases to handle:
+  //   1. json_validate_failed — model accepted JSON mode but couldn't produce valid JSON
+  //   2. "does not support feature: structured-outputs" — provider (e.g. Novita/Ling)
+  //      doesn't support response_format at all
+  // Both cases: retry WITHOUT response_format (free-text mode + regex cleanup).
   if (res.status === 400) {
     const errText = await res.text();
-    if (errText.includes('json_validate_failed')) {
-      console.warn('[openrouter] JSON validation failed (400). Retrying WITHOUT response_format...');
+    const isJsonValidateFailure = errText.includes('json_validate_failed');
+    const isStructuredOutputsUnsupported = errText.includes('does not support feature: structured-outputs')
+      || errText.includes('structured-outputs')
+      || errText.includes('INVALID_REQUEST_BODY');
+
+    if (isJsonValidateFailure || isStructuredOutputsUnsupported) {
+      console.warn(`[openrouter] 400 — retrying WITHOUT response_format. Reason: ${
+        isJsonValidateFailure ? 'json_validate_failed' : 'structured-outputs not supported'
+      }`);
       const fallbackBody: Record<string, unknown> = {
         model: OPENROUTER_PRIMARY_MODEL,
         fallbacks: OPENROUTER_FALLBACK_MODELS,
@@ -121,7 +131,7 @@ export async function openRouterChatCall(
         return fallbackData.choices?.[0]?.message?.content || '';
       }
       const fbErrText = await fallbackRes.text().catch(() => '');
-      throw new Error(`OpenRouter API error after JSON-validate fallback (${fallbackRes.status}): ${fbErrText}`);
+      throw new Error(`OpenRouter API error after JSON-mode fallback (${fallbackRes.status}): ${fbErrText}`);
     }
     throw new Error(`OpenRouter API error (400): ${errText}`);
   }

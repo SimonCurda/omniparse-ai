@@ -9,7 +9,8 @@ const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 // Order by reliability for artifact generation (charts/tables need lots of tokens):
 //   llama-3.1-8b-instant:    30k OTPM, very reliable, smaller model (no thinking leak)
 //   llama-4-scout:            6k OTPM, better quality, sometimes rate-limited (no thinking leak)
-//   llama-3.3-70b-versatile:  high quality, generous free-tier limits (no thinking leak)
+//   llama-3.1-70b-versatile:   high quality, free tier, JSON mode supported (no thinking leak)
+//                            (replaces llama-3.3-70b-versatile which started returning 404 on Groq)
 //   qwen/qwen3.6-27b:         1k OTPM, REASONING MODEL (leaks thinking) — kept as last resort
 //                            because it is the most accessible model on Groq free tier.
 //                            The chat route's stripThinkingLines + cleanReplyText handle
@@ -19,13 +20,13 @@ const VISION_MODEL = 'qwen/qwen3.6-27b';
 
 const CHAT_MODEL = 'llama-3.1-8b-instant';
 const CHAT_MODEL_FALLBACK_1 = 'llama-4-scout-17b-16e-instruct';
-const CHAT_MODEL_FALLBACK_2 = 'llama-3.3-70b-versatile';
+const CHAT_MODEL_FALLBACK_2 = 'llama-3.1-70b-versatile'; // replaces llama-3.3-70b-versatile (was 404)
 const CHAT_MODEL_FALLBACK_3 = 'qwen/qwen3.6-27b'; // last resort — reasoning model, cleanup handles leak
 
 // Groq free tier (on_demand) output token limits per minute:
 //   llama-3.1-8b-instant:     ~30,000 OTPM  (highest, most reliable)
 //   llama-4-scout:             ~6,000 OTPM
-//   llama-3.3-70b-versatile:   generous (no hard cap observed in practice)
+//   llama-3.1-70b-versatile:   generous (no hard cap observed in practice)
 //   qwen/qwen3.6-27b:          ~1,000 OTPM  (lowest, but always available)
 // Max tokens per request: stay well under the per-minute limit.
 // Responses with artifacts (tables/charts) need more tokens for the JSON.

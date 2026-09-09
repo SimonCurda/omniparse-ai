@@ -264,7 +264,7 @@ const THINKING_PATTERNS = [
   /^\s*so[,:]\s/i,
   /^\s*now\s+(i|let|we|the)\s/i,
   /^\s*wait[,:]\s/i,
-  /^\s*actually[,:]\s/i,
+  // /^\s*actually[,:]\s/i,  // REMOVED — also matches legitimate answer "Actually, there are..."
   /^\s*hmm[,:]\s/i,
   /^\s*ok[,:]\s/i,
   /^\s*alright[,:]\s/i,
@@ -359,6 +359,15 @@ const THINKING_PATTERNS = [
   /^\s*artifact\s+check/i,                   // "Artifact check"
   /^\s*check\s+the\s+(schema|artifact|json|response)/i,  // "Check the schema"
   /^\s*validating\s+(the\s+)?(schema|artifact|json|response)/i,  // "Validating schema"
+  // ─── More "discussion of user's question" patterns (qwen free-text mode) ─
+  /^\s*this\s+implies\s/i,                   // "This implies a previous turn..."
+  /^\s*the\s+user'?s?\s+(question|phrasing|intent|request|message)/i,  // "The user's question..."
+  /^\s*also[,:]\s+(the|they|there)/i,         // "Also, the 'exact company name'..."
+  /^\s*i\s+need\s+to\s+correct\s/i,           // "I need to correct them"
+  /^\s*structure\s*[:.]\s*(text|json|artifact)/i,  // "Structure: Text: ..."
+  // ─── More self-instruction lines ──────────────────────────────────────────
+  /^\s*clarify\s+that\s+/i,                   // "Clarify that there are actually..."
+  /^\s*correct\s+them\s*\.?\s*$/i,            // "I need to correct them" (continuation)
 ];
 
 // Patterns for "answer lead-in" prefixes that the model adds to the actual
@@ -366,13 +375,15 @@ const THINKING_PATTERNS = [
 // e.g. "Output: You have 18 invoices" → "You have 18 invoices"
 // "Text Construction:" is included because llama-3.3 sometimes labels the
 // final prose answer with that header (the rest is thinking preamble).
-// "Text:\"" is included (with a quote after) because qwen sometimes writes
-// the answer as `Text: "..."` when in free-text mode after JSON validation
-// failure. The quote requirement avoids matching "Text: Summary" headings.
-// The trailing `(?:[:.]\s*)?` is OPTIONAL — for the `text\s*[:.]\s*"` alternative
-// the colon is already inside; for the other alternatives we need to consume
-// the colon (or period) and following whitespace.
-const ANSWER_PREFIX_PATTERN = /^\s*(output|answer|response|final\s+answer|final\s+response|final\s+output|result|conclusion|text\s+construction|text\s*[:.]\s*")\s*(?:[:.]\s*)?/i;
+// "Text:" is included because qwen sometimes writes the answer as `Text: <answer>`
+// when in free-text mode. We use a NEGATIVE LOOKAHEAD to skip false positives
+// like "Text: Summary" / "Text: Notes" / "Text: Draft" (those are thinking
+// section headers, not answer markers).
+// The trailing `[:.]\s*` consumes the colon (or period) + whitespace after
+// the prefix keyword. For the `text\s*[:.]\s*` alternative, the colon is
+// already inside the alternative, but the trailing `[:.]\s*` matches zero
+// occurrences so it still works.
+const ANSWER_PREFIX_PATTERN = /^\s*(output|answer|response|final\s+answer|final\s+response|final\s+output|result|conclusion|text\s+construction|text\s*[:.]\s*(?!summary|introduction|notes?|draft|plan|outline|artifact\s+type))(?:[:.]\s*)?/i;
 
 // Patterns that match ANYWHERE in a line (not just start). Used for cases where
 // the model mixes thinking and content on the same line. If ANY of these match,
@@ -676,11 +687,11 @@ function extractArtifact(text: string): { reply: string; artifact: Artifact | un
  * so the caller can slice from there and strip the prefix.
  */
 function findLastAnswerPrefixIndex(text: string): number {
-  // Match a line that starts with an answer-prefix keyword, followed by
-  // ":" or "." (required for most keywords, but `text:..."` already includes it
-  // in the alternative), followed by at least one non-whitespace character.
-  // Anchored to start of line (^ or after \n).
-  const re = /(?:^|\n)([ \t]*(?:output|answer|response|final\s+answer|final\s+response|final\s+output|result|conclusion|text\s+construction|text\s*[:.]\s*")(?:[:.]\s*)?\S)/gi;
+  // Match a line that starts with an answer-prefix keyword. Same logic as
+  // ANSWER_PREFIX_PATTERN but with `^|\n` anchor for finding lines anywhere
+  // in the text. Uses negative lookahead on `Text:` to skip false positives
+  // like "Text: Summary" (those are section headers, not answer markers).
+  const re = /(?:^|\n)([ \t]*(?:output|answer|response|final\s+answer|final\s+response|final\s+output|result|conclusion|text\s+construction|text\s*[:.]\s*(?!summary|introduction|notes?|draft|plan|outline|artifact\s+type))(?:[:.]\s*)?\S)/gi;
   let lastIdx = -1;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text)) !== null) {
