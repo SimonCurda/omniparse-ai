@@ -5,28 +5,28 @@
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
-// Model hierarchy: primary → fallback1 → fallback2 → fallback3
+// Model hierarchy: primary → fallback1 → fallback2
 // Order by reliability for artifact generation (charts/tables need lots of tokens):
 //   llama-3.1-8b-instant:    30k OTPM, very reliable, smaller model (no thinking leak)
 //   llama-4-scout:            6k OTPM, better quality, sometimes rate-limited (no thinking leak)
-//   llama-3.1-70b-versatile:   high quality, free tier, JSON mode supported (no thinking leak)
-//                            (replaces llama-3.3-70b-versatile which started returning 404 on Groq)
-//   qwen/qwen3.6-27b:         1k OTPM, REASONING MODEL (leaks thinking) — kept as last resort
+//   qwen/qwen3.6-27b:         1k OTPM, REASONING MODEL (leaks thinking) — last resort
 //                            because it is the most accessible model on Groq free tier.
 //                            The chat route's stripThinkingLines + cleanReplyText handle
 //                            the thinking leak, so even when qwen is used the user sees
 //                            a clean response (just potentially truncated artifacts).
+//
+// NOTE: llama-3.3-70b-versatile and llama-3.1-70b-versatile were both REMOVED from the
+// cascade — Groq has decommissioned both. If Groq reintroduces a 70b llama variant
+// (check https://console.groq.com/docs/deprecations), it can be re-added here.
 const VISION_MODEL = 'qwen/qwen3.6-27b';
 
 const CHAT_MODEL = 'llama-3.1-8b-instant';
 const CHAT_MODEL_FALLBACK_1 = 'llama-4-scout-17b-16e-instruct';
-const CHAT_MODEL_FALLBACK_2 = 'llama-3.1-70b-versatile'; // replaces llama-3.3-70b-versatile (was 404)
-const CHAT_MODEL_FALLBACK_3 = 'qwen/qwen3.6-27b'; // last resort — reasoning model, cleanup handles leak
+const CHAT_MODEL_FALLBACK_2 = 'qwen/qwen3.6-27b'; // last resort — reasoning model, cleanup handles leak
 
 // Groq free tier (on_demand) output token limits per minute:
 //   llama-3.1-8b-instant:     ~30,000 OTPM  (highest, most reliable)
 //   llama-4-scout:             ~6,000 OTPM
-//   llama-3.1-70b-versatile:   generous (no hard cap observed in practice)
 //   qwen/qwen3.6-27b:          ~1,000 OTPM  (lowest, but always available)
 // Max tokens per request: stay well under the per-minute limit.
 // Responses with artifacts (tables/charts) need more tokens for the JSON.
@@ -128,14 +128,13 @@ export async function geminiChatCall(
     // `supportsJsonMode` controls whether we set `response_format: { type: "json_object" }`
     // in the request body. JSON mode forces the model to output valid JSON only,
     // eliminating the "Thinking Process:" / "Output:" / "Draft:" leak class entirely.
-    // All 4 chat models now try JSON mode first. If a model returns 422 (JSON mode
-    // not supported for that model), the request is automatically retried WITHOUT
-    // response_format — the model falls back to free-text mode and the regex cleanup
-    // layer in chat/route.ts handles any thinking leak.
+    // All 3 chat models try JSON mode first. If a model returns 422 (JSON mode not
+    // supported) or 400 (model_decommissioned), the request falls through to the
+    // next model in the cascade. If JSON mode is supported but the model fails to
+    // produce valid JSON (json_validate_failed), we retry without response_format.
     { model: CHAT_MODEL, maxTokens: MAX_TOKENS_HIGH, supportsJsonMode: true },            // llama-3.1-8b-instant
     { model: CHAT_MODEL_FALLBACK_1, maxTokens: MAX_TOKENS_HIGH, supportsJsonMode: true }, // llama-4-scout-17b-16e-instruct
-    { model: CHAT_MODEL_FALLBACK_2, maxTokens: MAX_TOKENS_HIGH, supportsJsonMode: true }, // llama-3.3-70b-versatile
-    { model: CHAT_MODEL_FALLBACK_3, maxTokens: MAX_TOKENS_LOW, supportsJsonMode: true }, // qwen3.6-27b — try JSON mode, 422 fallback handles unsupported
+    { model: CHAT_MODEL_FALLBACK_2, maxTokens: MAX_TOKENS_LOW, supportsJsonMode: true },  // qwen3.6-27b — try JSON mode, 422/400 fallback handles unsupported
   ];
 
   const triedModels: string[] = [];
@@ -233,14 +232,28 @@ export async function geminiChatCall(
             break;
           }
 
-          // 400 with json_validate_failed — the model accepted JSON mode but
-          // couldn't generate valid JSON (usually ran out of tokens or went into
-          // a reasoning loop). Retry the SAME model WITHOUT JSON mode (one extra
-          // attempt). Free-text mode + the regex cleanup layer in chat/route.ts
-          // will handle any thinking leak.
-          if (res.status === 400 && jsonModeEnabled) {
+          // 400 errors — multiple causes. Each needs a different response:
+          //   - json_validate_failed: retry same model WITHOUT response_format
+          //   - model_decommissioned / model_not_found / model_unavailable:
+          //     treat like 404, fall through to next model in cascade
+          //   - other 400 errors: throw immediately (real bug, should surface)
+          if (res.status === 400) {
             const errText = await res.text();
-            if (errText.includes('json_validate_failed')) {
+
+            // Decommissioned / unavailable model — fall through to next model
+            // (same as 404 — don't retry the same model, just move on)
+            if (errText.includes('model_decommissioned')
+              || errText.includes('model_not_found')
+              || errText.includes('model_unavailable')
+              || errText.includes('has been decommissioned')
+              || errText.includes('is no longer supported')) {
+              console.warn(`[gemini] Model ${model} decommissioned/unavailable (400). Trying next model...`);
+              triedModels.push(model);
+              break;
+            }
+
+            // JSON validation failed — retry WITHOUT response_format
+            if (jsonModeEnabled && errText.includes('json_validate_failed')) {
               console.warn(`[gemini] Model ${model} failed JSON validation (400). Retrying WITHOUT response_format...`);
               jsonModeEnabled = false;
               const fallbackBody: Record<string, unknown> = {
@@ -267,7 +280,8 @@ export async function geminiChatCall(
               triedModels.push(model);
               break;
             }
-            // Other 400 errors (not json_validate_failed) — throw immediately
+
+            // Other 400 errors (real validation issues, etc.) — throw immediately
             throw new Error(`Groq API error (400): ${errText}`);
           }
 
