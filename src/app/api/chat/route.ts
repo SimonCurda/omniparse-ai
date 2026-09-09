@@ -368,6 +368,23 @@ const THINKING_PATTERNS = [
   // ─── More self-instruction lines ──────────────────────────────────────────
   /^\s*clarify\s+that\s+/i,                   // "Clarify that there are actually..."
   /^\s*correct\s+them\s*\.?\s*$/i,            // "I need to correct them" (continuation)
+  // ─── "Self-verification AFTER answer" patterns (qwen sometimes appends these) ──
+  // These appear AFTER the actual answer (the answer IS in the JSON text field,
+  // but the model adds a "Check constraints: ... matches schema. Proceed." tail).
+  /^\s*check\s+constraints/i,                  // "Check constraints: JSON only..."
+  /^\s*looks\s+good\s*\.?\s*$/i,               // "Looks good." (alone on line)
+  /^\s*matches\s+schema/i,                    // "matches schema. Proceed."
+  /^\s*matches\s+the\s+schema/i,              // "matches the schema"
+  /^\s*proceed\s*\.?\s*$/i,                    // "Proceed." (alone on line)
+  /^\s*proceed\s+to\s+/i,                      // "Proceed to..."
+  /^\s*one\s+minor\s+thing\s/i,                // "One minor thing: The prompt says..."
+  /^\s*the\s+prompt\s+says\s/i,                // "The prompt says '2-4 sentences...'"
+  /^\s*self[- ]correction/i,                  // "Self-Correction/Refinement during thought:"
+  /^\s*self[- ]refinement/i,                  // "Self-Refinement..."
+  /^\s*this\s+fits\s*\.?\s*$/i,               // "This fits." (alone on line)
+  /^\s*all\s+matches\s*\.?\s*$/i,              // "All matches." (alone on line)
+  /^\s*text\s+field\s+has\s+/i,                 // "Text field has markdown."
+  /^\s*json\s+only\s*\.?\s*$/i,                // "JSON only." (alone on line)
 ];
 
 // Patterns for "answer lead-in" prefixes that the model adds to the actual
@@ -497,6 +514,109 @@ function stripThinkingLines(reply: string): string {
  *
  * Used by the JSON-mode primary path in extractArtifact.
  */
+/**
+ * Strip a single pair of surrounding quotes from a string, if present.
+ * - "..." → ...
+ * - '...' → ...
+ * - `"..."` → `...` (handles escaped JSON-string case)
+ * - Non-quoted text → unchanged
+ * - Quotes only stripped if BOTH the start AND end are quotes (same type).
+ *   Partial quotes ("hello world) are NOT stripped.
+ *
+ * ALSO handles the case where stripPostAnswerThinking has already removed
+ * the closing quote (and everything after) — in that case, we still want to
+ * strip the leading `"` if the text starts with one. Otherwise the user sees
+ * a leading `"` with no matching closing quote.
+ */
+function stripSurroundingQuotes(text: string): string {
+  if (!text || text.length < 2) return text;
+
+  const trimmed = text.trim();
+  if (trimmed.length < 2) return text;
+
+  const first = trimmed[0];
+  const last = trimmed[trimmed.length - 1];
+
+  // Case 1: matching single or double quotes wrap the entire text
+  if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
+    return trimmed.slice(1, -1);
+  }
+
+  // Case 2: escaped quotes (model sometimes outputs \"...\"  as JSON-string-literal)
+  // Pattern: starts with \" and ends with \"
+  if (trimmed.startsWith('\\"') && trimmed.endsWith('\\"')) {
+    return trimmed.slice(2, -2);
+  }
+
+  // Case 3: leading quote only — the closing quote was already removed by
+  // stripPostAnswerThinking (it stripped everything from the closing quote
+  // onward, leaving only the opening quote). Strip the leading quote too.
+  if (first === '"' && last !== '"') {
+    return trimmed.slice(1);
+  }
+  if (first === "'" && last !== "'") {
+    return trimmed.slice(1);
+  }
+
+  return text;
+}
+
+/**
+ * Strip "post-answer self-verification" content that some models append AFTER
+ * the actual answer on the SAME line.
+ *
+ * Example (from user's paste):
+ *   "Based on your invoice data... save over $67 million..." Check constraints:
+ *   JSON only. Text field has markdown. ... matches schema. Proceed.
+ *   Self-Correction/Refinement during thought:
+ *
+ * The actual answer is wrapped in `"..."`. After the closing quote, the model
+ * appends self-verification phrases. We detect the closing quote followed by
+ * known thinking markers and slice everything from there onward.
+ *
+ * Also handles the case where the answer is followed by `Check constraints:`,
+ * `Self-Correction`, `matches schema`, `Proceed.`, `Looks good`, etc. without
+ * a preceding closing quote (defensive).
+ */
+function stripPostAnswerThinking(text: string): string {
+  if (!text) return text;
+
+  // Markers that indicate "self-verification AFTER answer" content. If we find
+  // any of these after the answer, slice from that point to end-of-string.
+  // We use a regex that finds the FIRST occurrence of any marker and strips
+  // from there onward.
+  const markers = [
+    /"\s*Check\s+constraints/i,           // answer." Check constraints:
+    /"\s*Self[- ]Correction/i,             // answer." Self-Correction:
+    /"\s*Self[- ]Refinement/i,             // answer." Self-Refinement:
+    /"\s*Looks\s+good\s*\.?/i,             // answer." Looks good.
+    /"\s*matches\s+schema/i,               // answer." matches schema.
+    /"\s*matches\s+the\s+schema/i,         // answer." matches the schema.
+    /"\s*Proceed\s*\.?/i,                  // answer." Proceed.
+    /"\s*One\s+minor\s+thing/i,            // answer." One minor thing:
+    /"\s*The\s+prompt\s+says/i,            // answer." The prompt says:
+    /\s+Check\s+constraints\s*:/i,         // (no quote) Check constraints:
+    /\s+Self[- ]Correction/i,              // (no quote) Self-Correction
+    /\s+matches\s+schema/i,                // (no quote) matches schema
+  ];
+
+  let earliestIdx = -1;
+  for (const marker of markers) {
+    const match = text.match(marker);
+    if (match && match.index !== undefined) {
+      if (earliestIdx === -1 || match.index < earliestIdx) {
+        earliestIdx = match.index;
+      }
+    }
+  }
+
+  if (earliestIdx > 0) {
+    return text.slice(0, earliestIdx).trim();
+  }
+
+  return text;
+}
+
 function stripArtifactJsonFromText(text: string): string {
   if (!text) return text;
 
@@ -569,6 +689,28 @@ function extractArtifact(text: string): { reply: string; artifact: Artifact | un
       // table/chart card AND raw JSON in the chat bubble above it. We strip
       // the JSON so the user only sees the prose + the rendered artifact card.
       text_field = stripArtifactJsonFromText(text_field);
+
+      // ─── Strip "post-answer self-verification" content ────────────────
+      // Some models append "Check constraints: ... matches schema. Proceed.
+      // Self-Correction/Refinement during thought:" AFTER the actual answer
+      // (which is wrapped in quotes). This must run BEFORE stripSurroundingQuotes
+      // so we strip the post-answer thinking while still seeing the closing
+      // quote that marks where the answer ends.
+      text_field = stripPostAnswerThinking(text_field);
+
+      // ─── Strip leaked thinking patterns from the text field ──────────
+      // Some models (especially qwen in free-text mode) include their
+      // "Check constraints: ... matches schema. Proceed." self-verification
+      // in the text field AFTER the actual answer. We apply the same
+      // stripThinkingLines cleanup as the legacy path.
+      text_field = stripThinkingLines(text_field);
+
+      // ─── Strip surrounding quotes ─────────────────────────────────────
+      // Some models (especially qwen) wrap the text field value in literal
+      // quote characters, treating it as a JSON string literal. The user
+      // sees: "Based on your invoice data, the most significant opportunity..."
+      // with the literal " quotes visible. Strip them if they wrap the answer.
+      text_field = stripSurroundingQuotes(text_field);
 
       const reply = text_field.trim() || (artifact ? 'Here you go.' : 'I had trouble generating a clean response — please try again.');
       return { reply, artifact };
@@ -666,6 +808,9 @@ function extractArtifact(text: string): { reply: string; artifact: Artifact | un
   }
 
   reply = stripThinkingLines(reply);
+
+  // Strip surrounding quotes if the model wrapped the answer in literal quote chars
+  reply = stripSurroundingQuotes(reply);
 
   if (!reply) {
     reply = artifact

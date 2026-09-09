@@ -120,6 +120,21 @@ const THINKING_PATTERNS = [
   // More self-instruction lines
   /^\s*clarify\s+that\s+/i,
   /^\s*correct\s+them\s*\.?\s*$/i,
+  // "Self-verification AFTER answer" patterns
+  /^\s*check\s+constraints/i,
+  /^\s*looks\s+good\s*\.?\s*$/i,
+  /^\s*matches\s+schema/i,
+  /^\s*matches\s+the\s+schema/i,
+  /^\s*proceed\s*\.?\s*$/i,
+  /^\s*proceed\s+to\s+/i,
+  /^\s*one\s+minor\s+thing\s/i,
+  /^\s*the\s+prompt\s+says\s/i,
+  /^\s*self[- ]correction/i,
+  /^\s*self[- ]refinement/i,
+  /^\s*this\s+fits\s*\.?\s*$/i,
+  /^\s*all\s+matches\s*\.?\s*$/i,
+  /^\s*text\s+field\s+has\s+/i,
+  /^\s*json\s+only\s*\.?\s*$/i,
 ];
 
 const ANSWER_PREFIX_PATTERN = /^\s*(output|answer|response|final\s+answer|final\s+response|final\s+output|result|conclusion|text\s+construction|text\s*[:.]\s*(?!summary|introduction|notes?|draft|plan|outline|artifact\s+type))(?:[:.]\s*)?/i;
@@ -217,6 +232,59 @@ function findThinkingProcessHeader(text: string): number {
   return -1;
 }
 
+function stripPostAnswerThinking(text: string): string {
+  if (!text) return text;
+  const markers = [
+    /"\s*Check\s+constraints/i,
+    /"\s*Self[- ]Correction/i,
+    /"\s*Self[- ]Refinement/i,
+    /"\s*Looks\s+good\s*\.?/i,
+    /"\s*matches\s+schema/i,
+    /"\s*matches\s+the\s+schema/i,
+    /"\s*Proceed\s*\.?/i,
+    /"\s*One\s+minor\s+thing/i,
+    /"\s*The\s+prompt\s+says/i,
+    /\s+Check\s+constraints\s*:/i,
+    /\s+Self[- ]Correction/i,
+    /\s+matches\s+schema/i,
+  ];
+  let earliestIdx = -1;
+  for (const marker of markers) {
+    const match = text.match(marker);
+    if (match && match.index !== undefined) {
+      if (earliestIdx === -1 || match.index < earliestIdx) {
+        earliestIdx = match.index;
+      }
+    }
+  }
+  if (earliestIdx > 0) {
+    return text.slice(0, earliestIdx).trim();
+  }
+  return text;
+}
+
+function stripSurroundingQuotes(text: string): string {
+  if (!text || text.length < 2) return text;
+  const trimmed = text.trim();
+  if (trimmed.length < 2) return text;
+  const first = trimmed[0];
+  const last = trimmed[trimmed.length - 1];
+  if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
+    return trimmed.slice(1, -1);
+  }
+  if (trimmed.startsWith('\\"') && trimmed.endsWith('\\"')) {
+    return trimmed.slice(2, -2);
+  }
+  // Case 3: leading quote only — closing quote already removed by stripPostAnswerThinking
+  if (first === '"' && last !== '"') {
+    return trimmed.slice(1);
+  }
+  if (first === "'" && last !== "'") {
+    return trimmed.slice(1);
+  }
+  return text;
+}
+
 function stripArtifactJsonFromText(text: string): string {
   if (!text) return text;
   let clean = text;
@@ -256,6 +324,13 @@ function extractArtifact(text: string): { reply: string; artifact: Artifact | un
 
       // Strip leaked artifact JSON from text field (mirrors production code)
       text_field = stripArtifactJsonFromText(text_field);
+      // Strip "post-answer self-verification" (must run BEFORE stripSurroundingQuotes
+      // so we still see the closing quote marker)
+      text_field = stripPostAnswerThinking(text_field);
+      // Strip leaked thinking patterns (Check constraints: ... matches schema. Proceed.)
+      text_field = stripThinkingLines(text_field);
+      // Strip surrounding quotes (model sometimes wraps answer in literal " ")
+      text_field = stripSurroundingQuotes(text_field);
 
       const reply = text_field.trim() || (artifact ? 'Here you go.' : 'I had trouble generating a clean response — please try again.');
       return { reply, artifact };
@@ -346,6 +421,8 @@ function extractArtifact(text: string): { reply: string; artifact: Artifact | un
   }
 
   reply = stripThinkingLines(reply);
+  reply = stripPostAnswerThinking(reply);
+  reply = stripSurroundingQuotes(reply);
   if (!reply) {
     reply = artifact ? 'Here you go.' : 'I had trouble generating a clean response — please try again.';
   }
@@ -812,6 +889,35 @@ check('reply does NOT include raw invoice IDs', !r17.reply.includes('cmtfqxbyy00
 check('reply starts with the actual answer', r17.reply.startsWith('Actually, there are a few'));
 check('reply preserves the placeholder text mention', r17.reply.includes('exact company name contains placeholder text'));
 console.log(`  → Final reply:\n${r17.reply.split('\n').map(l => '    ' + l).join('\n')}`);
+
+// Case 18: User's "where can i save money?" paste — model wrapped the answer
+// in literal quotes AND appended "Check constraints: ... matches schema. Proceed.
+// Self-Correction/Refinement during thought:" after the answer. We should:
+//   - Strip the surrounding " " quotes
+//   - Strip the "Check constraints: ... matches schema. Proceed." tail
+//   - Strip the "Self-Correction/Refinement during thought:" tail
+const jsonModeWithQuotesAndVerification = JSON.stringify({
+  text: `"Based on your invoice data, the most significant opportunity to save money is addressing a major discrepancy with Elite Auto Care & Performance. There are 8 copies of invoice INV-2026-0702-001, where one amounts to $67,676,767.00 while the other 7 are $3,787.30. This likely indicates a duplicate payment or a data entry error that could save you over $67 million if corrected. Additionally, you have 8 invoices from 'Unknown' vendors (4 at $0.00 and 4 at $1,333.33) that should be reviewed for accuracy or potential cancellation." Check constraints: JSON only. Text field has markdown. Bold key numbers. 2-4 sentences. Looks good. One minor thing: The prompt says "2-4 sentences for simple questions." This fits. Elite Auto Care: 8 copies. One is $67,676,767.00. Seven are $3,787.30. Difference is huge. Unknown: 8 invoices. 4 are $0.00, 4 are $1,333.33. Total invoices: 18. All matches. matches schema. Proceed. Self-Correction/Refinement during thought:`,
+  artifact: null,
+});
+console.log('\nTest 18: JSON-mode with surrounding quotes + self-verification tail');
+const r18 = extractArtifact(jsonModeWithQuotesAndVerification);
+check('reply does NOT start with a literal quote', !r18.reply.startsWith('"'));
+check('reply does NOT end with a literal quote', !r18.reply.endsWith('"'));
+check('reply starts with the actual answer', r18.reply.startsWith('Based on your invoice data'));
+check('reply does NOT include "Check constraints"', !r18.reply.includes('Check constraints'));
+check('reply does NOT include "Looks good"', !r18.reply.includes('Looks good'));
+check('reply does NOT include "matches schema"', !r18.reply.includes('matches schema'));
+check('reply does NOT include "Self-Correction"', !r18.reply.includes('Self-Correction'));
+check('reply does NOT include "Self-Refinement"', !r18.reply.includes('Self-Refinement'));
+check('reply does NOT include "The prompt says"', !r18.reply.includes('The prompt says'));
+check('reply does NOT include "One minor thing"', !r18.reply.includes('One minor thing'));
+check('reply does NOT include "This fits"', !r18.reply.includes('This fits'));
+check('reply does NOT include "JSON only"', !r18.reply.includes('JSON only'));
+check('reply does NOT include "Text field has markdown"', !r18.reply.includes('Text field has markdown'));
+check('reply preserves the $67M opportunity mention', r18.reply.includes('most significant opportunity to save money'));
+check('reply preserves the Unknown vendor mention', r18.reply.includes('Unknown') || r18.reply.includes('unknown'));
+console.log(`  → Final reply:\n${r18.reply.split('\n').map(l => '    ' + l).join('\n')}`);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail > 0 ? 1 : 0);
