@@ -11,6 +11,16 @@ const SECURITY_HEADERS: Record<string, string> = {
   'X-XSS-Protection': '1; mode=block',
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), browsing-topics=()',
   'Strict-Transport-Security': 'max-age=63072000; includeSubDomains; preload',
+  // Content-Security-Policy: primary XSS defense. Restricts where scripts,
+  // styles, images, fonts, connections, etc. may load from. 'unsafe-inline'
+  // is required for script-src/style-src because Next.js + Tailwind rely on
+  // inline scripts/styles for hydration and styling; future hardening can
+  // switch to per-request nonces. img-src includes data:/blob: to support
+  // in-browser file previews (PDFs/images rendered from base64/blob URLs).
+  // connect-src includes Groq + OpenRouter as defense-in-depth in case
+  // client-side calls are added later (currently all AI calls are server-side).
+  'Content-Security-Policy':
+    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://api.groq.com https://openrouter.ai; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
 }
 
 /** General API rate limit: 60 requests per minute per IP */
