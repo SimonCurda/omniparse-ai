@@ -58,6 +58,17 @@ export async function POST(req: NextRequest) {
         }
         break;
       }
+      case 'customer.subscription.deleted': {
+        const sub = event.data.object as { customer: string };
+        const user = await db.user.findFirst({ where: { stripeCustomerId: sub.customer } });
+        if (user) {
+          await db.user.update({
+            where: { id: user.id },
+            data: { plan: 'free', stripeSubscriptionId: null, stripeCurrentPeriodEnd: null },
+          });
+        }
+        break;
+      }
       case 'invoice.payment_failed': {
         const invoice = event.data.object as { customer: string };
         const user = await db.user.findFirst({ where: { stripeCustomerId: invoice.customer } });

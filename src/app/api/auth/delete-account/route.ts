@@ -37,6 +37,33 @@ export async function DELETE(req: Request) {
   }
 
   try {
+    // Cancel Stripe subscription if user has one (prevents ongoing charges for deleted account)
+    const userWithStripe = await db.user.findUnique({
+      where: { id: auth.userId },
+      select: { stripeSubscriptionId: true },
+    });
+
+    if (userWithStripe?.stripeSubscriptionId) {
+      try {
+        const Stripe = (await import('stripe')).default;
+        const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+        if (stripeSecretKey) {
+          const stripe = new Stripe(stripeSecretKey);
+          await stripe.subscriptions.cancel(userWithStripe.stripeSubscriptionId);
+          console.warn(`[delete-account] Cancelled Stripe subscription ${userWithStripe.stripeSubscriptionId} for user ${auth.userId}`);
+        }
+      } catch (stripeErr) {
+        // Log but don't block deletion — user still wants their account gone
+        console.error(`[delete-account] Failed to cancel Stripe subscription ${userWithStripe.stripeSubscriptionId}:`, stripeErr instanceof Error ? stripeErr.message : String(stripeErr));
+      }
+    }
+
+    // Document the erasure request in server logs.
+    // Note: AuditLog entries have onDelete: Cascade on userId, so writing one here would
+    // be cascade-deleted with the user below. The user explicitly requested full erasure
+    // (GDPR-correct), so this console.warn is the audit trail instead.
+    console.warn(`[delete-account] Erasing account ${auth.userId} and all associated data (chat sessions, invoices, audit logs)`);
+
     await db.$transaction([
       db.chatSession.deleteMany({ where: { userId: auth.userId } }),
       db.invoice.deleteMany({ where: { userId: auth.userId } }),
