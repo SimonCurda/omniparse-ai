@@ -352,6 +352,13 @@ const THINKING_PATTERNS = [
   /^\s*did\s+the\s+user\s+ask\s/i,                // "Did the user ask for a summary?"
   /^\s*strict\s+rules\s+say\s/i,                 // "strict rules say artifact is null unless..."
   /^\s*they\s+asked\s/i,                          // "They asked 'do you see anything suspicious?'"
+  // ─── "Verification" / "schema check" lines (qwen sometimes leaks these) ──
+  /^\s*check\s+artifact\s+schema/i,           // "Check artifact schema."
+  /^\s*verifying\s+(the\s+)?(schema|artifact|json|response)/i,  // "Verifying schema..."
+  /^\s*schema\s+check/i,                     // "Schema check"
+  /^\s*artifact\s+check/i,                   // "Artifact check"
+  /^\s*check\s+the\s+(schema|artifact|json|response)/i,  // "Check the schema"
+  /^\s*validating\s+(the\s+)?(schema|artifact|json|response)/i,  // "Validating schema"
 ];
 
 // Patterns for "answer lead-in" prefixes that the model adds to the actual
@@ -464,6 +471,59 @@ function stripThinkingLines(reply: string): string {
   return result.trim();
 }
 
+/**
+ * Strip leaked artifact JSON from a chat reply's text field.
+ *
+ * Some models — especially qwen3.6-27b in free-text mode (after JSON validation
+ * fails) — put the artifact JSON inline in the text field AS WELL AS in the
+ * artifact field. The user then sees BOTH a styled table/chart card AND raw
+ * JSON in the chat bubble above it.
+ *
+ * This function removes any JSON object that looks like an artifact
+ * (has "type": "table" | "chart-bar" | "chart-line" | "chart-pie" | "summary"
+ * and "data" or "columns"). It also removes leading comma/whitespace artifacts
+ * left behind (e.g. "blah. ,{\"type\": ...}" → "blah.").
+ *
+ * Used by the JSON-mode primary path in extractArtifact.
+ */
+function stripArtifactJsonFromText(text: string): string {
+  if (!text) return text;
+
+  let clean = text;
+
+  // Remove raw JSON objects that look like artifacts ({"type": "chart-bar", ...})
+  // Single level: {"type":"table","title":"...","data":{...}}
+  clean = clean.replace(/\{[^{}]*"type"\s*:\s*"(chart-bar|chart-line|chart-pie|table|summary)"[^{}]*\}/g, '');
+
+  // Two-level nesting: {"type":"table","title":"...","data":{"columns":[...],"rows":[...]}}
+  // Match { ... { ... } ... "type": ... ... } and { ... "type": ... ... { ... } ... }
+  clean = clean.replace(/\{[^{]*\{[^}]*\}[^}]*"type"\s*:\s*"(chart-bar|chart-line|chart-pie|table|summary)"[^}]*\}/g, '');
+  clean = clean.replace(/\{[^{]*"type"\s*:\s*"(chart-bar|chart-line|chart-pie|table|summary)"[^{]*\{[^}]*\}[^}]*\}/g, '');
+
+  // Deeper nesting (3+ levels, e.g. full artifact with rows containing objects):
+  // Match { ... { ... { ... } ... } ... "type": ... ... } patterns.
+  // We use a greedy match up to the last `}` followed by end-of-string or newline.
+  clean = clean.replace(/\{[\s\S]*?"type"\s*:\s*"(chart-bar|chart-line|chart-pie|table|summary)"[\s\S]*?\n?\}/g, '');
+
+  // Remove INLINE partial artifact JSON that starts with `{ "type": "..."` or
+  // `,{"type":"..."` (often appears when the model writes the artifact inline
+  // mid-prose). Strip from the first occurrence to end of message.
+  clean = clean.replace(/\s*[,;.]?\s*\{[\s\n]*"type"\s*:\s*"(chart-bar|chart-line|chart-pie|table|summary)"[\s\S]*$/g, '');
+
+  // Clean up trailing punctuation left by JSON removal (e.g. "blah. ," → "blah.")
+  clean = clean.replace(/[,\s]+$/g, '');
+  clean = clean.replace(/\s+,/g, ',');
+  // Clean up ", }" or "., }" leftovers after JSON removal (preserves trailing period
+  // on legitimate prose like "You have 18 invoices in total.")
+  clean = clean.replace(/,?\s*\}\s*$/g, '');
+  clean = clean.replace(/\s+,\s*$/g, '');
+
+  // Clean up multiple blank lines left by removals
+  clean = clean.replace(/\n{3,}/g, '\n\n');
+
+  return clean.trim();
+}
+
 function extractArtifact(text: string): { reply: string; artifact: Artifact | undefined } {
   // ─── PRIMARY PATH: JSON-mode structured response ──────────────────────────
   // When the chat model supports JSON mode (llama-3.1, llama-3.3, llama-4-scout),
@@ -479,7 +539,7 @@ function extractArtifact(text: string): { reply: string; artifact: Artifact | un
     const parsed = JSON.parse(jsonStr) as { text?: unknown; artifact?: unknown };
 
     if (parsed && typeof parsed === 'object' && 'text' in parsed) {
-      const text_field = typeof parsed.text === 'string' ? parsed.text : '';
+      let text_field = typeof parsed.text === 'string' ? parsed.text : '';
       const artifact_field = parsed.artifact;
 
       // Validate the artifact field
@@ -490,6 +550,14 @@ function extractArtifact(text: string): { reply: string; artifact: Artifact | un
           artifact = a as unknown as Artifact;
         }
       }
+
+      // ─── Strip leaked artifact JSON from the text field ─────────────
+      // Some models (especially qwen in free-text fallback mode after JSON
+      // validation failed) put the artifact JSON inline in the text field AS
+      // WELL AS in the artifact field. The result: the user sees a styled
+      // table/chart card AND raw JSON in the chat bubble above it. We strip
+      // the JSON so the user only sees the prose + the rendered artifact card.
+      text_field = stripArtifactJsonFromText(text_field);
 
       const reply = text_field.trim() || (artifact ? 'Here you go.' : 'I had trouble generating a clean response — please try again.');
       return { reply, artifact };
@@ -829,19 +897,37 @@ export async function POST(req: NextRequest) {
         || groqMsg.includes('rate_limit')
         || groqMsg.includes('all models');
 
-      if (!isGroqExhausted || !isOpenRouterConfigured()) {
-        throw groqErr;
+      const orConfigured = isOpenRouterConfigured();
+      // Diagnostic logs — check Vercel function logs for these to debug
+      // OpenRouter fallback issues. If you see "Groq exhausted" but NOT
+      // "Falling through to OpenRouter", the issue is that OPENROUTER_API_KEY
+      // is missing or not picked up by the deployment.
+      console.warn('[chat] Groq failed:', groqMsg);
+      console.warn(`[chat] isOpenRouterConfigured: ${orConfigured ? 'true' : 'false (OPENROUTER_API_KEY not set)'}`);
+      console.warn(`[chat] isGroqExhausted: ${isGroqExhausted ? 'true' : 'false'}`);
+
+      if (!isGroqExhausted || !orConfigured) {
+        // Include diagnostic hint in the error message so it's visible in the
+        // chat UI when OpenRouter isn't configured. This makes it obvious to
+        // the user (and to us debugging) exactly what's missing.
+        const hint = !orConfigured
+          ? ' (OpenRouter fallback not configured — set OPENROUTER_API_KEY env var to enable)'
+          : '';
+        const wrappedErr = new Error(`${groqMsg}${hint}`);
+        throw wrappedErr;
       }
 
       // Groq exhausted — try OpenRouter
-      console.warn('[chat] Groq exhausted, falling back to OpenRouter...', groqMsg);
+      console.warn('[chat] Falling through to OpenRouter...', groqMsg);
       try {
         responseText = await openRouterChatCall(
           systemMessage,
           messages as Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
         );
+        console.warn('[chat] OpenRouter succeeded — using OpenRouter response.');
       } catch (openRouterErr) {
         const orMsg = openRouterErr instanceof Error ? openRouterErr.message : String(openRouterErr);
+        console.error('[chat] OpenRouter also failed:', orMsg);
         // Both providers failed. Throw a combined error that includes both provider
         // names so the user knows the situation is "everyone is busy", not just Groq.
         throw new Error(

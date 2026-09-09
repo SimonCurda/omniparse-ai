@@ -201,6 +201,23 @@ function findThinkingProcessHeader(text: string): number {
   return -1;
 }
 
+function stripArtifactJsonFromText(text: string): string {
+  if (!text) return text;
+  let clean = text;
+  clean = clean.replace(/\{[^{}]*"type"\s*:\s*"(chart-bar|chart-line|chart-pie|table|summary)"[^{}]*\}/g, '');
+  clean = clean.replace(/\{[^{]*\{[^}]*\}[^}]*"type"\s*:\s*"(chart-bar|chart-line|chart-pie|table|summary)"[^}]*\}/g, '');
+  clean = clean.replace(/\{[^{]*"type"\s*:\s*"(chart-bar|chart-line|chart-pie|table|summary)"[^{]*\{[^}]*\}[^}]*\}/g, '');
+  clean = clean.replace(/\{[\s\S]*?"type"\s*:\s*"(chart-bar|chart-line|chart-pie|table|summary)"[\s\S]*?\n?\}/g, '');
+  clean = clean.replace(/\s*[,;.]?\s*\{[\s\n]*"type"\s*:\s*"(chart-bar|chart-line|chart-pie|table|summary)"[\s\S]*$/g, '');
+  clean = clean.replace(/[,\s]+$/g, '');
+  clean = clean.replace(/\s+,/g, ',');
+  // Clean up ", }" leftovers after JSON removal (preserves trailing period)
+  clean = clean.replace(/,?\s*\}\s*$/g, '');
+  clean = clean.replace(/\s+,\s*$/g, '');
+  clean = clean.replace(/\n{3,}/g, '\n\n');
+  return clean.trim();
+}
+
 function extractArtifact(text: string): { reply: string; artifact: Artifact | undefined } {
   // ─── PRIMARY PATH: JSON-mode structured response ──────────────────────────
   try {
@@ -210,7 +227,7 @@ function extractArtifact(text: string): { reply: string; artifact: Artifact | un
     const parsed = JSON.parse(jsonStr) as { text?: unknown; artifact?: unknown };
 
     if (parsed && typeof parsed === 'object' && 'text' in parsed) {
-      const text_field = typeof parsed.text === 'string' ? parsed.text : '';
+      let text_field = typeof parsed.text === 'string' ? parsed.text : '';
       const artifact_field = parsed.artifact;
 
       let artifact: Artifact | undefined;
@@ -220,6 +237,9 @@ function extractArtifact(text: string): { reply: string; artifact: Artifact | un
           artifact = a as unknown as Artifact;
         }
       }
+
+      // Strip leaked artifact JSON from text field (mirrors production code)
+      text_field = stripArtifactJsonFromText(text_field);
 
       const reply = text_field.trim() || (artifact ? 'Here you go.' : 'I had trouble generating a clean response — please try again.');
       return { reply, artifact };
@@ -709,6 +729,34 @@ check('reply starts with the actual answer', r15.reply.includes('I found 1 dupli
 check('reply preserves the amount mismatch detail', r15.reply.includes('amount mismatch in this group'));
 check('reply preserves the $67,676,767.00 outlier', r15.reply.includes('$67,676,767.00'));
 console.log(`  → Final reply:\n${r15.reply.split('\n').map(l => '    ' + l).join('\n')}`);
+
+// Case 16: User's "Show duplicate invoices" paste — JSON-mode response where
+// the model ALSO leaked artifact JSON inline in the text field. The user sees
+// a styled table card AND raw JSON in the chat bubble. We should strip the JSON.
+const jsonLeakedInTextPaste = JSON.stringify({
+  text: `I found 1 duplicate group containing 8 invoices from Elite Auto Care & Performance for invoice #INV-2026-0702-001 dated 2026-07-02.
+,{" "type": "table", "title": "Suspicious Invoices", "data": { "columns": ["Category", "Issue", "Details"], "rows": [ { "Category": "Elite Auto Care & Performance", "Issue": "Massive Duplicate Amount", "Details": "8 copies of INV-2026-0702-001. One is $67,676,767.00 while others are $3,787.30." } ] } }`,
+  artifact: {
+    type: "table",
+    title: "Suspicious Invoices",
+    data: {
+      columns: ["Category", "Issue", "Details"],
+      rows: [
+        { Category: "Elite Auto Care & Performance", Issue: "Massive Duplicate Amount", Details: "8 copies of INV-2026-0702-001. One is $67,676,767.00 while others are $3,787.30." },
+      ],
+    },
+  },
+});
+console.log('\nTest 16: JSON-mode with leaked artifact JSON in text field');
+const r16 = extractArtifact(jsonLeakedInTextPaste);
+check('reply contains the prose answer', r16.reply.includes('I found 1 duplicate group containing 8 invoices'));
+check('reply does NOT contain leaked {"type":"table"} JSON', !r16.reply.includes('"type":"table"') && !r16.reply.includes('"type": "table"'));
+check('reply does NOT contain "data": "columns"', !r16.reply.includes('"columns"') && !r16.reply.includes('"rows"'));
+check('reply does NOT contain raw JSON artifact', !r16.reply.includes('{') || r16.reply.indexOf('{') === -1);
+check('artifact was extracted correctly', r16.artifact !== undefined);
+check('artifact is a table', r16.artifact?.type === 'table');
+check('artifact has 1 row', (r16.artifact?.data.rows as unknown[])?.length === 1);
+console.log(`  → Final reply:\n${r16.reply.split('\n').map(l => '    ' + l).join('\n')}`);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail > 0 ? 1 : 0);
