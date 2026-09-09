@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ArrowLeft, Check, Eye, EyeOff, Loader2, X } from 'lucide-react';
@@ -16,10 +17,15 @@ export function AuthView({ mode, onSwitch, onBack }: { mode: 'login' | 'signup';
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState('');
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [ageConfirmed, setAgeConfirmed] = useState(false);
 
   const setUser = useAppStore((s) => s.setUser);
   const setView = useAppStore((s) => s.setView);
   const setInvoices = useAppStore((s) => s.setInvoices);
+
+  // In signup mode, submit is disabled until both consent checkboxes are checked
+  const submitDisabled = loading || (mode === 'signup' && (!termsAccepted || !ageConfirmed));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,12 +42,26 @@ export function AuthView({ mode, onSwitch, onBack }: { mode: 'login' | 'signup';
       return;
     }
 
+    // Client-side consent validation (defense-in-depth even though submit is disabled)
+    if (mode === 'signup' && !termsAccepted) {
+      setApiError('You must accept the Terms of Service and Privacy Policy.');
+      return;
+    }
+    if (mode === 'signup' && !ageConfirmed) {
+      setApiError('You must confirm you are at least 15 years old.');
+      return;
+    }
+
     setLoading(true);
 
     try {
       const endpoint = mode === 'login' ? '/api/auth/login' : '/api/auth/register';
-      const body: Record<string, string> = { email, password };
-      if (mode === 'signup') body.name = name;
+      const body: Record<string, string | boolean> = { email, password };
+      if (mode === 'signup') {
+        body.name = name;
+        body.termsAccepted = true;
+        body.ageConfirmed = true;
+      }
 
       const res = await fetch(endpoint, {
         method: 'POST',
@@ -53,6 +73,14 @@ export function AuthView({ mode, onSwitch, onBack }: { mode: 'login' | 'signup';
 
       if (!res.ok) {
         setApiError(data.error || 'Something went wrong. Please try again.');
+        return;
+      }
+
+      // Email-enumeration prevention: server may return a generic `message` (no
+      // user/token) when the email was already registered. Show the message and
+      // do NOT attempt to log in.
+      if (mode === 'signup' && data.message && !data.user) {
+        setApiError(data.message);
         return;
       }
 
@@ -199,11 +227,63 @@ export function AuthView({ mode, onSwitch, onBack }: { mode: 'login' | 'signup';
               );
             })()}
 
+            {mode === 'signup' && (
+              <div className="space-y-3 pt-1">
+                <div className="flex items-start gap-2">
+                  <Checkbox
+                    id="terms"
+                    checked={termsAccepted}
+                    onCheckedChange={(checked) => setTermsAccepted(checked === true)}
+                    disabled={loading}
+                    className="mt-0.5"
+                  />
+                  <Label
+                    htmlFor="terms"
+                    className="text-xs text-muted-foreground font-normal leading-relaxed cursor-pointer"
+                  >
+                    I agree to the{' '}
+                    <a
+                      href="/terms-of-service"
+                      target="_blank"
+                      rel="noopener"
+                      className="text-amber-500 hover:underline"
+                    >
+                      Terms of Service
+                    </a>
+                    {' '}and{' '}
+                    <a
+                      href="/privacy-policy"
+                      target="_blank"
+                      rel="noopener"
+                      className="text-amber-500 hover:underline"
+                    >
+                      Privacy Policy
+                    </a>
+                  </Label>
+                </div>
+                <div className="flex items-start gap-2">
+                  <Checkbox
+                    id="age"
+                    checked={ageConfirmed}
+                    onCheckedChange={(checked) => setAgeConfirmed(checked === true)}
+                    disabled={loading}
+                    className="mt-0.5"
+                  />
+                  <Label
+                    htmlFor="age"
+                    className="text-xs text-muted-foreground font-normal leading-relaxed cursor-pointer"
+                  >
+                    I confirm I am at least 15 years old
+                  </Label>
+                </div>
+              </div>
+            )}
+
             {apiError && (
               <p className="text-sm text-destructive font-medium">{apiError}</p>
             )}
 
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" className="w-full" disabled={submitDisabled}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {mode === 'login' ? 'Sign In' : 'Create Account'}
             </Button>

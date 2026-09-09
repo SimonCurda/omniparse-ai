@@ -15,7 +15,7 @@ export const signupSchema = z.object({
     email: z.string().email('Please enter a valid email address'),
     password: z
       .string()
-      .min(6, 'Password must be at least 6 characters')
+      .min(8, 'Password must be at least 8 characters')
       .refine(
         (pwd) => /[A-Z]/.test(pwd),
         'Password must contain at least one uppercase letter'
@@ -28,6 +28,8 @@ export const signupSchema = z.object({
         (pwd) => /[0-9]/.test(pwd),
         'Password must contain at least one number'
       ),
+    termsAccepted: z.literal(true, { error: 'You must accept the Terms of Service and Privacy Policy' }),
+    ageConfirmed: z.literal(true, { error: 'You must confirm you are at least 15 years old' }),
   });
 
 export const changePasswordSchema = z
@@ -98,7 +100,7 @@ export const chatSchema = z.object({
   history: z
     .array(
       z.object({
-        role: z.enum(['user', 'assistant', 'system']),
+        role: z.enum(['user', 'assistant']),
         content: z.string(),
       })
     )

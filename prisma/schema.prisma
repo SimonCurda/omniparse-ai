@@ -23,6 +23,9 @@ model User {
   retentionDays Int?
   // Active entity for multi-entity (Business+)
   activeEntityId String?
+  // GDPR Art. 7 (consent) + Art. 8 (children) — when user accepted terms / confirmed age
+  termsAcceptedAt   DateTime?
+  ageConfirmedAt    DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   invoices       Invoice[]

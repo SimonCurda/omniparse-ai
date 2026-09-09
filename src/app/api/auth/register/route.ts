@@ -30,7 +30,10 @@ export async function POST(req: NextRequest) {
 
     const existing = await db.user.findUnique({ where: { email: email.toLowerCase() } });
     if (existing) {
-      return NextResponse.json({ error: 'An account with this email already exists.' }, { status: 409 });
+      // Don't reveal that the email is already registered (prevent enumeration)
+      return NextResponse.json({
+        message: 'If this email is not already registered, an account has been created. Please check your email for verification (coming soon).'
+      }, { status: 200 });
     }
 
     const hashedPw = await hashPassword(password);
@@ -40,6 +43,8 @@ export async function POST(req: NextRequest) {
         email: email.toLowerCase(),
         name,
         password: hashedPw,
+        termsAcceptedAt: new Date(),
+        ageConfirmedAt: new Date(),
       },
       select: { id: true, email: true, name: true, plan: true, createdAt: true },
     });
