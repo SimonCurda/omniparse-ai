@@ -5,9 +5,20 @@ import { db } from '@/lib/db';
 // Called by Vercel Cron or external scheduler
 // Returns count of purged invoices
 export async function POST(req: Request) {
-  // Verify cron secret to prevent unauthorized calls
+  // Verify cron secret to prevent unauthorized calls.
+  // In production, CRON_SECRET must be set as a Vercel env var. There is no
+  // fallback — if the env var is missing, the endpoint refuses to serve
+  // requests (security: don't ship hardcoded dev secrets to prod).
   const authHeader = req.headers.get('authorization');
-  const cronSecret = process.env.CRON_SECRET || 'omniparse-cron-dev';
+  const cronSecret = process.env.CRON_SECRET;
+
+  if (!cronSecret) {
+    console.error('[cron] CRON_SECRET env var is not set. Refusing request.');
+    return NextResponse.json(
+      { error: 'Cron endpoint not configured. Set CRON_SECRET env var.' },
+      { status: 503 }
+    );
+  }
 
   if (authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
