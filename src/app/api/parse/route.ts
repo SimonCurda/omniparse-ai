@@ -237,14 +237,59 @@ IMPORTANT: For each field, estimate your extraction confidence (0.0 to 1.0). If 
       return NextResponse.json({ error: 'AI returned an empty response. The document may be unreadable.' }, { status: 500 });
     }
 
-    let parsed: Record<string, unknown>;
-    const jsonMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/) ?? null;
-    const jsonStr = jsonMatch ? jsonMatch[1] : responseText.trim();
+    // ─── Clean the AI response before parsing as JSON ────────────────────
+    // The vision model (qwen3.6-27b) is a reasoning model and may leak its
+    // thinking process before the JSON output. We need to extract just the
+    // JSON from the response. Same patterns as the chat cleanup system.
+    let cleanResponse = responseText;
 
+    // Strategy 1: Extract from markdown code fences (```json ... ```)
+    const fenceMatch = cleanResponse.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (fenceMatch) {
+      cleanResponse = fenceMatch[1].trim();
+    }
+
+    // Strategy 2: If no fence, find the first { and last } — extract JSON object
+    if (!fenceMatch) {
+      const firstBrace = cleanResponse.indexOf('{');
+      const lastBrace = cleanResponse.lastIndexOf('}');
+      if (firstBrace >= 0 && lastBrace > firstBrace) {
+        cleanResponse = cleanResponse.slice(firstBrace, lastBrace + 1);
+      }
+    }
+
+    // Strategy 3: Remove common thinking prefixes (same patterns as chat)
+    // The vision model sometimes writes "The user wants me to..." before the JSON
+    cleanResponse = cleanResponse.replace(/^[\s\S]*?(?=\{)/, (match) => {
+      // Only strip if the text before the first { looks like thinking
+      const beforeJson = match.trim();
+      if (beforeJson.length < 5) return match;
+      // Check for common thinking patterns
+      if (/the user wants|I need to|I should|I will|I'll|I'm going to|Let me|The user is/i.test(beforeJson)) {
+        return ''; // Strip everything before the first {
+      }
+      return match;
+    });
+
+    // Clean up any remaining markdown
+    cleanResponse = cleanResponse.replace(/```json\s*/g, '').replace(/```\s*$/g, '').trim();
+
+    let parsed: Record<string, unknown>;
     try {
-      parsed = JSON.parse(jsonStr);
+      parsed = JSON.parse(cleanResponse);
     } catch {
-      return NextResponse.json({ error: 'AI response could not be parsed as valid JSON.', raw: responseText }, { status: 500 });
+      // If JSON.parse still fails, try to find any valid JSON object in the text
+      const jsonRegex = /\{[\s\S]*\}/;
+      const jsonMatch = responseText.match(jsonRegex);
+      if (jsonMatch) {
+        try {
+          parsed = JSON.parse(jsonMatch[0]);
+        } catch {
+          return NextResponse.json({ error: 'AI response could not be parsed as valid JSON.', raw: responseText }, { status: 500 });
+        }
+      } else {
+        return NextResponse.json({ error: 'AI response could not be parsed as valid JSON.', raw: responseText }, { status: 500 });
+      }
     }
 
     const processingTime = (Date.now() - startTime) / 1000;
