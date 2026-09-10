@@ -19,12 +19,15 @@ const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 //   2. nvidia/llama-3.1-nemotron-70b-instruct:free — NVIDIA's instruction-tuned
 //      Llama 3.1, reliable for chat and structured output.
 //
-// Both are free on OpenRouter. If Ling fails (rate-limited or down),
-// OpenRouter automatically tries Nemotron. If both fail, OpenRouter returns
-// an error and the chat route shows the "AI is temporarily busy" message.
+// All are free on OpenRouter. If Ling fails (rate-limited or down),
+// OpenRouter automatically tries each fallback in order. If all fail,
+// OpenRouter returns an error and the chat route shows the error.
 const OPENROUTER_PRIMARY_MODEL = 'inclusionai/ling-3.0-flash-fin:free';
 const OPENROUTER_FALLBACK_MODELS = [
   'nvidia/llama-3.1-nemotron-70b-instruct:free',
+  'meta-llama/llama-3.3-70b-instruct:free',
+  'mistralai/mistral-7b-instruct:free',
+  'qwen/qwen-2.5-72b-instruct:free',
 ];
 
 const MAX_TOKENS = 4096;       // enough for chat + medium-sized artifacts
