@@ -37,17 +37,28 @@ const MAX_SIZE = 10 * 1024 * 1024;
  */
 function extractFieldsFromProse(text: string): Record<string, unknown> {
   const result: Record<string, unknown> = {};
-  const lower = text.toLowerCase();
 
   // Vendor: look for "vendor" followed by a value
-  const vendorMatch = text.match(/(?:vendor|company|from)\s*(?:is|:|=)\s*["']?([^"'\n,.]+)["']?/i);
-  if (vendorMatch) result.vendor = vendorMatch[1].trim();
+  // Skip markdown bold markers (**), list markers (- *), and quotes
+  const vendorMatch = text.match(/(?:vendor|company|from)\s*(?:is|:|=)\s*["']?([A-Za-z][A-Za-z0-9\s&.,]+?)["']?(?:\s*[.\n]|$)/i);
+  if (vendorMatch) {
+    let v = vendorMatch[1].trim().replace(/^\*+|\*+$/g, '').replace(/^[-*]\s*/, '');
+    // Don't accept very short or generic matches
+    if (v.length > 1 && !/^(the|this|that|it|a|an)$/i.test(v)) {
+      result.vendor = v;
+    }
+  }
 
-  // Invoice number
-  const invNumMatch = text.match(/(?:invoice\s*(?:number|#|no))\s*(?:is|:|=)\s*["']?([A-Z0-9\-\/]+)["']?/i);
+  // Invoice number: match alphanumeric invoice numbers
+  const invNumMatch = text.match(/(?:invoice\s*(?:number|#|no))?\s*(?:is|:|=)\s*["']?(INV[-A-Z0-9\-\/]+)["']?/i);
   if (invNumMatch) result.invoiceNumber = invNumMatch[1].trim();
+  else {
+    // Also try "Invoice #: XXX"
+    const invNumMatch2 = text.match(/invoice\s*#?\s*:?\s*([A-Z]{3,}-[A-Z0-9\-]+)/i);
+    if (invNumMatch2) result.invoiceNumber = invNumMatch2[1].trim();
+  }
 
-  // Invoice date
+  // Invoice date: YYYY-MM-DD format
   const dateMatch = text.match(/(?:invoice\s*date|date)\s*(?:is|:|=)\s*["']?(\d{4}-\d{2}-\d{2})["']?/i);
   if (dateMatch) result.invoiceDate = dateMatch[1];
 
@@ -55,11 +66,11 @@ function extractFieldsFromProse(text: string): Record<string, unknown> {
   const dueMatch = text.match(/(?:due\s*date)\s*(?:is|:|=)\s*["']?(\d{4}-\d{2}-\d{2})["']?/i);
   if (dueMatch) result.dueDate = dueMatch[1];
 
-  // Amount (subtotal)
-  const amountMatch = text.match(/(?:amount|subtotal)\s*(?:is|:|=)\s*["']?\$?([\d,.]+)["']?/i);
+  // Amount (subtotal) - look for "subtotal" or "amount" followed by a number
+  const amountMatch = text.match(/(?:subtotal|amount)\s*(?:is|:|=)\s*["']?\$?([\d,.]+)["']?/i);
   if (amountMatch) {
     const val = parseFloat(amountMatch[1].replace(/,/g, ''));
-    if (!isNaN(val)) result.amount = val;
+    if (!isNaN(val) && val > 0) result.amount = val;
   }
 
   // VAT
@@ -69,18 +80,24 @@ function extractFieldsFromProse(text: string): Record<string, unknown> {
     if (!isNaN(val)) result.vatAmount = val;
   }
 
-  // Total
-  const totalMatch = text.match(/(?:total|grand\s*total)\s*(?:is|:|=)\s*["']?\$?([\d,.]+)["']?/i);
+  // Total - look for "total" or "grand total" but NOT "subtotal" or "Unit Price" or "Total:" on a line item
+  // Match "Total:" followed by a number, but the number must be > 100 to avoid matching line item totals
+  const totalMatch = text.match(/(?:^|\n|\.\s)(?:grand\s*)?total\s*(?:is|:|=)\s*["']?\$?([\d,.]+)["']?/i);
   if (totalMatch) {
     const val = parseFloat(totalMatch[1].replace(/,/g, ''));
-    if (!isNaN(val)) result.total = val;
+    if (!isNaN(val) && val > 0) result.total = val;
+  }
+  // If no total found, try to compute from amount + vat
+  if (!result.total && result.amount && result.vatAmount) {
+    result.total = Math.round((result.amount as number + result.vatAmount as number) * 100) / 100;
   }
 
   // Currency
   const currencyMatch = text.match(/(?:currency)\s*(?:is|:|=)\s*["']?(USD|EUR|GBP|CZK|JPY|CAD|AUD|CHF)["']?/i);
   if (currencyMatch) result.currency = currencyMatch[1].toUpperCase();
-  else if (text.includes('$')) result.currency = 'USD';
+  else if (text.includes('$') || text.includes('USD')) result.currency = 'USD';
   else if (text.includes('EUR') || text.includes('\u20ac')) result.currency = 'EUR';
+  else if (text.includes('GBP') || text.includes('\u00a3')) result.currency = 'GBP';
 
   // Confidence
   result.confidence = 0.7; // Lower confidence for prose extraction
