@@ -35,6 +35,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'User not found' }, { status: 401 });
   }
 
+  // OAuth-only users (password == null) have no password to change.
+  // They sign in via Google / GitHub and manage credentials through the
+  // provider, not us.
+  if (user.password === null) {
+    return NextResponse.json(
+      { error: 'Password change is not available for OAuth accounts.' },
+      { status: 400 }
+    );
+  }
+
   const isValid = await verifyPassword(currentPassword, user.password);
   if (!isValid) {
     return NextResponse.json({ error: 'Current password is incorrect' }, { status: 401 });

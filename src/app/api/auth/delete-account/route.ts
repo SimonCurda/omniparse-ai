@@ -15,13 +15,6 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
   }
 
-  if (!body.password) {
-    return NextResponse.json(
-      { error: 'Current password is required to delete your account' },
-      { status: 400 }
-    );
-  }
-
   const user = await db.user.findUnique({
     where: { id: auth.userId },
     select: { id: true, password: true },
@@ -31,9 +24,22 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: 'User not found' }, { status: 401 });
   }
 
-  const isValid = await verifyPassword(body.password, user.password);
-  if (!isValid) {
-    return NextResponse.json({ error: 'Invalid password' }, { status: 401 });
+  // Password verification:
+  // - Password users (user.password != null) must supply a valid password.
+  // - OAuth-only users (user.password == null) skip the check — they are
+  //   already authenticated via the JWT in the Authorization header, which
+  //   is the only credential they have.
+  if (user.password !== null) {
+    if (!body.password) {
+      return NextResponse.json(
+        { error: 'Current password is required to delete your account' },
+        { status: 400 }
+      );
+    }
+    const isValid = await verifyPassword(body.password, user.password);
+    if (!isValid) {
+      return NextResponse.json({ error: 'Invalid password' }, { status: 401 });
+    }
   }
 
   try {

@@ -33,6 +33,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid email or password.' }, { status: 401 });
     }
 
+    // OAuth-only users (no password) cannot log in via the email/password flow.
+    // Return the same generic error as a bad password to avoid account enumeration.
+    if (!user.password) {
+      return NextResponse.json({ error: 'Invalid email or password.' }, { status: 401 });
+    }
+
     const valid = await verifyPassword(password, user.password);
     if (!valid) {
       return NextResponse.json({ error: 'Invalid email or password.' }, { status: 401 });

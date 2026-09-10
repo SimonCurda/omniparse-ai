@@ -14,6 +14,7 @@ import { AuthView } from '@/components/landing/auth-view';
 import { DashboardShell } from '@/components/dashboard/dashboard-shell';
 import { LegalDrawer } from '@/components/landing/legal-drawer';
 import { CookieBanner } from '@/components/landing/cookie-banner';
+import { toast } from 'sonner';
 
 export default function Home() {
   const view = useAppStore((s) => s.view);
@@ -26,6 +27,67 @@ export default function Home() {
   const setLegalPage = useAppStore((s) => s.setLegalPage);
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [mounted, setMounted] = useState(false);
+
+  // OAuth callback redirect pickup.
+  // The OAuth callback routes redirect to /?token=<jwt> or /?oauth_error=<provider>.
+  // On mount we detect those query params, persist the token (or show a toast
+  // for an error), and strip the param from the URL with history.replaceState
+  // so users don't accidentally re-share the token in their address bar.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    const oauthError = params.get('oauth_error');
+
+    if (token) {
+      localStorage.setItem('op_token', token);
+      // Strip the token from the URL but preserve any other params (e.g. hash).
+      params.delete('token');
+      const remaining = params.toString();
+      const newSearch = remaining ? `?${remaining}` : '';
+      window.history.replaceState(null, '', `${window.location.pathname}${newSearch}${window.location.hash}`);
+
+      // Fetch the user profile using the freshly-stored token and switch
+      // straight to the dashboard.
+      fetch('/api/auth/me', { headers: { Authorization: 'Bearer ' + token } })
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.user) {
+            setUser({
+              id: data.user.id,
+              email: data.user.email,
+              name: data.user.name,
+              plan: data.user.plan,
+              createdAt: data.user.createdAt,
+            });
+            setInvoices([]);
+            setView('dashboard');
+            toast.success(`Welcome, ${data.user.name}`);
+          } else {
+            // Token didn't validate — clear it so the user isn't stuck in
+            // a half-logged-in state.
+            localStorage.removeItem('op_token');
+            toast.error('Sign-in failed. Please try again.');
+          }
+        })
+        .catch(() => {
+          toast.error('Network error. Please try again.');
+        });
+      return;
+    }
+
+    if (oauthError) {
+      const messages: Record<string, string> = {
+        google: 'Google sign-in failed. Please try again.',
+        github: 'GitHub sign-in failed. Please try again.',
+      };
+      toast.error(messages[oauthError] || 'Authentication failed. Please try again.');
+      params.delete('oauth_error');
+      const remaining = params.toString();
+      const newSearch = remaining ? `?${remaining}` : '';
+      window.history.replaceState(null, '', `${window.location.pathname}${newSearch}${window.location.hash}`);
+    }
+  }, []);
 
   useEffect(() => {
     setMounted(true);

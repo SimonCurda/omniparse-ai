@@ -11,7 +11,11 @@ model User {
   id        String   @id @default(cuid())
   email     String   @unique
   name      String
-  password  String
+  // Null for OAuth-only users (Google / GitHub). Required for password users.
+  password  String?
+  // OAuth provider account IDs. Null for password-only users.
+  googleId  String?  @unique
+  githubId  String?  @unique
   plan      String   @default("free")  // free, pro, plus, business, enterprise
   stripeCustomerId     String?
   stripeSubscriptionId String?
