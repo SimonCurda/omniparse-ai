@@ -176,6 +176,8 @@ export function AuthView({ mode, onSwitch, onBack }: { mode: 'login' | 'signup';
                   onClick={() => setShowPw(!showPw)}
                   tabIndex={-1}
                   disabled={loading}
+                  aria-label={showPw ? 'Hide password' : 'Show password'}
+                  aria-pressed={showPw}
                 >
                   {showPw ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                 </Button>
@@ -294,7 +296,7 @@ export function AuthView({ mode, onSwitch, onBack }: { mode: 'login' | 'signup';
                       href="/terms-of-service"
                       target="_blank"
                       rel="noopener"
-                      className="text-amber-500 hover:underline"
+                      className="text-amber-600 hover:underline"
                     >
                       Terms of Service
                     </a>
@@ -303,7 +305,7 @@ export function AuthView({ mode, onSwitch, onBack }: { mode: 'login' | 'signup';
                       href="/privacy-policy"
                       target="_blank"
                       rel="noopener"
-                      className="text-amber-500 hover:underline"
+                      className="text-amber-600 hover:underline"
                     >
                       Privacy Policy
                     </a>
@@ -341,7 +343,7 @@ export function AuthView({ mode, onSwitch, onBack }: { mode: 'login' | 'signup';
               <>
                 Don&apos;t have an account?{' '}
                 <button
-                  className="text-amber-500 hover:underline font-medium"
+                  className="text-amber-600 hover:underline font-medium"
                   onClick={() => { setApiError(''); onSwitch('signup'); }}
                   disabled={loading}
                 >
@@ -352,7 +354,7 @@ export function AuthView({ mode, onSwitch, onBack }: { mode: 'login' | 'signup';
               <>
                 Already have an account?{' '}
                 <button
-                  className="text-amber-500 hover:underline font-medium"
+                  className="text-amber-600 hover:underline font-medium"
                   onClick={() => { setApiError(''); onSwitch('login'); }}
                   disabled={loading}
                 >

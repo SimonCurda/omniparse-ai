@@ -85,14 +85,16 @@ export function DashboardShell() {
         }))))
         .catch(() => {});
 
-      // Fetch pending approvals count
-      fetch('/api/approvals?status=pending_review', { headers: { Authorization: 'Bearer ' + token } })
-        .then((r) => r.ok ? r.json() : [])
-        .then((data) => {
-          const arr = Array.isArray(data) ? data : [];
-          setPendingApprovalsCount(arr.length);
-        })
-        .catch(() => {});
+      // Fetch pending approvals count (Plus/Business/Enterprise only)
+      if (user && ['plus', 'business', 'enterprise'].includes(user.plan)) {
+        fetch('/api/approvals?status=pending_review', { headers: { Authorization: 'Bearer ' + token } })
+          .then((r) => r.ok ? r.json() : [])
+          .then((data) => {
+            const arr = Array.isArray(data) ? data : [];
+            setPendingApprovalsCount(arr.length);
+          })
+          .catch(() => {});
+      }
     }
   }, []);
 
@@ -189,6 +191,7 @@ export function DashboardShell() {
               className="pl-9 w-64 h-9"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              aria-label="Search invoices"
             />
           </div>
 
@@ -204,14 +207,15 @@ export function DashboardShell() {
                     className="pl-9 w-48 h-9"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
+                    aria-label="Search invoices"
                   />
                 </div>
-                <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => { setSearchMobileOpen(false); setSearchQuery(''); }}>
+                <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => { setSearchMobileOpen(false); setSearchQuery(''); }} aria-label="Close search">
                   ✕
                 </Button>
               </div>
             ) : (
-              <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setSearchMobileOpen(true)}>
+              <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setSearchMobileOpen(true)} aria-label="Open search">
                 <Search className="h-4 w-4" />
               </Button>
             )}
@@ -230,7 +234,7 @@ export function DashboardShell() {
             <Progress value={limit === Infinity ? 0 : Math.min(100, (invoices.length / limit) * 100)} className="w-16 h-1" />
           </div>
 
-          <Button variant="ghost" size="icon" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+          <Button variant="ghost" size="icon" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} aria-label="Toggle theme">
             {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
           <DropdownMenu>

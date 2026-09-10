@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     if (!hasFeature(user.plan, 'custom_validation_rules')) {
-      return NextResponse.json({ error: 'Custom validation rules require Plus plan or higher' }, { status: 403 });
+      return NextResponse.json({ error: 'Custom validation rules require Pro plan or higher.' }, { status: 403 });
     }
 
     const rules = await db.customRule.findMany({
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     if (!hasFeature(user.plan, 'custom_validation_rules')) {
-      return NextResponse.json({ error: 'Custom validation rules require Plus plan or higher' }, { status: 403 });
+      return NextResponse.json({ error: 'Custom validation rules require Pro plan or higher.' }, { status: 403 });
     }
 
     const body = await req.json();
@@ -127,7 +127,7 @@ export async function PUT(req: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     if (!hasFeature(user.plan, 'custom_validation_rules')) {
-      return NextResponse.json({ error: 'Custom validation rules require Plus plan or higher' }, { status: 403 });
+      return NextResponse.json({ error: 'Custom validation rules require Pro plan or higher.' }, { status: 403 });
     }
 
     const body = await req.json();
@@ -180,7 +180,7 @@ export async function DELETE(req: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     if (!hasFeature(user.plan, 'custom_validation_rules')) {
-      return NextResponse.json({ error: 'Custom validation rules require Plus plan or higher' }, { status: 403 });
+      return NextResponse.json({ error: 'Custom validation rules require Pro plan or higher.' }, { status: 403 });
     }
 
     const id = req.nextUrl.searchParams.get('id');

@@ -793,7 +793,10 @@ function CustomRulesBuilder() {
     if (!token) return;
     try {
       const res = await fetch('/api/custom-rules', { headers: { Authorization: 'Bearer ' + token } });
-      if (res.ok) setRules((await res.json()).rules || []);
+      if (res.ok) {
+        const data = await res.json();
+        setRules(Array.isArray(data) ? data : (data.rules || []));
+      }
     } catch {}
   }, []);
 

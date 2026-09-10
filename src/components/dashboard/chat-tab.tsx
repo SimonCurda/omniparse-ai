@@ -323,7 +323,7 @@ export function ChatTab() {
         <div className="border-t p-4">
           <form onSubmit={(e) => { e.preventDefault(); sendMessage(); }} className="flex gap-2">
             <Input ref={inputRef} placeholder="Ask about your invoices..." value={input} onChange={(e) => setInput(e.target.value)} disabled={chatLoading} className="flex-1" />
-            <Button type="submit" size="icon" disabled={!input.trim() || chatLoading}>
+            <Button type="submit" size="icon" disabled={!input.trim() || chatLoading} aria-label="Send message">
               <Send className="h-4 w-4" />
             </Button>
           </form>

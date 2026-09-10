@@ -32,20 +32,20 @@ export function Navbar({ onAuth }: { onAuth: (v: 'login' | 'signup') => void }) 
         </div>
 
         <div className="hidden md:flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+          <Button variant="ghost" size="sm" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} aria-label="Toggle theme">
             {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
           <Button variant="ghost" size="sm" onClick={() => onAuth('login')}>Log in</Button>
           <Button size="sm" onClick={() => onAuth('signup')}>Get Started</Button>
         </div>
 
-        <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setMobileOpen(!mobileOpen)}>
+        <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setMobileOpen(!mobileOpen)} aria-label="Toggle navigation menu" aria-expanded={mobileOpen} aria-controls="mobile-nav-menu">
           {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </Button>
       </div>
 
       {mobileOpen && (
-        <div className="md:hidden border-t border-border bg-background px-4 pb-4 pt-2 space-y-3">
+        <div id="mobile-nav-menu" className="md:hidden border-t border-border bg-background px-4 pb-4 pt-2 space-y-3">
           <a href="#features" className="block text-sm text-muted-foreground hover:text-foreground" onClick={close}>Features</a>
           <a href="#pricing" className="block text-sm text-muted-foreground hover:text-foreground" onClick={close}>Pricing</a>
           <a href="#comparison" className="block text-sm text-muted-foreground hover:text-foreground" onClick={close}>Compare</a>

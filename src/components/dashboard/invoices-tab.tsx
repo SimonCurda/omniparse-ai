@@ -98,6 +98,7 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
   const plan = user?.plan || 'free';
   const hasBulkOps = ['plus', 'business', 'enterprise'].includes(plan);
   const canEdit = ['pro', 'plus', 'business', 'enterprise'].includes(plan);
+  const canChangeLifecycle = true;
   const canLoadCustomStatuses = ['plus', 'business', 'enterprise'].includes(plan);
 
   const [filter, setFilter] = useState('all');
@@ -136,6 +137,7 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
     { id: 'pending', name: 'Pending', color: 'amber', isBasic: true },
     { id: 'approved', name: 'Approved', color: 'emerald', isBasic: true },
     { id: 'exported', name: 'Exported', color: 'blue', isBasic: true },
+    { id: 'paid', name: 'Paid', color: 'violet', isBasic: true },
   ];
 
   const allStatuses = [...basicStatuses, ...customStatuses.filter((s) => !s.isBasic)];
@@ -1388,7 +1390,7 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                     </td>
                     {/* Lifecycle Status */}
                     <td className="px-4 py-3 text-center hidden md:table-cell" onClick={(e) => e.stopPropagation()}>
-                      {canEdit ? (
+                      {canChangeLifecycle ? (
                         statusChanging === inv.id ? (
                           <Loader2 className="h-4 w-4 animate-spin mx-auto" />
                         ) : (
@@ -1444,7 +1446,7 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                               <Lock className="h-3 w-3 text-muted-foreground" />
                             </div>
                           </TooltipTrigger>
-                          <TooltipContent>Upgrade to Pro to change lifecycle status</TooltipContent>
+                          <TooltipContent>Status tracking is not available.</TooltipContent>
                         </Tooltip>
                       )}
                     </td>

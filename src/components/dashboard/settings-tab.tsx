@@ -28,7 +28,7 @@ import { useAppStore } from '@/stores/app-store';
 import { DEFAULT_SHORTCUTS, saveShortcuts } from '@/lib/shortcuts';
 
 const PLAN_LABELS: Record<string, string> = { free: 'Free', pro: 'Pro', plus: 'Plus', business: 'Business', enterprise: 'Enterprise' };
-const PLAN_LIMITS: Record<string, number> = { free: 15, pro: 500, plus: 2000, business: 5000, enterprise: Infinity };
+const PLAN_LIMITS: Record<string, number> = { free: 15, pro: 500, plus: 2000, business: 10000, enterprise: Infinity };
 
 // Available column keys for export templates
 const EXPORT_COLUMNS: { key: string; label: string }[] = [
@@ -452,7 +452,8 @@ export function SettingsTab() {
       toast.error('Please type your email address to confirm.');
       return;
     }
-    if (!deletePassword) {
+    // OAuth-only users (no password) don't need to enter a password
+    if (user?.hasPassword && !deletePassword) {
       toast.error('Please enter your password.');
       return;
     }
@@ -463,10 +464,15 @@ export function SettingsTab() {
         toast.error('Please log in again.');
         return;
       }
+      // Only send password if the user has one
+      const body: Record<string, string> = {};
+      if (user?.hasPassword) {
+        body.password = deletePassword;
+      }
       const res = await fetch('/api/auth/delete-account', {
         method: 'DELETE',
         headers,
-        body: JSON.stringify({ password: deletePassword }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -784,12 +790,12 @@ export function SettingsTab() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {plan !== 'business' && plan !== 'enterprise' ? (
+          {!['plus','business','enterprise'].includes(plan) ? (
             <div className="flex items-center gap-3 p-6 rounded-lg bg-muted/50 border border-dashed border-border/50 justify-center">
               <Lock className="h-5 w-5 text-muted-foreground" />
               <div>
-                <p className="text-sm font-medium">Upgrade to Plus</p>
-                <p className="text-xs text-muted-foreground">Custom export templates are available on Business &amp; Enterprise plans.</p>
+                <p className="text-sm font-medium">Available on Plus and higher plans</p>
+                <p className="text-xs text-muted-foreground">Custom export templates are available on Plus and higher plans.</p>
               </div>
             </div>
           ) : (
@@ -842,12 +848,12 @@ export function SettingsTab() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {plan !== 'business' && plan !== 'enterprise' ? (
+          {!['plus','business','enterprise'].includes(plan) ? (
             <div className="flex items-center gap-3 p-6 rounded-lg bg-muted/50 border border-dashed border-border/50 justify-center">
               <Lock className="h-5 w-5 text-muted-foreground" />
               <div>
-                <p className="text-sm font-medium">Upgrade to Plus</p>
-                <p className="text-xs text-muted-foreground">Data retention control is available on Business &amp; Enterprise plans.</p>
+                <p className="text-sm font-medium">Available on Plus and higher plans</p>
+                <p className="text-xs text-muted-foreground">Data retention control is available on Plus and higher plans.</p>
               </div>
             </div>
           ) : (
@@ -1156,6 +1162,7 @@ export function SettingsTab() {
               />
             </div>
 
+            {user?.hasPassword !== false && (
             <div className="space-y-2">
               <Label htmlFor="delete-confirm-password">Enter your password</Label>
               <Input
@@ -1168,6 +1175,7 @@ export function SettingsTab() {
                 autoComplete="current-password"
               />
             </div>
+            )}
           </div>
 
           <DialogFooter>
@@ -1181,7 +1189,7 @@ export function SettingsTab() {
             <Button
               variant="destructive"
               onClick={handleDeleteAccount}
-              disabled={deleting || deleteEmail !== user?.email || !deletePassword}
+              disabled={deleting || deleteEmail !== user?.email || (user?.hasPassword !== false && !deletePassword)}
             >
               {deleting ? (
                 <>

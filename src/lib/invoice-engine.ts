@@ -104,6 +104,7 @@ export interface UserSettings {
   validationRules: Record<string, boolean>; // which rules are enabled
   varianceThresholds: Record<string, { type: 'percent' | 'absolute'; value: number }>;
   customFields: Array<{ name: string; instruction: string; enabled: boolean }>;
+  retentionDays?: number | null; // Plus+ feature: data retention period in days (null = forever)
 }
 
 export const DEFAULT_SETTINGS: UserSettings = {

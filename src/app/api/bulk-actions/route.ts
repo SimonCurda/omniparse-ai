@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getUserFromRequest, hasFeature } from '@/lib/auth';
 
-const VALID_BULK_ACTIONS = ['delete', 'change_status'];
+const VALID_BULK_ACTIONS = ['delete', 'change_lifecycle_status'];
 
 export async function POST(req: NextRequest) {
   try {
@@ -58,16 +58,16 @@ export async function POST(req: NextRequest) {
           details: { bulk: true },
         })),
       });
-    } else if (action === 'change_status') {
+    } else if (action === 'change_lifecycle_status') {
       if (!data || !data.status) {
-        return NextResponse.json({ error: 'data.status is required for change_status action' }, { status: 400 });
+        return NextResponse.json({ error: 'data.status is required for change_lifecycle_status action' }, { status: 400 });
       }
 
       const newStatus = String(data.status);
 
       await db.invoice.updateMany({
         where: { id: { in: Array.from(ownedIds) } },
-        data: { status: newStatus },
+        data: { lifecycleStatus: newStatus },
       });
 
       // Create audit log for each
@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
           userId: user.id,
           invoiceId: invId,
           action: 'edited',
-          details: { bulk: true, field: 'status', newValue: newStatus },
+          details: { bulk: true, field: 'lifecycleStatus', newValue: newStatus },
         })),
       });
     }

@@ -47,6 +47,9 @@ export interface UserProfile {
   plan: string;
   createdAt: string;
   stripeCurrentPeriodEnd?: string | null;
+  hasPassword?: boolean;
+  googleId?: boolean;
+  githubId?: boolean;
 }
 
 export type ArtifactType = "table" | "chart-bar" | "chart-line" | "chart-pie" | "summary";

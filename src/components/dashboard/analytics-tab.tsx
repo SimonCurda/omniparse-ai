@@ -145,8 +145,8 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
   useEffect(() => {
     if (!isBusiness) return;
     setPriceAlertsLoading(true);
-    fetch('/api/price-alerts')
-      .then((r) => r.json())
+    fetch('/api/price-alerts', { headers: { Authorization: 'Bearer ' + localStorage.getItem('op_token') } })
+      .then((r) => { if (!r.ok) throw new Error('Failed'); return r.json(); })
       .then((data) => {
         setPriceAlerts(data.alerts ?? []);
         setPriceAlertsMeta({
@@ -182,8 +182,8 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
   useEffect(() => {
     if (!isBusiness) return;
     setVendorScorecardLoading(true);
-    fetch('/api/vendor-scorecard')
-      .then((r) => r.json())
+    fetch('/api/vendor-scorecard', { headers: { Authorization: 'Bearer ' + localStorage.getItem('op_token') } })
+      .then((r) => { if (!r.ok) throw new Error('Failed'); return r.json(); })
       .then((data) => {
         setVendorScorecards(data.scorecards ?? []);
         setVendorScorecardMeta({ totalVendors: data.totalVendors ?? 0 });

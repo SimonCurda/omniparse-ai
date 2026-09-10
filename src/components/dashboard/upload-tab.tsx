@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -40,8 +40,16 @@ export function UploadTab() {
   const [statusText, setStatusText] = useState('');
   const [results, setResults] = useState<InvoiceRow[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
+  const [showWelcome, setShowWelcome] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { setInvoices, invoices, user } = useAppStore();
+
+  // Delay showing the Welcome card so it doesn't flicker while invoices are
+  // being fetched from the API on initial mount.
+  useEffect(() => {
+    const t = setTimeout(() => setShowWelcome(true), 100);
+    return () => clearTimeout(t);
+  }, []);
 
   const plan = user?.plan || 'free';
   const batchLimit = PLAN_BATCH_LIMITS[plan] ?? 1;
@@ -189,7 +197,7 @@ export function UploadTab() {
         <p className="text-muted-foreground mt-1">Drop invoices or receipts to extract structured data using AI.</p>
       </div>
 
-      {invoices.length === 0 && (
+      {showWelcome && invoices.length === 0 && (
         <Card className="border-l-4 border-l-amber-500 bg-card">
           <CardContent className="p-5">
             <div className="flex items-center gap-2 mb-3">

@@ -65,6 +65,11 @@ export async function DELETE(req: NextRequest) {
     const auth = await getUserFromRequest(req);
     if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+    const user = await db.user.findUnique({ where: { id: auth.userId }, select: { plan: true } });
+    if (!user || !hasFeature(user.plan, 'multi_entity')) {
+      return NextResponse.json({ error: 'Multi-entity requires Business plan or higher.' }, { status: 403 });
+    }
+
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
     if (!id) return NextResponse.json({ error: 'Entity id is required.' }, { status: 400 });
@@ -73,10 +78,13 @@ export async function DELETE(req: NextRequest) {
     if (!entity) return NextResponse.json({ error: 'Entity not found' }, { status: 404 });
 
     // Reset user's active entity if deleting the active one
-    const user = await db.user.findUnique({ where: { id: auth.userId }, select: { activeEntityId: true } });
-    if (user?.activeEntityId === id) {
+    const userWithEntity = await db.user.findUnique({ where: { id: auth.userId }, select: { activeEntityId: true } });
+    if (userWithEntity?.activeEntityId === id) {
       await db.user.update({ where: { id: auth.userId }, data: { activeEntityId: null } });
     }
+
+    // Null out entity references on invoices before deleting the entity
+    await db.invoice.updateMany({ where: { entityId: id, userId: auth.userId }, data: { entityId: null } });
 
     await db.entity.delete({ where: { id } });
     return NextResponse.json({ success: true });

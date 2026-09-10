@@ -63,28 +63,28 @@ const ALLOWED_MIME_TYPES = [
   'application/pdf',
   'image/jpeg',
   'image/png',
-  'image/tiff',
+  'image/webp',
 ];
 
-const ALLOWED_EXTENSIONS = ['pdf', 'jpg', 'jpeg', 'png', 'tiff', 'tif'];
+const ALLOWED_EXTENSIONS = ['pdf', 'jpg', 'jpeg', 'png', 'webp'];
 
-const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
 export function validateFile(file: File): string | null {
   // Check file size
   if (file.size > MAX_FILE_SIZE) {
-    return `File "${file.name}" exceeds the 20 MB size limit (${(file.size / 1024 / 1024).toFixed(1)} MB)`;
+    return `File "${file.name}" exceeds the 10 MB size limit (${(file.size / 1024 / 1024).toFixed(1)} MB)`;
   }
 
   // Check MIME type
   if (!ALLOWED_MIME_TYPES.includes(file.type)) {
-    return `File "${file.name}" has unsupported type "${file.type}". Allowed: PDF, JPEG, PNG, TIFF`;
+    return `File "${file.name}" has unsupported type "${file.type}". Allowed: PDF, JPEG, PNG, WebP`;
   }
 
   // Check extension
   const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
   if (!ALLOWED_EXTENSIONS.includes(ext)) {
-    return `File "${file.name}" has unsupported extension ".${ext}". Allowed: .pdf, .jpg, .jpeg, .png, .tiff, .tif`;
+    return `File "${file.name}" has unsupported extension ".${ext}". Allowed: .pdf, .jpg, .jpeg, .png, .webp`;
   }
 
   return null; // No error

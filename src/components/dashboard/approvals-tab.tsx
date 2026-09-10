@@ -128,7 +128,7 @@ function ApprovalsContent({ plan }: { plan: string }) {
     setRulesLoading(true);
     fetch('/api/approval-rules', { headers: { Authorization: 'Bearer ' + token } })
       .then((r) => (r.ok ? r.json() : { rules: [] }))
-      .then((data) => setRules(data.rules || []))
+      .then((data) => setRules(Array.isArray(data) ? data : (data.rules || [])))
       .catch(() => {})
       .finally(() => setRulesLoading(false));
   }, []);

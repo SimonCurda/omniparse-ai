@@ -175,7 +175,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
     } else {
       // Pro: only basic statuses
-      const allowed = ['pending', 'approved', 'exported'];
+      const allowed = ['pending', 'approved', 'exported', 'paid'];
       if (!allowed.includes(newStatus)) {
         return NextResponse.json({ error: `Status must be one of: ${allowed.join(', ')}` }, { status: 400 });
       }

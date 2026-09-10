@@ -35,7 +35,7 @@ export function CookieBanner() {
         <Cookie className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
         <p className="text-sm text-muted-foreground flex-1">
           We use local storage for your preferences and authentication. No tracking cookies are active by default. See our{' '}
-          <Link href="/cookie-policy" className="text-amber-500 hover:underline font-medium" target="_blank" rel="noopener">
+          <Link href="/cookie-policy" className="text-amber-600 hover:underline font-medium" target="_blank" rel="noopener">
             Cookie Policy
           </Link>{' '}
           for details.

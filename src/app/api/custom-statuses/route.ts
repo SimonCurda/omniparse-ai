@@ -84,6 +84,11 @@ export async function DELETE(req: NextRequest) {
     const auth = await getUserFromRequest(req);
     if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+    const user = await db.user.findUnique({ where: { id: auth.userId }, select: { plan: true } });
+    if (!user || !hasFeature(user.plan, 'custom_lifecycle_statuses')) {
+      return NextResponse.json({ error: 'Custom statuses require Plus plan or higher.' }, { status: 403 });
+    }
+
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
     if (!id) return NextResponse.json({ error: 'Status id is required.' }, { status: 400 });
