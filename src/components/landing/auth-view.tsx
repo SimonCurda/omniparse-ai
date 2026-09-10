@@ -242,6 +242,13 @@ export function AuthView({ mode, onSwitch, onBack }: { mode: 'login' | 'signup';
               </div>
             </div>
 
+            {/*
+              Google OAuth — hidden until branding verification is approved by Google.
+              Backend code + env vars are in place. To re-enable:
+              1. Wait for Google branding verification to pass
+              2. Uncomment the block below
+            */}
+            {/*
             <a
               href="/api/auth/oauth/google"
               className="inline-flex items-center justify-center gap-2.5 whitespace-nowrap rounded-md text-sm font-medium h-10 w-full border border-input bg-background shadow-xs transition-all hover:bg-accent hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] outline-none"
@@ -255,6 +262,7 @@ export function AuthView({ mode, onSwitch, onBack }: { mode: 'login' | 'signup';
               </svg>
               <span>{mode === 'login' ? 'Sign in with Google' : 'Sign up with Google'}</span>
             </a>
+            */}
 
             <a
               href="/api/auth/oauth/github"
