@@ -242,6 +242,15 @@ export function AuthView({ mode, onSwitch, onBack }: { mode: 'login' | 'signup';
               </div>
             </div>
 
+            {/*
+              Google OAuth button — temporarily hidden.
+              The backend code (/api/auth/oauth/google/*) is kept in place.
+              To re-enable: uncomment this block and publish the Google OAuth
+              app in Google Cloud Console (OAuth consent screen → Publish app).
+              Until the app is published, Google only allows manually-added
+              test users, which isn't scalable for production.
+            */}
+            {/*
             <a
               href="/api/auth/oauth/google"
               className="inline-flex items-center justify-center gap-2.5 whitespace-nowrap rounded-md text-sm font-medium h-10 w-full border border-input bg-background shadow-xs transition-all hover:bg-accent hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] outline-none"
@@ -255,6 +264,7 @@ export function AuthView({ mode, onSwitch, onBack }: { mode: 'login' | 'signup';
               </svg>
               <span>{mode === 'login' ? 'Sign in with Google' : 'Sign up with Google'}</span>
             </a>
+            */}
 
             <a
               href="/api/auth/oauth/github"
