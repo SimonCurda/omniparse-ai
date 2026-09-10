@@ -21,11 +21,90 @@ import { extractPdfText as extractPdfContent } from '@/lib/pdf-extractor';
 const ALLOWED_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/webp']);
 const MAX_SIZE = 10 * 1024 * 1024;
 
+/**
+ * Extract invoice fields from prose text (last resort when the AI model
+ * doesn't output JSON but writes its analysis as text).
+ *
+ * Example input: "The vendor is Acme Corp. The invoice number is INV-001.
+ * The date is 2026-09-01. The total is $641.24."
+ *
+ * Looks for patterns like:
+ * - "Vendor: Acme Corp" or "vendor is Acme Corp" or "Vendor" ... "Acme Corp"
+ * - "Invoice #: INV-001" or "Invoice Number: INV-001"
+ * - "Date: 2026-09-01" or "Invoice Date: 2026-09-01"
+ * - "Total: $641.24" or "Total: 641.24"
+ * - etc.
+ */
+function extractFieldsFromProse(text: string): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  const lower = text.toLowerCase();
+
+  // Vendor: look for "vendor" followed by a value
+  const vendorMatch = text.match(/(?:vendor|company|from)\s*(?:is|:|=)\s*["']?([^"'\n,.]+)["']?/i);
+  if (vendorMatch) result.vendor = vendorMatch[1].trim();
+
+  // Invoice number
+  const invNumMatch = text.match(/(?:invoice\s*(?:number|#|no))\s*(?:is|:|=)\s*["']?([A-Z0-9\-\/]+)["']?/i);
+  if (invNumMatch) result.invoiceNumber = invNumMatch[1].trim();
+
+  // Invoice date
+  const dateMatch = text.match(/(?:invoice\s*date|date)\s*(?:is|:|=)\s*["']?(\d{4}-\d{2}-\d{2})["']?/i);
+  if (dateMatch) result.invoiceDate = dateMatch[1];
+
+  // Due date
+  const dueMatch = text.match(/(?:due\s*date)\s*(?:is|:|=)\s*["']?(\d{4}-\d{2}-\d{2})["']?/i);
+  if (dueMatch) result.dueDate = dueMatch[1];
+
+  // Amount (subtotal)
+  const amountMatch = text.match(/(?:amount|subtotal)\s*(?:is|:|=)\s*["']?\$?([\d,.]+)["']?/i);
+  if (amountMatch) {
+    const val = parseFloat(amountMatch[1].replace(/,/g, ''));
+    if (!isNaN(val)) result.amount = val;
+  }
+
+  // VAT
+  const vatMatch = text.match(/(?:vat|tax)\s*(?:is|:|=)\s*["']?\$?([\d,.]+)["']?/i);
+  if (vatMatch) {
+    const val = parseFloat(vatMatch[1].replace(/,/g, ''));
+    if (!isNaN(val)) result.vatAmount = val;
+  }
+
+  // Total
+  const totalMatch = text.match(/(?:total|grand\s*total)\s*(?:is|:|=)\s*["']?\$?([\d,.]+)["']?/i);
+  if (totalMatch) {
+    const val = parseFloat(totalMatch[1].replace(/,/g, ''));
+    if (!isNaN(val)) result.total = val;
+  }
+
+  // Currency
+  const currencyMatch = text.match(/(?:currency)\s*(?:is|:|=)\s*["']?(USD|EUR|GBP|CZK|JPY|CAD|AUD|CHF)["']?/i);
+  if (currencyMatch) result.currency = currencyMatch[1].toUpperCase();
+  else if (text.includes('$')) result.currency = 'USD';
+  else if (text.includes('EUR') || text.includes('\u20ac')) result.currency = 'EUR';
+
+  // Confidence
+  result.confidence = 0.7; // Lower confidence for prose extraction
+  result.fieldConfidence = {
+    vendor: result.vendor ? 0.7 : 0,
+    invoiceNumber: result.invoiceNumber ? 0.7 : 0,
+    invoiceDate: result.invoiceDate ? 0.7 : 0,
+    dueDate: result.dueDate ? 0.7 : 0,
+    amount: result.amount ? 0.7 : 0,
+    vatAmount: result.vatAmount ? 0.7 : 0,
+    total: result.total ? 0.7 : 0,
+    currency: result.currency ? 0.8 : 0,
+  };
+
+  return result;
+}
+
 function buildVlmPrompt(customFieldsPart: string): string {
   const customSuffix = customFieldsPart ? ',\n  ...customFieldsHere' : '';
-  return `You are an expert document parser for invoices. Analyze the provided document and extract ALL visible fields.
+  return `You are an invoice parser. Extract ALL visible fields from the document image.
 
-Return ONLY valid JSON with no markdown, no code fences, no explanation. Use this EXACT schema:
+CRITICAL: Output ONLY the JSON object. Do NOT explain, do NOT analyze, do NOT write any text before or after the JSON.
+
+Output this EXACT JSON schema (fill in the values, use null for missing fields):
 {
   "vendor": "company name or null",
   "invoiceNumber": "invoice number string or null",
@@ -285,10 +364,21 @@ IMPORTANT: For each field, estimate your extraction confidence (0.0 to 1.0). If 
         try {
           parsed = JSON.parse(jsonMatch[0]);
         } catch {
-          return NextResponse.json({ error: 'AI response could not be parsed as valid JSON.', raw: responseText }, { status: 500 });
+          // ─── LAST RESORT: Prose-to-JSON extraction ──────────────────
+          // If the model wrote its analysis as prose (e.g. "The vendor is
+          // Acme Corp. The invoice number is INV-2026-001..."), try to
+          // extract the fields from the text using pattern matching.
+          parsed = extractFieldsFromProse(responseText);
+          if (Object.keys(parsed).length === 0) {
+            return NextResponse.json({ error: 'AI response could not be parsed as valid JSON.', raw: responseText }, { status: 500 });
+          }
         }
       } else {
-        return NextResponse.json({ error: 'AI response could not be parsed as valid JSON.', raw: responseText }, { status: 500 });
+        // No JSON found at all — try prose extraction
+        parsed = extractFieldsFromProse(responseText);
+        if (Object.keys(parsed).length === 0) {
+          return NextResponse.json({ error: 'AI response could not be parsed as valid JSON.', raw: responseText }, { status: 500 });
+        }
       }
     }
 
