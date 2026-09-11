@@ -6,16 +6,18 @@ import { db } from '@/lib/db';
 // This endpoint runs raw SQL to create the email capture tables
 // (EmailInbox, PendingReview, EmailBlocklist) that the new feature needs.
 //
-// Usage: GET /api/migrate-email-tables?key=YOUR_JWT_SECRET
-// After success, delete this file and redeploy.
+// Usage: GET /api/migrate-email-tables?key=YOUR_MIGRATION_KEY
+// The MIGRATION_KEY env var is set temporarily in Vercel — delete both
+// the env var and this file after running.
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const key = searchParams.get('key');
-  const expectedKey = process.env.JWT_SECRET;
+  // Prefer MIGRATION_KEY (temporary, will be deleted), fall back to JWT_SECRET
+  const expectedKey = process.env.MIGRATION_KEY || process.env.JWT_SECRET;
 
   if (!expectedKey) {
-    return NextResponse.json({ error: 'JWT_SECRET not set' }, { status: 500 });
+    return NextResponse.json({ error: 'Neither MIGRATION_KEY nor JWT_SECRET is set' }, { status: 500 });
   }
   if (key !== expectedKey) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
