@@ -77,63 +77,34 @@ function ClassificationBadge({ classification }: { classification: string }) {
 }
 
 // ─── PDF preview component ──────────────────────────────────────────────────
-// Uses the same pattern as invoices-tab.tsx:
-// 1. Convert the base64 attachment to a Blob
-// 2. Create a blob URL via URL.createObjectURL()
-// 3. Use an <iframe> to render the PDF
+// Uses pdf.js to render the PDF onto a <canvas> element. This avoids
+// Content-Security-Policy issues with iframes — Vercel's CSP blocks blob:
+// URLs in frame-src, but canvas rendering is pure JavaScript and isn't
+// subject to frame-src restrictions.
 //
-// Blob URLs inherit the origin of the page that creates them, so they
-// satisfy Vercel's CSP `frame-src 'self'` directive. This is the same
-// pattern the Invoices tab uses for its file preview.
-//
-// The cleanup function intentionally does NOT revoke the blob URL because
-// revoking it too early causes ERR_FILE_NOT_FOUND in the iframe.
+// The actual rendering logic lives in the PdfViewer component.
+
+import { PdfViewer } from './pdf-viewer';
 
 function PdfPreview({ base64, mime, filename }: { base64: string; mime: string; filename: string }) {
-  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  if (mime === 'application/pdf') {
+    return <PdfViewer base64={base64} filename={filename} />;
+  }
 
-  useEffect(() => {
-    try {
-      const binary = atob(base64);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      const blob = new Blob([bytes], { type: mime });
-      const url = URL.createObjectURL(blob);
-      setBlobUrl(url);
-      // NOTE: We intentionally do NOT revoke the blob URL here.
-      // Revoking it when the component unmounts causes ERR_FILE_NOT_FOUND
-      // because the iframe is still trying to load it.
-      // The browser cleans up blob URLs automatically when the page unloads.
-    } catch (err) {
-      console.error('Failed to create blob URL:', err);
-    }
-  }, [base64, mime]);
-
+  // Fallback for non-PDF attachments (images already handled by the parent)
   return (
-    <div className="space-y-2">
-      {blobUrl ? (
-        <>
-          <div className="rounded border bg-white overflow-hidden">
-            <iframe
-              src={blobUrl}
-              className="w-full h-[60vh] border-0"
-              title={filename}
-            />
-          </div>
-          <p className="text-xs text-muted-foreground mt-2 text-center">
-            If the PDF doesn&apos;t display,{' '}
-            <a href={blobUrl} download={filename} className="text-primary hover:underline">
-              download it
-            </a>{' '}
-            instead.
-          </p>
-        </>
-      ) : (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          <span className="text-sm text-muted-foreground ml-2">Preparing PDF...</span>
-        </div>
-      )}
+    <div className="p-8 text-center space-y-3">
+      <FileText className="h-10 w-10 mx-auto text-muted-foreground/40" />
+      <p className="text-sm text-muted-foreground">
+        Preview not available for this file type ({mime}).
+      </p>
+      <a
+        href={`data:${mime};base64,${base64}`}
+        download={filename}
+        className="inline-flex items-center gap-1.5 text-sm text-amber-500 hover:underline"
+      >
+        <Download className="h-4 w-4" /> Download {filename}
+      </a>
     </div>
   );
 }
