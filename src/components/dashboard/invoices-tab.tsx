@@ -1147,36 +1147,75 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
           {/* Variance Checks */}
           {vr && vr.varianceChecks && vr.varianceChecks.length > 0 && (
             <div className="mt-4">
-              <h4 className="text-sm font-semibold mb-2">Variance Checks</h4>
+              <div className="flex items-center gap-2 mb-2">
+                <h4 className="text-sm font-semibold">Variance Checks</h4>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button type="button" className="cursor-help text-muted-foreground hover:text-foreground">
+                      <AlertCircle className="h-3.5 w-3.5" />
+                      <span className="sr-only">What does this mean?</span>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-[320px] text-left">
+                    <div className="space-y-1.5">
+                      <p className="font-semibold">Internal consistency checks</p>
+                      <p className="text-muted-foreground">
+                        These checks compare line items <em>against each other</em> to spot outliers —
+                        they don&apos;t compare against an external &quot;correct&quot; value.
+                      </p>
+                      <p className="text-muted-foreground">
+                        <strong>Baseline</strong> = the average across all line items.<br />
+                        <strong>Outlier</strong> = the one that deviates the most from the average.<br />
+                        <strong>Variance</strong> = how far off it is, as a % of the average.
+                      </p>
+                      <p className="text-muted-foreground">
+                        A warning here doesn&apos;t necessarily mean the extraction is wrong —
+                        it just means one line item looks unusual compared to the others.
+                        Open the invoice and verify the highlighted line.
+                      </p>
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
               <div className="rounded-lg border overflow-hidden">
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b bg-muted/50">
-                      <th className="text-left px-3 py-2 font-medium">Field</th>
-                      <th className="text-right px-3 py-2 font-medium">Expected</th>
-                      <th className="text-right px-3 py-2 font-medium">Actual</th>
-                      <th className="text-right px-3 py-2 font-medium">Variance</th>
+                      <th className="text-left px-3 py-2 font-medium">Check</th>
+                      <th className="text-right px-3 py-2 font-medium">Baseline (avg)</th>
+                      <th className="text-right px-3 py-2 font-medium">Outlier</th>
+                      <th className="text-right px-3 py-2 font-medium">Deviation</th>
                       <th className="text-center px-3 py-2 font-medium">Status</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {vr.varianceChecks.map((vc, i) => (
-                      <tr key={i} className="border-b last:border-0">
-                        <td className="px-3 py-2 font-medium">{vc.field}</td>
-                        <td className="px-3 py-2 text-right font-mono">
-                          {typeof vc.expected === 'number' ? vc.expected.toFixed(2) : vc.expected}
-                        </td>
-                        <td className="px-3 py-2 text-right font-mono">
-                          {typeof vc.actual === 'number' ? vc.actual.toFixed(2) : vc.actual}
-                        </td>
-                        <td className="px-3 py-2 text-right font-mono">
-                          {vc.variancePercent.toFixed(1)}%
-                        </td>
-                        <td className="px-3 py-2 text-center">
-                          <MiniStatusBadge status={vc.status} />
-                        </td>
-                      </tr>
-                    ))}
+                    {vr.varianceChecks.map((vc, i) => {
+                      const checkLabel: Record<string, string> = {
+                        unit_price: 'Unit price spread',
+                        line_item: 'Line-item total spread',
+                        total: 'Total vs (amount + VAT)',
+                      };
+                      return (
+                        <tr key={i} className="border-b last:border-0">
+                          <td className="px-3 py-2 font-medium">
+                            {checkLabel[vc.field] || vc.field}
+                          </td>
+                          <td className="px-3 py-2 text-right font-mono">
+                            {typeof vc.expected === 'number' ? fmtCurrency(vc.expected, inv.currency) : vc.expected}
+                          </td>
+                          <td className="px-3 py-2 text-right font-mono">
+                            {typeof vc.actual === 'number' ? fmtCurrency(vc.actual, inv.currency) : vc.actual}
+                          </td>
+                          <td className="px-3 py-2 text-right font-mono">
+                            {vc.variancePercent.toFixed(1)}%
+                            <span className="text-muted-foreground ml-1">(threshold {vc.threshold}{typeof vc.threshold === 'number' && vc.threshold <= 100 ? '%' : ''})</span>
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            <MiniStatusBadge status={vc.status} />
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
