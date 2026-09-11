@@ -43,15 +43,25 @@ function extractFieldsFromProse(text: string): Record<string, unknown> {
   // other languages. The patterns look for the label keyword followed by
   // a value (after a colon, equals, or "is").
 
-  // Vendor: English (vendor/company), Czech (dodavatel/poskytovatel),
-  // German (anbieter/lieferant/rechnung von), French (fournisseur/vendeur),
-  // Spanish (proveedor/empresa)
+  // Vendor: English, Czech, Slovak, German, French, Spanish, Italian, Polish, Portuguese
   const vendorPatterns = [
-    /(?:vendor|company|from|supplier|seller)\s*(?:is|:|=)\s*["']?([A-Za-z][A-Za-z0-9\s&.,ěščřžýáíéúůťďňóöüäëëïçàâîûô]+?)["']?(?:\s*[.\n,]|$)/i,
-    /(?:dodavatel|poskytovatel|prodávající)\s*(?:is|:|=|je)?\s*["']?([A-Za-z][A-Za-z0-9\s&.,ěščřžýáíéúůťďňóöüäëëïçàâîûô]+?)["']?(?:\s*[.\n,]|$)/i,
+    /(?:vendor|company|from|supplier|seller)\s*(?:is|:|=)\s*["']?([A-Za-z][A-Za-z0-9\s&.,ěščřžýáíéúůťďňóöüäëïçàâîûôąćęłńóśźżãõáàéêóô]+?)["']?(?:\s*[.\n,]|$)/i,
+    // Czech
+    /(?:dodavatel|poskytovatel|prodávající)\s*(?:is|:|=|je)?\s*["']?([A-Za-z][A-Za-z0-9\s&.,ěščřžýáíéúůťďňóöüäëïçàâîûôąćęłńóśźż]+?)["']?(?:\s*[.\n,]|$)/i,
+    // Slovak
+    /(?:dodávateľ|poskytovateľ|predávajúci)\s*(?:is|:|=|je)?\s*["']?([A-Za-z][A-Za-z0-9\s&.,ěščřžýáíéúůťďňóöüäëïçàâîûôąćęłńóśźžľščťžýáíéú]+?)["']?(?:\s*[.\n,]|$)/i,
+    // German
     /(?:lieferant|anbieter|rechnung\s+von|verkäufer)\s*(?:is|:|=|ist)?\s*["']?([A-Za-z][A-Za-z0-9\s&.,ěščřžýáíéúůťďňöüäëïçàâîûô]+?)["']?(?:\s*[.\n,]|$)/i,
+    // French
     /(?:fournisseur|vendeur|émetteur)\s*(?:est|:|=)?\s*["']?([A-Za-z][A-Za-z0-9\s&.,ěščřžýáíéúůťďňöüäëïçàâîûô]+?)["']?(?:\s*[.\n,]|$)/i,
+    // Spanish
     /(?:proveedor|empresa|emisor)\s*(?:es|:|=)?\s*["']?([A-Za-z][A-Za-z0-9\s&.,ěščřžýáíéúůťďňöüäëïçàâîûô]+?)["']?(?:\s*[.\n,]|$)/i,
+    // Italian
+    /(?:fornitore|venditore|emittente)\s*(?:è|:|=)?\s*["']?([A-Za-z][A-Za-z0-9\s&.,ěščřžýáíéúůťďňöüäëïçàâîûô]+?)["']?(?:\s*[.\n,]|$)/i,
+    // Polish
+    /(?:dostawca|sprzedawca|wystawca)\s*(?:to|:|=|jest)?\s*["']?([A-Za-z][A-Za-z0-9\s&.,ęąćłńóśźżěščřžýáíéúůťďňöüäëïçàâîûô]+?)["']?(?:\s*[.\n,]|$)/i,
+    // Portuguese
+    /(?:fornecedor|empresa|emitente|vendedor)\s*(?:é|:|=)?\s*["']?([A-Za-z][A-Za-z0-9\s&.,ěščřžýáíéúůťďňöüäëïçàâîûôãõáàéêóô]+?)["']?(?:\s*[.\n,]|$)/i,
   ];
   for (const p of vendorPatterns) {
     const m = text.match(p);
@@ -64,15 +74,27 @@ function extractFieldsFromProse(text: string): Record<string, unknown> {
     }
   }
 
-  // Invoice number: match patterns like "Invoice #: XXX", "Číslo dokladu: XXX",
-  // "Rechnungsnummer: XXX", "Numéro de facture: XXX"
+  // Invoice number: match patterns in multiple languages
   const invNumPatterns = [
+    // English
     /(?:invoice\s*(?:number|#|no))\s*(?:is|:|=)?\s*["']?([A-Z0-9][A-Z0-9\-\/.]+)["']?/i,
+    // Czech
     /(?:číslo\s*dokladu|č\.?\s*dokladu|doklad\s*č\.?)\s*[:=]?\s*["']?([0-9A-Z][0-9A-Z\-\/.]+)["']?/i,
+    // Slovak
+    /(?:číslo\s*dokladu|variabilný\s*symbol|č\.?\s*dokladu)\s*[:=]?\s*["']?([0-9A-Z][0-9A-Z\-\/.]+)["']?/i,
+    // German
     /(?:rechnungsnummer|rechnung\s*nr\.?|belegnummer)\s*[:=]?\s*["']?([0-9A-Z][0-9A-Z\-\/.]+)["']?/i,
+    // French
     /(?:numéro\s*(?:de\s*)?facture|n°?\s*facture|facture\s*n°?)\s*[:=]?\s*["']?([0-9A-Z][0-9A-Z\-\/.]+)["']?/i,
+    // Spanish
     /(?:número\s*de\s*factura|factura\s*n°?)\s*[:=]?\s*["']?([0-9A-Z][0-9A-Z\-\/.]+)["']?/i,
-    // Generic: any "INV-" or number after a label
+    // Italian
+    /(?:numero\s*fattura|fattura\s*n\.?|n\.?\s*fattura)\s*[:=]?\s*["']?([0-9A-Z][0-9A-Z\-\/.]+)["']?/i,
+    // Polish
+    /(?:numer\s*faktury|faktura\s*nr\.?|nr\.?\s*faktury)\s*[:=]?\s*["']?([0-9A-Z][0-9A-Z\-\/.]+)["']?/i,
+    // Portuguese
+    /(?:número\s*da\s*nota\s*fiscal|nota\s*fiscal\s*n°?|n°?\s*nota)\s*[:=]?\s*["']?([0-9A-Z][0-9A-Z\-\/.]+)["']?/i,
+    // Generic
     /\b(INV[-A-Z0-9\-\/.]+)\b/i,
     /\b(20\d{4,}[-]?\d{2,})\b/i,
   ];
@@ -84,14 +106,25 @@ function extractFieldsFromProse(text: string): Record<string, unknown> {
     }
   }
 
-  // Invoice date: "Date: 2026-09-11" or "Datum: 11.09.2026" or "Date d'émission: 11/09/2026"
+  // Invoice date: multiple languages
   const datePatterns = [
+    // English
     /(?:invoice\s*date|date\s*of\s*issue|issue\s*date)\s*(?:is|:|=)\s*["']?(\d{4}-\d{2}-\d{2}|\d{1,2}[.\/]\d{1,2}[.\/]\d{4})["']?/i,
-    /(?:datum\s*vystavení|datum)\s*[:=]?\s*["']?(\d{1,2}[.\/]\d{1,2}[.\/]\d{4}|\d{4}-\d{2}-\d{2})["']?/i,
+    // Czech / Slovak
+    /(?:datum\s*vystavení|datum\s*vydania|datum)\s*[:=]?\s*["']?(\d{1,2}[.\/]\d{1,2}[.\/]\d{4}|\d{4}-\d{2}-\d{2})["']?/i,
+    // German
     /(?:rechnungsdatum|datum)\s*[:=]?\s*["']?(\d{1,2}[.\/]\d{1,2}[.\/]\d{4}|\d{4}-\d{2}-\d{2})["']?/i,
+    // French
     /(?:date\s*d[ée]mission|date)\s*[:=]?\s*["']?(\d{1,2}[.\/]\d{1,2}[.\/]\d{4}|\d{4}-\d{2}-\d{2})["']?/i,
+    // Spanish
     /(?:fecha)\s*[:=]?\s*["']?(\d{1,2}[.\/]\d{1,2}[.\/]\d{4}|\d{4}-\d{2}-\d{2})["']?/i,
-    // Generic date pattern near "date" keyword
+    // Italian
+    /(?:data\s*(?:emissione|fattura|documento)|data)\s*[:=]?\s*["']?(\d{1,2}[.\/]\d{1,2}[.\/]\d{4}|\d{4}-\d{2}-\d{2})["']?/i,
+    // Polish
+    /(?:data\s*wystawienia|data)\s*[:=]?\s*["']?(\d{1,2}[.\/]\d{1,2}[.\/]\d{4}|\d{4}-\d{2}-\d{2})["']?/i,
+    // Portuguese
+    /(?:data\s*(?:emissão|emissao)|data)\s*[:=]?\s*["']?(\d{1,2}[.\/]\d{1,2}[.\/]\d{4}|\d{4}-\d{2}-\d{2})["']?/i,
+    // Generic
     /(?:date|datum)\s*[:=]?\s*(\d{4}-\d{2}-\d{2}|\d{1,2}[.\/]\d{1,2}[.\/]\d{4})/i,
   ];
   for (const p of datePatterns) {
@@ -109,13 +142,23 @@ function extractFieldsFromProse(text: string): Record<string, unknown> {
     }
   }
 
-  // Due date
+  // Due date: multiple languages
   const dueDatePatterns = [
     /(?:due\s*date|date\s*due)\s*(?:is|:|=)\s*["']?(\d{4}-\d{2}-\d{2}|\d{1,2}[.\/]\d{1,2}[.\/]\d{4})["']?/i,
-    /(?:datum\s*splatnosti|splatnost)\s*[:=]?\s*["']?(\d{1,2}[.\/]\d{1,2}[.\/]\d{4}|\d{4}-\d{2}-\d{2})["']?/i,
-    /(?:fälligkeitsdatum|fällig\s*am)\s*[:=]?\s*["']?(\d{1,2}[.\/]\d{1,2}[.\/]\d{4}|\d{4}-\d{2}-\d{2})["']?/i,
+    // Czech / Slovak
+    /(?:datum\s*splatnosti|splatnosť|splatnost)\s*[:=]?\s*["']?(\d{1,2}[.\/]\d{1,2}[.\/]\d{4}|\d{4}-\d{2}-\d{2})["']?/i,
+    // German
+    /(?:fälligkeitsdatum|fällig\s*am|zahlbar\s*bis)\s*[:=]?\s*["']?(\d{1,2}[.\/]\d{1,2}[.\/]\d{4}|\d{4}-\d{2}-\d{2})["']?/i,
+    // French
     /(?:date\s*d[ée]chéance|échéance)\s*[:=]?\s*["']?(\d{1,2}[.\/]\d{1,2}[.\/]\d{4}|\d{4}-\d{2}-\d{2})["']?/i,
-    /(?:fecha\s*vencimiento|vencimiento)\s*[:=]?\s*["']?(\d{1,2}[.\/]\d{1,2}[.\/]\d{4}|\d{4}-\d{2}-\d{2})["']?/i,
+    // Spanish
+    /(?:fecha\s*vencimiento|vencimiento|vence)\s*[:=]?\s*["']?(\d{1,2}[.\/]\d{1,2}[.\/]\d{4}|\d{4}-\d{2}-\d{2})["']?/i,
+    // Italian
+    /(?:scadenza|data\s*scadenza)\s*[:=]?\s*["']?(\d{1,2}[.\/]\d{1,2}[.\/]\d{4}|\d{4}-\d{2}-\d{2})["']?/i,
+    // Polish
+    /(?:termin\s*platności|termin\s*platnosci|płatne\s*do)\s*[:=]?\s*["']?(\d{1,2}[.\/]\d{1,2}[.\/]\d{4}|\d{4}-\d{2}-\d{2})["']?/i,
+    // Portuguese
+    /(?:data\s*vencimento|vencimento)\s*[:=]?\s*["']?(\d{1,2}[.\/]\d{1,2}[.\/]\d{4}|\d{4}-\d{2}-\d{2})["']?/i,
   ];
   for (const p of dueDatePatterns) {
     const m = text.match(p);
@@ -130,13 +173,23 @@ function extractFieldsFromProse(text: string): Record<string, unknown> {
     }
   }
 
-  // Amount (subtotal): "Subtotal:", "Základ:", "Betrag:", "Montant HT:"
+  // Amount (subtotal): multiple languages
   const amountPatterns = [
     /(?:subtotal|amount\s*(?:excl|net))\s*(?:is|:|=)\s*["']?[\$€£ Kč]*\s*([\d.,]+)\s*["']?/i,
+    // Czech / Slovak
     /(?:základ|základ\s*daně|bez\s*DPH)\s*[:=]?\s*["']?([\d.,]+)\s* Kč?/i,
+    // German
     /(?:betrag|netto|zwischensumme)\s*[:=]?\s*["']?€?\s*([\d.,]+)/i,
+    // French
     /(?:montant\s*HT|sous-total|base\s*imposable)\s*[:=]?\s*["']?€?\s*([\d.,]+)/i,
+    // Spanish
     /(?:base\s*imponible|subtotal|importe\s*base)\s*[:=]?\s*["']?[\$€]?\s*([\d.,]+)/i,
+    // Italian
+    /(?:imponibile|totale\s*imponibile|subtotale)\s*[:=]?\s*["']?€?\s*([\d.,]+)/i,
+    // Polish
+    /(?:wartość\s*netto|netto|podstawa)\s*[:=]?\s*["']?([\d.,]+)\s*zł?/i,
+    // Portuguese
+    /(?:valor\s*líquido|base\s*de\s*cálculo|subtotal)\s*[:=]?\s*["']?R?\$?\s*([\d.,]+)/i,
   ];
   for (const p of amountPatterns) {
     const m = text.match(p);
@@ -164,13 +217,23 @@ function extractFieldsFromProse(text: string): Record<string, unknown> {
     }
   }
 
-  // VAT: "VAT:", "DPH:", "MwSt:", "TVA:", "IVA:"
+  // VAT: multiple languages
   const vatPatterns = [
     /(?:vat|tax)\s*(?:is|:|=)\s*["']?[\$€£ Kč]*\s*([\d.,]+)\s*["']?/i,
+    // Czech / Slovak
     /(?:dph|daň\s*z\s*přidané\s*hodnoty)\s*[:=]?\s*["']?([\d.,]+)\s* Kč?/i,
+    // German
     /(?:mwst|ust\.?|umsatzsteuer)\s*[:=]?\s*["']?€?\s*([\d.,]+)/i,
+    // French
     /(?:tva|taxe)\s*[:=]?\s*["']?€?\s*([\d.,]+)/i,
+    // Spanish
     /(?:iva|impuesto)\s*[:=]?\s*["']?[\$€]?\s*([\d.,]+)/i,
+    // Italian
+    /(?:iva|imposta)\s*[:=]?\s*["']?€?\s*([\d.,]+)/i,
+    // Polish
+    /(?:vat|podatek\s*vat|ptu)\s*[:=]?\s*["']?([\d.,]+)\s*zł?/i,
+    // Portuguese
+    /(?:iva|imposto)\s*[:=]?\s*["']?R?\$?\s*([\d.,]+)/i,
   ];
   for (const p of vatPatterns) {
     const m = text.match(p);
@@ -194,13 +257,23 @@ function extractFieldsFromProse(text: string): Record<string, unknown> {
     }
   }
 
-  // Total: "Total:", "Celkem:", "Gesamt:", "Total TTC:", "Total:"
+  // Total: multiple languages
   const totalPatterns = [
     /(?:^|\n|\.\s)(?:grand\s*)?total\s*(?:is|:|=)\s*["']?[\$€£ Kč]*\s*([\d.,]+)\s*["']?/i,
-    /(?:celkem|celková\s*částka)\s*(?:k\s*úhradě)?\s*[:=]?\s*["']?([\d.,]+)\s* Kč?/i,
-    /(?:gesamt|gesamtbetrag|endbetrag|summe)\s*[:=]?\s*["']?€?\s*([\d.,]+)/i,
-    /(?:total\s*TTC|total\s*à\s*payer|montant\s*TTC)\s*[:=]?\s*["']?€?\s*([\d.,]+)/i,
+    // Czech / Slovak
+    /(?:celkem|celková\s*částka|celkom)\s*(?:k\s*úhradě|k\s*úhrade)?\s*[:=]?\s*["']?([\d.,]+)\s* Kč?/i,
+    // German
+    /(?:gesamt|gesamtbetrag|endbetrag|summe|rechnungsbetrag)\s*[:=]?\s*["']?€?\s*([\d.,]+)/i,
+    // French
+    /(?:total\s*TTC|total\s*à\s*payer|montant\s*TTC|net\s*à\s*payer)\s*[:=]?\s*["']?€?\s*([\d.,]+)/i,
+    // Spanish
     /(?:total|importe\s*total|total\s*a\s*pagar)\s*[:=]?\s*["']?[\$€]?\s*([\d.,]+)/i,
+    // Italian
+    /(?:totale|importo\s*totale|totale\s*da\s*pagare)\s*[:=]?\s*["']?€?\s*([\d.,]+)/i,
+    // Polish
+    /(?:razem|do\s*zapłaty|kwota\s*brutto)\s*[:=]?\s*["']?([\d.,]+)\s*zł?/i,
+    // Portuguese
+    /(?:total|valor\s*total|total\s*a\s*pagar)\s*[:=]?\s*["']?R?\$?\s*([\d.,]+)/i,
   ];
   for (const p of totalPatterns) {
     const m = text.match(p);
@@ -235,10 +308,16 @@ function extractFieldsFromProse(text: string): Record<string, unknown> {
   else if (text.includes('€') || text.includes('EUR')) result.currency = 'EUR';
   else if (text.includes('$') || text.includes('USD')) result.currency = 'USD';
   else if (text.includes('£') || text.includes('GBP')) result.currency = 'GBP';
+  else if (text.includes('zł') || text.includes('PLN')) result.currency = 'PLN';
+  else if (text.includes('SEK') || text.includes('kr')) result.currency = 'SEK';
+  else if (text.includes('NOK')) result.currency = 'NOK';
+  else if (text.includes('DKK')) result.currency = 'DKK';
+  else if (text.includes('HUF') || text.includes('Ft')) result.currency = 'HUF';
+  else if (text.includes('RON') || text.includes('lei')) result.currency = 'RON';
   else if (text.includes('¥') || text.includes('JPY')) result.currency = 'JPY';
+  else if (text.includes('R$') || text.includes('BRL')) result.currency = 'BRL';
   else {
-    // Check for currency patterns
-    const currMatch = text.match(/(?:currency|měna|währung|devise|moneda)\s*[:=]?\s*(CZK|EUR|USD|GBP|JPY|CAD|AUD|CHF|PLN|SEK|NOK|DKK|HUF|RON)/i);
+    const currMatch = text.match(/(?:currency|měna|währung|devise|moneda|valuta|moeda)\s*[:=]?\s*(CZK|EUR|USD|GBP|JPY|CAD|AUD|CHF|PLN|SEK|NOK|DKK|HUF|RON|BRL)/i);
     if (currMatch) result.currency = currMatch[1].toUpperCase();
   }
 
