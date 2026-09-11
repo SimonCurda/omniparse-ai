@@ -16,7 +16,7 @@ const PLAN_LABELS: Record<string, string> = { free: 'Free', pro: 'Pro', plus: 'P
 import {
   Search, LogOut, ChevronDown, User,
   Upload, FileText, BarChart3, Bot, Settings, ShieldCheck, CheckCircle2,
-  Sun, Moon, Building2, Crown,
+  Sun, Moon, Building2, Crown, Inbox,
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { UploadTab } from './upload-tab';
@@ -26,6 +26,7 @@ import { ChatTab } from './chat-tab';
 import { SettingsTab } from './settings-tab';
 import { ValidationTab } from './validation-tab';
 import { ApprovalsTab } from './approvals-tab';
+import { PendingReviewTab } from './pending-review-tab';
 
 interface TabItem {
   key: string;
@@ -37,6 +38,7 @@ interface TabItem {
 const TAB_ITEMS: TabItem[] = [
   { key: 'upload', label: 'Upload', icon: Upload },
   { key: 'invoices', label: 'Invoices', icon: FileText },
+  { key: 'pending', label: 'Pending', icon: Inbox },
   { key: 'validation', label: 'Validation', icon: ShieldCheck, minPlan: 'pro' },
   { key: 'approvals', label: 'Approvals', icon: CheckCircle2, minPlan: 'plus' },
   { key: 'analytics', label: 'Analytics', icon: BarChart3 },
@@ -52,6 +54,7 @@ export function DashboardShell() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchMobileOpen, setSearchMobileOpen] = useState(false);
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
+  const [pendingReviewCount, setPendingReviewCount] = useState(0);
   const tabsScrollRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -95,6 +98,15 @@ export function DashboardShell() {
           })
           .catch(() => {});
       }
+
+      // Fetch pending email review count (all plans — email capture is free-tier)
+      fetch('/api/pending-review?status=pending', { headers: { Authorization: 'Bearer ' + token } })
+        .then((r) => r.ok ? r.json() : [])
+        .then((data) => {
+          const arr = Array.isArray(data) ? data : [];
+          setPendingReviewCount(arr.length);
+        })
+        .catch(() => {});
     }
   }, []);
 
@@ -310,6 +322,11 @@ export function DashboardShell() {
                     {pendingApprovalsCount}
                   </span>
                 )}
+                {item.key === 'pending' && pendingReviewCount > 0 && (
+                  <span className="ml-1 text-[10px] font-bold leading-none px-1.5 py-0.5 rounded-full bg-amber-500 text-white">
+                    {pendingReviewCount}
+                  </span>
+                )}
               </button>
             ))}
           </div>
@@ -320,6 +337,7 @@ export function DashboardShell() {
       <main className="flex-1 p-4 sm:p-6 lg:p-8">
         {activeDashTab === 'upload' && <UploadTab />}
         {activeDashTab === 'invoices' && <InvoicesTab invoices={invoices} searchQuery={searchQuery} />}
+        {activeDashTab === 'pending' && <PendingReviewTab />}
         {activeDashTab === 'validation' && <ValidationTab />}
         {activeDashTab === 'approvals' && <ApprovalsTab />}
         {activeDashTab === 'analytics' && <AnalyticsTab invoices={invoices} />}

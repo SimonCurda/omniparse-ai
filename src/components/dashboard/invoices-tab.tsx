@@ -66,6 +66,7 @@ import {
   Undo2,
   FileText,
   ArrowUpDown,
+  Mail,
 } from 'lucide-react';
 import { ConfidenceMeter } from './confidence-meter';
 import { toast } from 'sonner';
@@ -1443,6 +1444,15 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
           </p>
         </div>
         <div className="flex items-center gap-3">
+          {/* Scan Inboxes button — link to Pending tab */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => useAppStore.getState().setActiveDashTab('pending')}
+            title="Go to Pending Review to scan your email inboxes"
+          >
+            <Mail className="h-4 w-4 mr-1" /> Scan Inboxes
+          </Button>
           {/* Show Normalized toggle */}
           <div className="flex items-center gap-2">
             <Switch

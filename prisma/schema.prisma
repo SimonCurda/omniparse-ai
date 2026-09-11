@@ -32,14 +32,17 @@ model User {
   ageConfirmedAt    DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  invoices       Invoice[]
-  chatSessions   ChatSession[]
-  approvalRules  ApprovalRule[]
-  customRules    CustomRule[]
-  auditLogs      AuditLog[]
-  exportTemplates ExportTemplate[]
-  customStatuses CustomStatus[]
-  entities       Entity[]
+  invoices         Invoice[]
+  chatSessions     ChatSession[]
+  approvalRules    ApprovalRule[]
+  customRules      CustomRule[]
+  auditLogs        AuditLog[]
+  exportTemplates  ExportTemplate[]
+  customStatuses   CustomStatus[]
+  entities         Entity[]
+  emailInboxes     EmailInbox[]
+  emailBlocklist   EmailBlocklist[]
+  pendingReviews   PendingReview[]
 }
 
 model Entity {
@@ -196,4 +199,96 @@ model ChatMessage {
   artifact  Json?
   createdAt DateTime @default(now())
   @@index([sessionId])
+}
+
+// ─── Email Capture ───────────────────────────────────────────────────────────
+// Allows users to connect their IMAP inbox so invoices can be auto-imported.
+// Credentials are AES-256-GCM encrypted using JWT_SECRET.
+
+model EmailInbox {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // User-facing label e.g. "Work invoices", "Personal"
+  label             String
+  // The email address being scanned (for display + sender blocklist matching)
+  emailAddress      String
+  // IMAP connection details
+  imapHost          String   // e.g. imap.gmail.com
+  imapPort          Int      @default(993)
+  // IMAP username (usually same as emailAddress but not always)
+  username          String
+  // AES-256-GCM encrypted password blob: "iv:ciphertext:authTag" (hex-encoded)
+  encryptedPassword String
+  // Resume point for chunked scanning — highest UID we've already processed
+  lastSeenUID       Int      @default(0)
+  // "manual" = every email goes to Pending Review (default, safest)
+  // "trusted" = emails from trusted senders auto-import, others go to Pending
+  scanMode          String   @default("manual")
+  // List of trusted sender email addresses (lowercased) for "trusted" mode
+  trustedSenders    Json?
+  // Active = included in scan loop. Inactive = paused by user.
+  active            Boolean  @default(true)
+  lastScannedAt     DateTime?
+  lastScanError     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  pendingReviews    PendingReview[]
+  @@index([userId])
+}
+
+// ─── Pending Review Queue ────────────────────────────────────────────────────
+// Emails that have been scanned but not yet approved. Never auto-imports to
+// Invoices — user must explicitly approve each one. This is the safety net
+// that prevents the user's invoice list from getting flooded with junk.
+
+model PendingReview {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  inboxId         String
+  inbox           EmailInbox @relation(fields: [inboxId], references: [id], onDelete: Cascade)
+  // Email metadata (for display in the review queue)
+  fromAddress     String
+  fromName        String?
+  subject         String
+  receivedAt      DateTime
+  // The attachment that was processed
+  attachmentFilename String
+  attachmentMime  String
+  // Raw attachment bytes (base64) — kept only until user approves (then moved
+  // to Invoice.fileData) or skips (then deleted)
+  attachmentData  String
+  // Quick classifier result
+  // 'invoice' = looks like an invoice (high confidence)
+  // 'maybe' = ambiguous — user should review
+  // 'no' = probably not an invoice (but user can still approve)
+  classification  String
+  // If classified as 'invoice', the AI extraction result is cached here so the
+  // approve action is instant (no re-extraction needed)
+  extractedData   Json?
+  // Status: 'pending' (waiting for user action), 'approved', 'skipped', 'blocked'
+  status          String   @default("pending")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  @@index([userId])
+  @@index([inboxId])
+  @@index([status])
+}
+
+// ─── Sender Blocklist ─────────────────────────────────────────────────────────
+// Senders the user has explicitly blocked. Future emails from these addresses
+// are auto-skipped at IMAP fetch time — no AI cost, no Pending entry.
+
+model EmailBlocklist {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Lowercased email address to block (e.g. "newsletter@spam.com")
+  address     String
+  // Optional reason the user blocked (for their own reference)
+  reason      String?
+  createdAt   DateTime @default(now())
+  @@index([userId])
+  @@unique([userId, address])
 }

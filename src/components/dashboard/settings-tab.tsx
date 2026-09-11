@@ -26,6 +26,7 @@ import { CreditCard, Loader2, Download, Trash2, Shield, Eye, EyeOff, Plus, X, Sp
 import { toast } from 'sonner';
 import { useAppStore } from '@/stores/app-store';
 import { DEFAULT_SHORTCUTS, saveShortcuts } from '@/lib/shortcuts';
+import { EmailInboxSettings } from './email-inbox-settings';
 
 const PLAN_LABELS: Record<string, string> = { free: 'Free', pro: 'Pro', plus: 'Plus', business: 'Business', enterprise: 'Enterprise' };
 const PLAN_LIMITS: Record<string, number> = { free: 15, pro: 500, plus: 2000, business: 10000, enterprise: Infinity };
@@ -549,6 +550,9 @@ export function SettingsTab() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Email Inboxes — IMAP-based auto-import */}
+      <EmailInboxSettings />
 
       {/* Security Card */}
       <Card className="border-border/50">
