@@ -96,7 +96,11 @@ function PdfPreview({ base64, mime, filename }: { base64: string; mime: string; 
       const blob = new Blob([bytes], { type: mime });
       const url = URL.createObjectURL(blob);
       setBlobUrl(url);
-      return () => URL.revokeObjectURL(url);
+      // NOTE: We intentionally do NOT revoke the blob URL here.
+      // If we revoke it when the component unmounts, any new tab the user
+      // opened will get ERR_FILE_NOT_FOUND because the blob is gone.
+      // Instead, we let the browser clean it up when the page unloads.
+      // The memory cost is one PDF (~10KB-10MB) which is acceptable.
     } catch (err) {
       console.error('Failed to create blob URL:', err);
     }
