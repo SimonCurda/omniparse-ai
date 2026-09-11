@@ -52,24 +52,34 @@ export function PdfViewer({ base64, filename }: PdfViewerProps) {
         // Dynamic import pdfjs-dist (client-side only)
         const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
 
-        // Disable the worker entirely. pdf.js can run in "fake worker" mode
-        // where it processes the PDF on the main thread. This is slower than
-        // using a real worker but avoids CSP issues with loading external
-        // worker scripts (Vercel's CSP blocks cdn.jsdelivr.net in script-src,
-        // and bundling the worker as a static asset is unreliable with
-        // Turbopack).
+        // Configure the worker.
+        // We import the worker as a URL via the ?url suffix — the bundler
+        // copies the worker file to the output directory and gives us a
+        // same-origin URL. This works with Vercel's CSP (script-src 'self')
+        // because the worker is served from the same origin as the app.
         //
-        // For small PDFs (which is what we're rendering here — invoices), the
-        // performance difference is negligible.
-        pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+        // If the ?url import fails (some bundlers don't support it for .mjs),
+        // we fall back to creating a Blob URL from the worker source string.
+        try {
+          // @ts-expect-error — ?url suffix is a bundler feature, not a TS type
+          const workerUrl = await import('pdfjs-dist/legacy/build/pdf.worker.min.mjs?url');
+          pdfjsLib.GlobalWorkerOptions.workerSrc = (workerUrl as unknown as { default: string }).default;
+        } catch {
+          // Fallback: import the worker source as a string and create a blob URL
+          // @ts-expect-error — ?raw suffix is a bundler feature, not a TS type
+          const workerSource = await import('pdfjs-dist/legacy/build/pdf.worker.min.mjs?raw');
+          const src = (workerSource as unknown as { default: string }).default;
+          const blob = new Blob([src], { type: 'application/javascript' });
+          pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(blob);
+        }
 
         // Decode base64 → Uint8Array
         const binary = atob(base64);
         const bytes = new Uint8Array(binary.length);
         for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
 
-        // Load the PDF document (will use fake worker since workerSrc is empty)
-        const loadingTask = pdfjsLib.getDocument({ data: bytes, useWorkerFetch: false, isEvalSupported: false });
+        // Load the PDF document
+        const loadingTask = pdfjsLib.getDocument({ data: bytes });
         const pdf = await loadingTask.promise;
         if (cancelled) return;
 
