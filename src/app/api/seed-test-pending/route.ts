@@ -2,42 +2,22 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
 import { encrypt } from '@/lib/crypto';
+import { makeValidPdf } from '@/lib/make-pdf';
 
 // POST /api/seed-test-pending
 //
 // Creates a fake EmailInbox + 5 fake PendingReview records so the user can
 // see the Pending Review tab working end-to-end without needing a real email
-// account. The pending items have realistic data + tiny valid PDF attachments.
+// account. The pending items have realistic data + valid PDF attachments.
 //
 // After the user is done testing, they can delete the inbox in Settings and
 // all pending items will be cascade-deleted.
 //
 // This endpoint is auth-gated (only works for the logged-in user).
 
-// Tiny valid PDF with text — same generator as the mock IMAP server
+// Generate a valid PDF with the given text content, return as base64
 function makePdf(text: string): string {
-  const escaped = text.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
-  const content = `BT /F1 12 Tf 50 750 Td (${escaped}) Tj ET`;
-  const objs = [
-    '1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj',
-    '2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj',
-    `3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >> endobj`,
-    `4 0 obj << /Length ${content.length} >> stream\n${content}\nendstream endobj`,
-    '5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj',
-  ];
-  const offsets: number[] = [];
-  let pos = 0;
-  const body: string[] = [];
-  for (const obj of objs) {
-    offsets.push(pos);
-    body.push(obj);
-    pos += obj.length + 1;
-  }
-  const xrefStart = pos;
-  let xref = `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n`;
-  for (const off of offsets) xref += String(off).padStart(10, '0') + ' 00000 n \n';
-  const trailer = `trailer << /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`;
-  return Buffer.from([...body, xref, trailer].join('\n')).toString('base64');
+  return makeValidPdf(text).toString('base64');
 }
 
 export async function POST(req: NextRequest) {
@@ -64,20 +44,15 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // Check if pending items already exist for this inbox
-  const existingCount = await db.pendingReview.count({
-    where: { userId: auth.userId, inboxId: inbox.id, status: 'pending' },
+  // Delete existing pending items for this inbox so we can re-seed with
+  // valid PDFs (the first version generated malformed PDFs that browsers
+  // couldn't render). Also handles the case where the user already tested
+  // and wants fresh data.
+  await db.pendingReview.deleteMany({
+    where: { userId: auth.userId, inboxId: inbox.id },
   });
-  if (existingCount > 0) {
-    return NextResponse.json({
-      success: true,
-      message: `You already have ${existingCount} pending items. Go to the Pending tab to review them.`,
-      inboxId: inbox.id,
-      pendingCount: existingCount,
-    });
-  }
 
-  // Create 5 test pending items with realistic data
+  // Create 5 test pending items with realistic data + valid PDFs
   const testItems = [
     {
       fromAddress: 'billing@aws.com',

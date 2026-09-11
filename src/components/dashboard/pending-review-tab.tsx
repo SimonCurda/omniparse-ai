@@ -77,13 +77,17 @@ function ClassificationBadge({ classification }: { classification: string }) {
 }
 
 // ─── PDF preview component ──────────────────────────────────────────────────
-// Vercel's Content-Security-Policy blocks blob: and data: URLs in iframes
-// (frame-src is restricted to 'self'), and we can't override Vercel's CSP.
-// Workaround: open the PDF in a new browser tab using window.open() with a
-// blob URL. Top-level navigations to blob: URLs are NOT subject to the
-// parent page's frame-src CSP — only embedded iframes are.
+// Uses the same pattern as invoices-tab.tsx:
+// 1. Convert the base64 attachment to a Blob
+// 2. Create a blob URL via URL.createObjectURL()
+// 3. Use an <iframe> to render the PDF
 //
-// The dialog shows a placeholder with a button to open the PDF in a new tab.
+// Blob URLs inherit the origin of the page that creates them, so they
+// satisfy Vercel's CSP `frame-src 'self'` directive. This is the same
+// pattern the Invoices tab uses for its file preview.
+//
+// The cleanup function intentionally does NOT revoke the blob URL because
+// revoking it too early causes ERR_FILE_NOT_FOUND in the iframe.
 
 function PdfPreview({ base64, mime, filename }: { base64: string; mime: string; filename: string }) {
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
@@ -97,42 +101,38 @@ function PdfPreview({ base64, mime, filename }: { base64: string; mime: string; 
       const url = URL.createObjectURL(blob);
       setBlobUrl(url);
       // NOTE: We intentionally do NOT revoke the blob URL here.
-      // If we revoke it when the component unmounts, any new tab the user
-      // opened will get ERR_FILE_NOT_FOUND because the blob is gone.
-      // Instead, we let the browser clean it up when the page unloads.
-      // The memory cost is one PDF (~10KB-10MB) which is acceptable.
+      // Revoking it when the component unmounts causes ERR_FILE_NOT_FOUND
+      // because the iframe is still trying to load it.
+      // The browser cleans up blob URLs automatically when the page unloads.
     } catch (err) {
       console.error('Failed to create blob URL:', err);
     }
   }, [base64, mime]);
 
-  // Use an <a download> link instead of window.open(). The <a> tag is a
-  // direct user gesture, so popup blockers don't interfere, and the
-  // download attribute tells the browser to save (or open) the file
-  // directly. This works reliably across all browsers.
   return (
-    <div className="p-8 text-center space-y-4">
-      <FileText className="h-12 w-12 mx-auto text-muted-foreground/40" />
-      <div>
-        <p className="text-sm font-medium text-foreground">{filename}</p>
-        <p className="text-xs text-muted-foreground mt-1">
-          Click below to download the PDF. Your browser will either open it
-          automatically or save it to your Downloads folder.
-        </p>
-      </div>
+    <div className="space-y-2">
       {blobUrl ? (
-        <a
-          href={blobUrl}
-          download={filename}
-          className="inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-        >
-          <Download className="h-4 w-4" />
-          Download {filename}
-        </a>
+        <>
+          <div className="rounded border bg-white overflow-hidden">
+            <iframe
+              src={blobUrl}
+              className="w-full h-[60vh] border-0"
+              title={filename}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground mt-2 text-center">
+            If the PDF doesn&apos;t display,{' '}
+            <a href={blobUrl} download={filename} className="text-primary hover:underline">
+              download it
+            </a>{' '}
+            instead.
+          </p>
+        </>
       ) : (
-        <Button disabled size="sm">
-          <Loader2 className="h-4 w-4 mr-1 animate-spin" /> Preparing...
-        </Button>
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <span className="text-sm text-muted-foreground ml-2">Preparing PDF...</span>
+        </div>
       )}
     </div>
   );
