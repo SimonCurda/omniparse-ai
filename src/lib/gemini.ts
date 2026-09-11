@@ -64,6 +64,8 @@ export interface GeminiVisionMessage {
 
 /**
  * Call Groq with vision (image) input — uses vision-capable model.
+ * If Groq's vision model (qwen3.6-27b) is rate-limited, falls back to
+ * OpenRouter's free vision models automatically.
  */
 export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise<string> {
   const apiKey = getApiKey();
@@ -85,27 +87,89 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
     openaiMessages.push({ role: msg.role === 'model' ? 'assistant' : 'user', content: parts });
   }
 
-  const res = await fetch(GROQ_API_URL, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: VISION_MODEL,
-      messages: openaiMessages,
-      max_tokens: MAX_TOKENS_LOW,
-      temperature: 0.1,
-    }),
-  });
+  // ─── Try Groq vision model first ──────────────────────────────────────
+  try {
+    const res = await fetch(GROQ_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: VISION_MODEL,
+        messages: openaiMessages,
+        max_tokens: MAX_TOKENS_LOW,
+        temperature: 0.1,
+      }),
+    });
 
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Groq API error (${res.status}): ${err}`);
+    if (res.ok) {
+      const data = await res.json();
+      const content = data.choices?.[0]?.message?.content || '';
+      if (content) return content;
+    }
+
+    // If Groq failed (429, 500, etc.), fall through to OpenRouter
+    const errText = await res.text().catch(() => '');
+    console.warn(`[gemini] Groq vision model ${VISION_MODEL} failed (${res.status}), falling back to OpenRouter vision models...`);
+  } catch (err) {
+    console.warn('[gemini] Groq vision call failed, falling back to OpenRouter...', err instanceof Error ? err.message : String(err));
   }
 
-  const data = await res.json();
-  return data.choices?.[0]?.message?.content || '';
+  // ─── Fall back to OpenRouter free vision models ────────────────────────
+  // These models support image input and are free on OpenRouter.
+  // We try them in order until one succeeds.
+  const orApiKey = process.env.OPENROUTER_API_KEY;
+  if (!orApiKey) {
+    throw new Error('Both Groq vision and OpenRouter are unavailable. Set OPENROUTER_API_KEY for vision fallback.');
+  }
+
+  const openRouterVisionModels = [
+    'inclusionai/ling-3.0-flash-vl:free',       // Finance-focused VL model, 262K context
+    'google/gemma-4-26b-a4b-it:free',           // Google Gemma 4, 262K context
+    'google/gemma-4-31b-it:free',               // Google Gemma 4 (larger), 262K context
+    'nex-agi/nex-n2.5-pro:free',                // Nex AGI Pro, 262K context
+    'thinkingmachines/inkling:free',             // Inkling, 1M context
+  ];
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://omniparse-ai.vercel.app';
+
+  for (const model of openRouterVisionModels) {
+    try {
+      console.warn(`[gemini] Trying OpenRouter vision model: ${model}...`);
+      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${orApiKey}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': appUrl,
+          'X-Title': 'OmniParse AI',
+        },
+        body: JSON.stringify({
+          model,
+          messages: openaiMessages,
+          max_tokens: 4096,
+          temperature: 0.1,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const content = data.choices?.[0]?.message?.content || '';
+        if (content) {
+          console.warn(`[gemini] OpenRouter vision model ${model} succeeded!`);
+          return content;
+        }
+      }
+
+      const errText = await res.text().catch(() => '');
+      console.warn(`[gemini] OpenRouter vision ${model} failed (${res.status})`);
+    } catch (err) {
+      console.warn(`[gemini] OpenRouter vision ${model} error:`, err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  throw new Error('All vision models (Groq + OpenRouter) are temporarily unavailable. Please try again in a moment.');
 }
 
 /**
