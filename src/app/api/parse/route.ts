@@ -89,7 +89,9 @@ function extractFieldsFromProse(text: string): Record<string, unknown> {
   }
   // If no total found, try to compute from amount + vat
   if (!result.total && result.amount && result.vatAmount) {
-    result.total = Math.round((result.amount as number + result.vatAmount as number) * 100) / 100;
+    const amt = result.amount as number;
+    const vat = result.vatAmount as number;
+    result.total = Math.round((amt + vat) * 100) / 100;
   }
 
   // Currency
