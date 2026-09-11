@@ -113,14 +113,6 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
   const isMixedCurrency = currencies.length > 1;
   const dominantCurrency = currencies[0] || 'USD';
 
-  // Lookup map: invoice ID → currency code. Used to show the right currency
-  // symbol next to each duplicate / outlier (which reference invoice IDs).
-  const currencyById = useMemo(() => {
-    const m: Record<string, string> = {};
-    for (const inv of invoices) m[inv.id] = (inv.currency || 'USD').toUpperCase();
-    return m;
-  }, [invoices]);
-
   // Total amount string — per currency, joined with ' + ' when mixed
   const totalAmountStr = byCurrency.length > 0
     ? byCurrency.map((c) => fmtCurrency(c.total, c.currency)).join(' + ')
@@ -214,6 +206,7 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
     vendor: string;
     type: string;
     description: string;
+    currency?: string;
     oldVal: number;
     newVal: number;
     changePercent: number;
@@ -242,6 +235,7 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
   // --- Vendor Performance Scorecard (Business+) ---
   const [vendorScorecards, setVendorScorecards] = useState<{
     vendor: string;
+    currency?: string;
     invoiceCount: number;
     totalAmount: number;
     avgAmount: number;
@@ -430,17 +424,17 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Total by Currency</span>
                     <span className="text-sm font-semibold text-foreground">
-                      {byCurrency.length === 0
+                      {metrics.currencyBreakdown.length === 0
                         ? fmtCurrency(0)
-                        : byCurrency.map((c) => fmtCurrency(c.total, c.currency)).join(' + ')}
+                        : metrics.currencyBreakdown.map((c) => fmtCurrency(c.total, c.currency)).join(' + ')}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Average Invoice Amount</span>
                     <span className="text-sm font-semibold text-foreground">
-                      {byCurrency.length === 0
+                      {metrics.currencyBreakdown.length === 0
                         ? fmtCurrency(0)
-                        : byCurrency.map((c) => fmtCurrency(c.avg, c.currency)).join(' + ')}
+                        : metrics.currencyBreakdown.map((c) => fmtCurrency(c.avg, c.currency)).join(' + ')}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
@@ -640,11 +634,11 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
                   </div>
                   <div className="bg-muted rounded-lg p-3">
                     <p className="text-xs text-muted-foreground">Avg. Amount</p>
-                    <p className="text-lg font-bold text-foreground">{fmtCurrency(batchAnalysis.summary.avgAmount, dominantCurrency)}</p>
+                    <p className="text-lg font-bold text-foreground">{batchAnalysis.currencyBreakdown.length === 0 ? fmtCurrency(0) : batchAnalysis.currencyBreakdown.map((c) => fmtCurrency(c.avg, c.currency)).join(' + ')}</p>
                   </div>
                   <div className="bg-muted rounded-lg p-3">
                     <p className="text-xs text-muted-foreground">Total Amount</p>
-                    <p className="text-lg font-bold text-foreground">{fmtCurrency(batchAnalysis.summary.totalAmount, dominantCurrency)}</p>
+                    <p className="text-lg font-bold text-foreground">{batchAnalysis.currencyBreakdown.length === 0 ? fmtCurrency(0) : batchAnalysis.currencyBreakdown.map((c) => fmtCurrency(c.total, c.currency)).join(' + ')}</p>
                   </div>
                   <div className="bg-muted rounded-lg p-3">
                     <p className="text-xs text-muted-foreground">Vendors</p>
@@ -683,7 +677,7 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
                           <div className="min-w-0">
                             <p className="text-sm font-medium text-foreground">{dup.vendor}</p>
                             <p className="text-xs text-muted-foreground">
-                              {fmtCurrency(dup.amount, dup.ids?.[0] ? currencyById[dup.ids[0]] : dominantCurrency)} &middot; {dup.reason}
+                              {fmtCurrency(dup.amount, dup.currency)} &middot; {dup.reason}
                             </p>
                           </div>
                         </div>
@@ -711,7 +705,7 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
                           <div className="min-w-0">
                             <p className="text-sm font-medium text-foreground">{out.vendor}</p>
                             <p className="text-xs text-muted-foreground">
-                              {fmtCurrency(out.amount, out.id ? currencyById[out.id] : dominantCurrency)} &middot; {out.reason}
+                              {fmtCurrency(out.amount, out.currency)} &middot; {out.reason}
                             </p>
                           </div>
                         </div>
@@ -796,6 +790,11 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2 mb-1">
                               <p className="text-sm font-medium text-foreground">{anomaly.vendor}</p>
+                              {anomaly.currency && (
+                                <Badge variant="secondary" className="bg-muted text-muted-foreground border-0 text-[10px] px-1.5 py-0">
+                                  {anomaly.currency}
+                                </Badge>
+                              )}
                               <Badge
                                 variant="secondary"
                                 className={
@@ -904,7 +903,7 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
                                 </div>
                                 <p className="text-xs text-foreground/80">{alert.description}</p>
                                 <p className="text-xs text-muted-foreground mt-1">
-                                  {fmtCurrency(alert.oldVal, dominantCurrency)} → {fmtCurrency(alert.newVal, dominantCurrency)}
+                                  {fmtCurrency(alert.oldVal, alert.currency || dominantCurrency)} → {fmtCurrency(alert.newVal, alert.currency || dominantCurrency)}
                                   <span className="ml-2">{alert.prevDate} → {alert.invDate}</span>
                                 </p>
                               </div>
@@ -973,6 +972,11 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
                                 <div className="flex items-center gap-2 min-w-0">
                                   <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
                                   <span className="text-sm font-semibold text-foreground truncate">{sc.vendor}</span>
+                                  {sc.currency && (
+                                    <Badge variant="secondary" className="bg-muted text-muted-foreground border-0 text-[10px] px-1.5 py-0 shrink-0">
+                                      {sc.currency}
+                                    </Badge>
+                                  )}
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0">
                                   {/* Price trend badge */}
@@ -1016,7 +1020,7 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
                                 </div>
                                 <div>
                                   <p className="text-muted-foreground">Total Amount</p>
-                                  <p className="font-medium text-foreground">{fmtCurrency(sc.totalAmount, dominantCurrency)}</p>
+                                  <p className="font-medium text-foreground">{fmtCurrency(sc.totalAmount, sc.currency || dominantCurrency)}</p>
                                 </div>
                                 <div>
                                   <p className="text-muted-foreground">Avg Confidence</p>

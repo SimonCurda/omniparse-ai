@@ -25,20 +25,25 @@ export async function GET(req: NextRequest) {
         vendor: true, total: true, amount: true, confidence: true,
         isDuplicate: true, validationStatus: true, invDate: true,
         processingTime: true, lineItems: true, createdAt: true,
-        approvalStatus: true,
+        approvalStatus: true, currency: true,
       },
       orderBy: { createdAt: 'desc' },
     });
 
-    // Group by vendor
-    const vendorMap = new Map<string, typeof invoices>();
+    // Group by vendor + currency — never mix currencies when summing totals
+    // or computing averages. A vendor with invoices in 2 currencies shows up
+    // as 2 separate scorecard entries.
+    const vendorCurrencyMap = new Map<string, typeof invoices>();
     for (const inv of invoices) {
       const v = inv.vendor!;
-      if (!vendorMap.has(v)) vendorMap.set(v, []);
-      vendorMap.get(v)!.push(inv);
+      const cur = (inv.currency || 'USD').toUpperCase();
+      const key = `${v}|||${cur}`;
+      if (!vendorCurrencyMap.has(key)) vendorCurrencyMap.set(key, []);
+      vendorCurrencyMap.get(key)!.push(inv);
     }
 
-    const scorecards = Array.from(vendorMap.entries()).map(([vendor, invs]) => {
+    const scorecards = Array.from(vendorCurrencyMap.entries()).map(([key, invs]) => {
+      const [vendor, currency] = key.split('|||');
       const totalAmount = invs.reduce((s, i) => s + (i.total ?? 0), 0);
       const avgAmount = totalAmount / invs.length;
       const avgConfidence = invs.reduce((s, i) => s + (i.confidence ?? 0), 0) / invs.length;
@@ -48,7 +53,7 @@ export async function GET(req: NextRequest) {
       const warningCount = invs.filter((i) => i.validationStatus === 'warning').length;
       const passCount = invs.filter((i) => i.validationStatus === 'pass').length;
 
-      // Price trend: compare first half vs second half avg
+      // Price trend: compare first half vs second half avg (within this currency)
       const mid = Math.floor(invs.length / 2);
       const firstHalf = invs.slice(0, mid || 1);
       const secondHalf = invs.slice(mid || 1);
@@ -72,6 +77,7 @@ export async function GET(req: NextRequest) {
 
       return {
         vendor,
+        currency,
         invoiceCount: invs.length,
         totalAmount: Math.round(totalAmount * 100) / 100,
         avgAmount: Math.round(avgAmount * 100) / 100,
@@ -89,7 +95,8 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    // Sort by total amount descending
+    // Sort by total amount descending (still meaningful since each scorecard
+    // is per-currency — within a currency, the totals are comparable).
     scorecards.sort((a, b) => b.totalAmount - a.totalAmount);
 
     return NextResponse.json({ scorecards, totalVendors: scorecards.length });

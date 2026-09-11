@@ -45,20 +45,36 @@ export interface InvoiceAging {
   status: 'current' | 'upcoming' | 'overdue';
 }
 
+export interface CurrencyBreakdown {
+  currency: string;
+  count: number;
+  total: number;
+  avg: number;
+}
+
 export interface ProcessingMetrics {
   avgAccuracy: number;
   avgProcessingTime: number;
   costPerInvoice: number;
   totalProcessed: number;
+  /** @deprecated Use `currencyBreakdown` instead — never sum across currencies. Kept for backwards compat (dominant currency only). */
   totalAmount: number;
+  /** @deprecated Use `currencyBreakdown` instead — never sum across currencies. Kept for backwards compat (dominant currency only). */
   avgInvoiceAmount: number;
+  /** Per-currency breakdown — the correct way to consume totals. */
+  currencyBreakdown: CurrencyBreakdown[];
+  /** ISO 4217 code of the currency with the most invoices (used for legacy fields). */
+  dominantCurrency: string;
 }
 
 export interface BatchAnalysisResult {
-  duplicates: Array<{ ids: string[]; vendor: string; amount: number; reason: string }>;
-  outliers: Array<{ id: string; vendor: string; amount: number; reason: string }>;
+  duplicates: Array<{ ids: string[]; vendor: string; amount: number; currency: string; reason: string }>;
+  outliers: Array<{ id: string; vendor: string; amount: number; currency: string; reason: string }>;
   fieldDifferences: Record<string, { unique: number; mostCommon: string }>;
+  /** @deprecated Use `currencyBreakdown` instead — never sum across currencies. */
   summary: { count: number; avgAmount: number; totalAmount: number; vendors: string[] };
+  /** Per-currency breakdown — the correct way to consume totals. */
+  currencyBreakdown: CurrencyBreakdown[];
 }
 
 export interface PatternAnomaly {
@@ -67,6 +83,7 @@ export interface PatternAnomaly {
   anomaly: string;
   severity: 'warning' | 'critical';
   detail: string;
+  currency?: string | null;
 }
 
 export interface TamperingCheck {
@@ -519,11 +536,21 @@ export function calculateMetrics(invoices: Array<{
   confidence?: number | null;
   processingTime?: number | null;
   total?: number | null;
+  currency?: string | null;
   createdAt: string;
   validationStatus?: string | null;
 }>): ProcessingMetrics {
   if (invoices.length === 0) {
-    return { avgAccuracy: 0, avgProcessingTime: 0, costPerInvoice: 0, totalProcessed: 0, totalAmount: 0, avgInvoiceAmount: 0 };
+    return {
+      avgAccuracy: 0,
+      avgProcessingTime: 0,
+      costPerInvoice: 0,
+      totalProcessed: 0,
+      totalAmount: 0,
+      avgInvoiceAmount: 0,
+      currencyBreakdown: [],
+      dominantCurrency: 'USD',
+    };
   }
 
   const withConf = invoices.filter((i) => i.confidence !== null && i.confidence !== undefined);
@@ -536,13 +563,37 @@ export function calculateMetrics(invoices: Array<{
     ? withTime.reduce((s, i) => s + i.processingTime!, 0) / withTime.length
     : 0;
 
-  // Cost per invoice: based on AI API cost estimation
-  // ~$0.002 per image inference + $0.001 per 1K tokens output
-  const estimatedCostPerInvoice = 0.003; // ~$0.003 base
+  // Cost per invoice: based on AI API cost estimation (always in USD — it's
+  // an API cost, not a user-facing invoice amount)
+  const estimatedCostPerInvoice = 0.003;
   const avgCost = estimatedCostPerInvoice + (avgProcessingTime > 10 ? 0.001 : 0);
 
-  const totalAmount = invoices.reduce((s, i) => s + (i.total ?? 0), 0);
-  const withTotal = invoices.filter((i) => i.total !== null && i.total !== undefined && i.total! > 0);
+  // ─── Per-currency breakdown ───────────────────────────────────────────────
+  // Group invoices by currency so totals are NEVER summed across currencies.
+  const byCurrency: Record<string, { count: number; total: number }> = {};
+  for (const inv of invoices) {
+    const cur = ((inv.currency as string | null) || 'USD').toUpperCase();
+    if (!byCurrency[cur]) byCurrency[cur] = { count: 0, total: 0 };
+    byCurrency[cur].count++;
+    byCurrency[cur].total += inv.total ?? 0;
+  }
+
+  const currencyBreakdown: CurrencyBreakdown[] = Object.entries(byCurrency)
+    .map(([currency, data]) => ({
+      currency,
+      count: data.count,
+      total: data.total,
+      avg: data.count > 0 ? data.total / data.count : 0,
+    }))
+    .sort((a, b) => b.count - a.count); // dominant currency first
+
+  const dominantCurrency = currencyBreakdown[0]?.currency || 'USD';
+
+  // Legacy fields — keep for backwards compat. Use the dominant currency only.
+  const dominantInvoices = invoices.filter((i) =>
+    ((i.currency as string | null) || 'USD').toUpperCase() === dominantCurrency);
+  const totalAmount = dominantInvoices.reduce((s, i) => s + (i.total ?? 0), 0);
+  const withTotal = dominantInvoices.filter((i) => i.total !== null && i.total !== undefined && i.total! > 0);
   const avgInvoiceAmount = withTotal.length > 0
     ? withTotal.reduce((s, i) => s + i.total!, 0) / withTotal.length
     : 0;
@@ -554,6 +605,8 @@ export function calculateMetrics(invoices: Array<{
     totalProcessed: invoices.length,
     totalAmount,
     avgInvoiceAmount,
+    currencyBreakdown,
+    dominantCurrency,
   };
 }
 
@@ -577,26 +630,47 @@ export function analyzeBatch(invoices: Array<{
   total?: number | null;
   invNumber?: string | null;
   amount?: number | null;
+  currency?: string | null;
 }>): BatchAnalysisResult {
   const duplicates: BatchAnalysisResult['duplicates'] = [];
   const outliers: BatchAnalysisResult['outliers'] = [];
   const vendors = new Set<string>();
-  let totalAmount = 0;
 
-  const withTotal = invoices.filter((i) => typeof i.total === 'number' && i.total > 0);
-  const avgAmount = withTotal.length > 0
-    ? withTotal.reduce((s, i) => s + i.total!, 0) / withTotal.length
-    : 0;
-
-  // Find potential duplicates (same vendor + same/similar total)
-  const byVendor: Record<string, typeof invoices> = {};
+  // ─── Per-currency breakdown ───────────────────────────────────────────────
+  // Group invoices by currency so we never sum across currencies.
+  const byCurrency: Record<string, typeof invoices> = {};
   for (const inv of invoices) {
-    const v = (inv.vendor || 'Unknown').toLowerCase();
-    if (!byVendor[v]) byVendor[v] = [];
-    byVendor[v].push(inv);
+    const cur = ((inv.currency as string | null) || 'USD').toUpperCase();
+    if (!byCurrency[cur]) byCurrency[cur] = [];
+    byCurrency[cur].push(inv);
   }
 
-  for (const [vendor, invs] of Object.entries(byVendor)) {
+  const currencyBreakdown: CurrencyBreakdown[] = Object.entries(byCurrency)
+    .map(([currency, invs]) => {
+      const total = invs.reduce((s, i) => s + (i.total ?? 0), 0);
+      const count = invs.length;
+      return { currency, count, total, avg: count > 0 ? total / count : 0 };
+    })
+    .sort((a, b) => b.count - a.count);
+
+  const dominantCurrency = currencyBreakdown[0]?.currency || 'USD';
+
+  // ─── Duplicate detection — currency-aware ────────────────────────────────
+  // Two invoices from the same vendor are ONLY potential duplicates if they
+  // share the SAME currency. An invoice in EUR and one in CZK from the same
+  // vendor with the "same" amount (after currency conversion) are NOT
+  // duplicates — they're just unrelated invoices.
+  const byVendorCurrency: Record<string, typeof invoices> = {};
+  for (const inv of invoices) {
+    const v = (inv.vendor || 'Unknown').toLowerCase();
+    const cur = ((inv.currency as string | null) || 'USD').toUpperCase();
+    const key = `${v}|||${cur}`;
+    if (!byVendorCurrency[key]) byVendorCurrency[key] = [];
+    byVendorCurrency[key].push(inv);
+  }
+
+  for (const [key, invs] of Object.entries(byVendorCurrency)) {
+    const [vendorKey, currency] = key.split('|||');
     vendors.add(invs[0].vendor || 'Unknown');
     if (invs.length > 1) {
       for (let i = 0; i < invs.length; i++) {
@@ -607,16 +681,18 @@ export function analyzeBatch(invoices: Array<{
             if (Math.abs(a.total - b.total) < 0.01) {
               duplicates.push({
                 ids: [a.id, b.id],
-                vendor: vendor.charAt(0).toUpperCase() + vendor.slice(1),
+                vendor: vendorKey.charAt(0).toUpperCase() + vendorKey.slice(1),
                 amount: a.total,
-                reason: 'Identical amount from same vendor',
+                currency,
+                reason: `Identical amount from same vendor (${currency})`,
               });
             } else if (a.invNumber && b.invNumber && a.invNumber === b.invNumber) {
               duplicates.push({
                 ids: [a.id, b.id],
-                vendor: vendor.charAt(0).toUpperCase() + vendor.slice(1),
+                vendor: vendorKey.charAt(0).toUpperCase() + vendorKey.slice(1),
                 amount: a.total,
-                reason: 'Same invoice number',
+                currency,
+                reason: `Same invoice number (${currency})`,
               });
             }
           }
@@ -625,15 +701,24 @@ export function analyzeBatch(invoices: Array<{
     }
   }
 
-  // Find outliers (>3x average)
-  for (const inv of withTotal) {
-    if (avgAmount > 0 && inv.total! > avgAmount * 3) {
-      outliers.push({
-        id: inv.id,
-        vendor: inv.vendor || 'Unknown',
-        amount: inv.total!,
-        reason: `Amount is ${(inv.total! / avgAmount).toFixed(1)}x the average ($${avgAmount.toFixed(2)})`,
-      });
+  // ─── Outlier detection — currency-aware ──────────────────────────────────
+  // Compute average PER CURRENCY, then find outliers within each currency.
+  // An invoice in EUR can never be an outlier against CZK averages.
+  for (const [currency, invs] of Object.entries(byCurrency)) {
+    const withTotal = invs.filter((i) => typeof i.total === 'number' && i.total! > 0);
+    if (withTotal.length === 0) continue;
+    const avgAmount = withTotal.reduce((s, i) => s + i.total!, 0) / withTotal.length;
+
+    for (const inv of withTotal) {
+      if (avgAmount > 0 && inv.total! > avgAmount * 3) {
+        outliers.push({
+          id: inv.id,
+          vendor: inv.vendor || 'Unknown',
+          amount: inv.total!,
+          currency,
+          reason: `Amount is ${(inv.total! / avgAmount).toFixed(1)}x the ${currency} average (${avgAmount.toFixed(2)})`,
+        });
+      }
     }
   }
 
@@ -651,9 +736,13 @@ export function analyzeBatch(invoices: Array<{
     }
   }
 
-  for (const inv of invoices) {
-    if (typeof inv.total === 'number') totalAmount += inv.total;
-  }
+  // Legacy summary — uses dominant currency only for backwards compat.
+  const dominantInvoices = byCurrency[dominantCurrency] || [];
+  const withTotal = dominantInvoices.filter((i) => typeof i.total === 'number' && i.total! > 0);
+  const avgAmount = withTotal.length > 0
+    ? withTotal.reduce((s, i) => s + i.total!, 0) / withTotal.length
+    : 0;
+  const totalAmount = dominantInvoices.reduce((s, i) => s + (i.total ?? 0), 0);
 
   return {
     duplicates,
@@ -665,6 +754,7 @@ export function analyzeBatch(invoices: Array<{
       totalAmount: Math.round(totalAmount * 100) / 100,
       vendors: Array.from(vendors),
     },
+    currencyBreakdown,
   };
 }
 
@@ -1192,6 +1282,7 @@ export function detectPatterns(
     id: string;
     vendor?: string | null;
     total?: number | null;
+    currency?: string | null;
     invDate?: string | null;
     createdAt: string;
   }>
@@ -1199,15 +1290,21 @@ export function detectPatterns(
   const anomalies: PatternAnomaly[] = [];
   if (allInvoices.length < 3) return anomalies; // Need at least 3 for patterns
 
-  // Group by vendor
-  const byVendor: Record<string, typeof allInvoices> = {};
+  // ─── Group by vendor + currency ───────────────────────────────────────────
+  // Don't mix currencies when computing a vendor's average — a vendor with
+  // 5 invoices in EUR and 3 in CZK should have separate averages per currency,
+  // otherwise the cross-currency "average" is meaningless.
+  const byVendorCurrency: Record<string, typeof allInvoices> = {};
   for (const inv of allInvoices) {
     const v = (inv.vendor || 'Unknown').toLowerCase();
-    if (!byVendor[v]) byVendor[v] = [];
-    byVendor[v].push(inv);
+    const cur = ((inv.currency as string | null) || 'USD').toUpperCase();
+    const key = `${v}|||${cur}`;
+    if (!byVendorCurrency[key]) byVendorCurrency[key] = [];
+    byVendorCurrency[key].push(inv);
   }
 
-  for (const [vendorKey, vendorInvoices] of Object.entries(byVendor)) {
+  for (const [key, vendorInvoices] of Object.entries(byVendorCurrency)) {
+    const [vendorKey, currency] = key.split('|||');
     const vendorName = vendorInvoices[0].vendor || 'Unknown';
     const totals = vendorInvoices
       .map((i) => i.total)
@@ -1218,7 +1315,7 @@ export function detectPatterns(
     const avg = totals.reduce((a, b) => a + b, 0) / totals.length;
     const stdDev = Math.sqrt(totals.reduce((s, t) => s + Math.pow(t - avg, 2), 0) / totals.length);
 
-    // Anomaly: Invoice amount > avg + 3*stdDev
+    // Anomaly: Invoice amount > avg + 3*stdDev (within this currency)
     if (stdDev > 0) {
       for (const inv of vendorInvoices) {
         if (typeof inv.total === 'number' && inv.total > avg + 3 * stdDev) {
@@ -1227,13 +1324,14 @@ export function detectPatterns(
             vendor: vendorName,
             anomaly: 'Unusual amount',
             severity: 'warning',
-            detail: `$${inv.total.toFixed(2)} is ${(stdDev > 0 ? ((inv.total - avg) / stdDev).toFixed(1) : '?')}σ above the vendor average of $${avg.toFixed(2)}.`,
+            currency,
+            detail: `${currency} ${inv.total.toFixed(2)} is ${(stdDev > 0 ? ((inv.total - avg) / stdDev).toFixed(1) : '?')}σ above the vendor average of ${currency} ${avg.toFixed(2)} (${currency}).`,
           });
         }
       }
     }
 
-    // Anomaly: Amount is >5x the vendor's average
+    // Anomaly: Amount is >5x the vendor's average (within this currency)
     if (avg > 0) {
       for (const inv of vendorInvoices) {
         if (typeof inv.total === 'number' && inv.total > avg * 5) {
@@ -1243,7 +1341,8 @@ export function detectPatterns(
               vendor: vendorName,
               anomaly: 'Spike in amount',
               severity: 'critical',
-              detail: `$${inv.total.toFixed(2)} is ${((inv.total / avg)).toFixed(1)}x the vendor's average of $${avg.toFixed(2)}.`,
+              currency,
+              detail: `${currency} ${inv.total.toFixed(2)} is ${((inv.total / avg)).toFixed(1)}x the vendor's average of ${currency} ${avg.toFixed(2)} (${currency}).`,
             });
           }
         }

@@ -22,6 +22,7 @@ export async function GET(req: NextRequest) {
 
     const alerts: Array<{
       vendor: string;
+      currency: string;
       type: 'total_increase' | 'item_price_increase';
       description: string;
       oldVal: number;
@@ -31,16 +32,21 @@ export async function GET(req: NextRequest) {
       prevDate: string;
     }> = [];
 
-    // Group by vendor
-    const byVendor = new Map<string, typeof invoices>();
+    // Group by vendor + currency — never mix currencies when comparing averages.
+    // A vendor's EUR invoices and CZK invoices are tracked separately so a
+    // price change in one currency doesn't pollute the other.
+    const byVendorCurrency = new Map<string, typeof invoices>();
     for (const inv of invoices) {
       const v = inv.vendor!;
-      if (!byVendor.has(v)) byVendor.set(v, []);
-      byVendor.get(v)!.push(inv);
+      const cur = (inv.currency || 'USD').toUpperCase();
+      const key = `${v}|||${cur}`;
+      if (!byVendorCurrency.has(key)) byVendorCurrency.set(key, []);
+      byVendorCurrency.get(key)!.push(inv);
     }
 
-    // Compare month-over-month per vendor
-    for (const [vendor, vendorInvs] of byVendor) {
+    // Compare month-over-month per vendor + currency
+    for (const [key, vendorInvs] of byVendorCurrency) {
+      const [vendor, currency] = key.split('|||');
       if (vendorInvs.length < 2) continue;
 
       // Group by month
@@ -70,10 +76,11 @@ export async function GET(req: NextRequest) {
         if (Math.abs(changePercent) >= 10) {
           alerts.push({
             vendor,
+            currency,
             type: 'total_increase',
             description: changePercent > 0
-              ? `${vendor} average invoice total increased ${changePercent.toFixed(1)}%`
-              : `${vendor} average invoice total decreased ${Math.abs(changePercent).toFixed(1)}%`,
+              ? `${vendor} average invoice total increased ${changePercent.toFixed(1)}% (${currency})`
+              : `${vendor} average invoice total decreased ${Math.abs(changePercent).toFixed(1)}% (${currency})`,
             oldVal: Math.round(prevAvgTotal * 100) / 100,
             newVal: Math.round(currentAvgTotal * 100) / 100,
             changePercent: Math.round(changePercent * 10) / 10,
@@ -83,7 +90,7 @@ export async function GET(req: NextRequest) {
         }
       }
 
-      // Line item price comparison
+      // Line item price comparison (within the same currency)
       const currentItemPrices = new Map<string, number[]>();
       const prevItemPrices = new Map<string, number[]>();
 
@@ -92,9 +99,9 @@ export async function GET(req: NextRequest) {
         if (Array.isArray(items)) {
           for (const item of items) {
             if (item.description && item.unitPrice) {
-              const key = item.description.toLowerCase().trim();
-              if (!currentItemPrices.has(key)) currentItemPrices.set(key, []);
-              currentItemPrices.get(key)!.push(item.unitPrice);
+              const k = item.description.toLowerCase().trim();
+              if (!currentItemPrices.has(k)) currentItemPrices.set(k, []);
+              currentItemPrices.get(k)!.push(item.unitPrice);
             }
           }
         }
@@ -105,9 +112,9 @@ export async function GET(req: NextRequest) {
         if (Array.isArray(items)) {
           for (const item of items) {
             if (item.description && item.unitPrice) {
-              const key = item.description.toLowerCase().trim();
-              if (!prevItemPrices.has(key)) prevItemPrices.set(key, []);
-              prevItemPrices.get(key)!.push(item.unitPrice);
+              const k = item.description.toLowerCase().trim();
+              if (!prevItemPrices.has(k)) prevItemPrices.set(k, []);
+              prevItemPrices.get(k)!.push(item.unitPrice);
             }
           }
         }
@@ -129,8 +136,9 @@ export async function GET(req: NextRequest) {
               : itemKey;
             alerts.push({
               vendor,
+              currency,
               type: 'item_price_increase',
-              description: `${vendor} raised price on '${itemDesc}' from $${prevAvg.toFixed(2)} to $${currentAvg.toFixed(2)} (${changePercent.toFixed(1)}% increase)`,
+              description: `${vendor} raised price on '${itemDesc}' from ${currency} ${prevAvg.toFixed(2)} to ${currency} ${currentAvg.toFixed(2)} (${changePercent.toFixed(1)}% increase)`,
               oldVal: Math.round(prevAvg * 100) / 100,
               newVal: Math.round(currentAvg * 100) / 100,
               changePercent: Math.round(changePercent * 10) / 10,
@@ -145,7 +153,7 @@ export async function GET(req: NextRequest) {
     // Sort by change percent descending
     alerts.sort((a, b) => Math.abs(b.changePercent) - Math.abs(a.changePercent));
 
-    return NextResponse.json({ alerts, totalVendors: byVendor.size, analyzedMonths: new Set(invoices.map((i) => (i.invDate || i.createdAt.toISOString()).slice(0, 7))).size });
+    return NextResponse.json({ alerts, totalVendors: byVendorCurrency.size, analyzedMonths: new Set(invoices.map((i) => (i.invDate || i.createdAt.toISOString()).slice(0, 7))).size });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     return NextResponse.json({ error: message }, { status: 500 });
