@@ -106,25 +106,34 @@ function PdfPreview({ base64, mime, filename }: { base64: string; mime: string; 
     }
   }, [base64, mime]);
 
-  const openInNewTab = () => {
-    if (blobUrl) {
-      window.open(blobUrl, '_blank', 'noopener,noreferrer');
-    }
-  };
-
+  // Use an <a download> link instead of window.open(). The <a> tag is a
+  // direct user gesture, so popup blockers don't interfere, and the
+  // download attribute tells the browser to save (or open) the file
+  // directly. This works reliably across all browsers.
   return (
     <div className="p-8 text-center space-y-4">
       <FileText className="h-12 w-12 mx-auto text-muted-foreground/40" />
       <div>
         <p className="text-sm font-medium text-foreground">{filename}</p>
         <p className="text-xs text-muted-foreground mt-1">
-          PDF preview opens in a new browser tab (browser security policy blocks inline PDF rendering).
+          Click below to download the PDF. Your browser will either open it
+          automatically or save it to your Downloads folder.
         </p>
       </div>
-      <Button onClick={openInNewTab} disabled={!blobUrl} size="sm">
-        <Download className="h-4 w-4 mr-1" />
-        Open PDF in new tab
-      </Button>
+      {blobUrl ? (
+        <a
+          href={blobUrl}
+          download={filename}
+          className="inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+        >
+          <Download className="h-4 w-4" />
+          Download {filename}
+        </a>
+      ) : (
+        <Button disabled size="sm">
+          <Loader2 className="h-4 w-4 mr-1 animate-spin" /> Preparing...
+        </Button>
+      )}
     </div>
   );
 }
