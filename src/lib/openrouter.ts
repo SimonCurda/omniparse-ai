@@ -22,12 +22,24 @@ const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 // All are free on OpenRouter. If Ling fails (rate-limited or down),
 // OpenRouter automatically tries each fallback in order. If all fail,
 // OpenRouter returns an error and the chat route shows the error.
+//
+// We include ALL useful free text models on OpenRouter to maximize
+// the number of quota pools we draw from. Each free model has its own
+// daily quota (typically 20-50 requests/day), so more models = more
+// total requests before hitting limits.
 const OPENROUTER_PRIMARY_MODEL = 'inclusionai/ling-3.0-flash-fin:free';
 const OPENROUTER_FALLBACK_MODELS = [
   'nvidia/llama-3.1-nemotron-70b-instruct:free',
   'meta-llama/llama-3.3-70b-instruct:free',
   'mistralai/mistral-7b-instruct:free',
   'qwen/qwen-2.5-72b-instruct:free',
+  'nvidia/nemotron-3-super-120b-a12b:free',       // 120B, 262K context
+  'nvidia/nemotron-3-ultra-550b-a55b:free',        // 550B, 1M context
+  'nvidia/nemotron-3.5-lightning:free',            // Fast, 1M context
+  'poolside/laguna-s-2.1:free',                    // 262K context
+  'poolside/laguna-xs-2.1:free',                   // 262K context
+  'inclusionai/ling-3.0-flash-sante:free',         // Health-focused variant
+  'openrouter/free',                                // Auto-router: picks any available free model
 ];
 
 const MAX_TOKENS = 4096;       // enough for chat + medium-sized artifacts

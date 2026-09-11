@@ -130,6 +130,10 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
     'google/gemma-4-31b-it:free',               // Google Gemma 4 (larger), 262K context
     'nex-agi/nex-n2.5-pro:free',                // Nex AGI Pro, 262K context
     'thinkingmachines/inkling:free',             // Inkling, 1M context
+    'nex-agi/nex-n2.5-mini:free',               // Nex AGI Mini, 262K context
+    'thinkingmachines/inkling-small:free',       // Inkling Small, 1M context
+    'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',  // Nemotron Omni, 256K
+    'openrouter/free',                           // Auto-router: picks any available free vision model
   ];
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://omniparse-ai.vercel.app';
