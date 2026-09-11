@@ -5,6 +5,17 @@
 // our AI supply so the chat keeps working even when Groq's daily quota
 // is exhausted.
 //
+// ─── Multi-key support ──────────────────────────────────────────────────
+// OpenRouter's free models have per-key daily quotas (typically 20-50
+// requests/day per model per key). To get more total throughput, we
+// support MULTIPLE API keys via OPENROUTER_API_KEY (primary) +
+// OPENROUTER_API_KEY_2, OPENROUTER_API_KEY_3, OPENROUTER_API_KEY_4,
+// OPENROUTER_API_KEY_5 (additional keys).
+//
+// When a request fails with 429 (rate limited) or 402 (quota exceeded),
+// we automatically rotate to the next key. This effectively multiplies
+// our total daily quota by the number of keys configured.
+//
 // OpenRouter supports a `fallbacks` array — we send ONE API call with a
 // primary model and a list of fallbacks, and OpenRouter routes internally
 // to whichever model is available. This is more efficient than us calling
@@ -45,12 +56,61 @@ const OPENROUTER_FALLBACK_MODELS = [
 const MAX_TOKENS = 4096;       // enough for chat + medium-sized artifacts
 const TEMPERATURE = 0.7;       // matches Groq chat temperature
 
-function getApiKey(): string {
-  const key = process.env.OPENROUTER_API_KEY;
-  if (!key) {
-    throw new Error('OPENROUTER_API_KEY is not configured. Add it to your Vercel environment variables.');
+// ─── Multi-key support ──────────────────────────────────────────────────
+// Collect all configured OpenRouter API keys. The primary key
+// (OPENROUTER_API_KEY) is always first; additional keys
+// (OPENROUTER_API_KEY_2, _3, _4, _5) are appended if present.
+//
+// We rotate keys on 429/402 errors to distribute load across quota pools.
+function getAllApiKeys(): string[] {
+  const keys: string[] = [];
+  const primary = process.env.OPENROUTER_API_KEY;
+  if (primary) keys.push(primary);
+  // Additional keys — up to 5 total
+  for (let i = 2; i <= 5; i++) {
+    const k = process.env[`OPENROUTER_API_KEY_${i}`];
+    if (k) keys.push(k);
   }
+  return keys;
+}
+
+// Track which key index we're currently using (round-robin starting point).
+// This is per-instance (per serverless function invocation) — each new
+// invocation starts from key 0.
+let currentKeyIndex = 0;
+
+function getNextApiKey(): string {
+  const keys = getAllApiKeys();
+  if (keys.length === 0) {
+    throw new Error('No OpenRouter API keys configured. Set OPENROUTER_API_KEY in your Vercel environment variables.');
+  }
+  // Round-robin: advance the index so consecutive calls use different keys,
+  // distributing load across quota pools.
+  const key = keys[currentKeyIndex % keys.length];
+  currentKeyIndex = (currentKeyIndex + 1) % keys.length;
   return key;
+}
+
+/**
+ * Try to get an API key, rotating through all configured keys.
+ * Used by callers that need to try each key in sequence when one is rate-limited.
+ */
+function getAllKeysForRetry(): string[] {
+  const keys = getAllApiKeys();
+  if (keys.length === 0) {
+    throw new Error('No OpenRouter API keys configured. Set OPENROUTER_API_KEY in your Vercel environment variables.');
+  }
+  // Start from the current index and wrap around so we try all keys
+  const result: string[] = [];
+  for (let i = 0; i < keys.length; i++) {
+    result.push(keys[(currentKeyIndex + i) % keys.length]);
+  }
+  return result;
+}
+
+// Legacy API — returns the primary key. Kept for backward compat.
+function getApiKey(): string {
+  return getNextApiKey();
 }
 
 export interface OpenRouterMessage {
@@ -182,7 +242,44 @@ export async function openRouterChatCall(
     return fallbackData.choices?.[0]?.message?.content || '';
   }
 
-  if (res.status === 429) {
+  if (res.status === 429 || res.status === 402) {
+    // Rate limited or quota exceeded on this key — try the next key if we have one
+    const allKeys = getAllKeysForRetry();
+    if (allKeys.length > 1) {
+      const errText = await res.text().catch(() => '');
+      console.warn(`[openrouter] Key #${(currentKeyIndex - 1 + allKeys.length) % allKeys.length + 1} rate limited (${res.status}). Rotating to next key...`);
+      // Try each remaining key
+      for (let i = 1; i < allKeys.length; i++) {
+        const nextKey = allKeys[i];
+        console.warn(`[openrouter] Trying key #${i + 1}...`);
+        const retryRes = await fetch(OPENROUTER_API_URL, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${nextKey}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': appUrl,
+            'X-Title': 'OmniParse AI',
+          },
+          body: JSON.stringify(requestBody),
+        });
+        if (retryRes.ok) {
+          const retryData = await retryRes.json();
+          const content = retryData.choices?.[0]?.message?.content || '';
+          if (content) {
+            console.warn(`[openrouter] Key #${i + 1} succeeded!`);
+            return content;
+          }
+        }
+        if (retryRes.status !== 429 && retryRes.status !== 402) {
+          // Different error — stop rotating and let the caller handle it
+          const retryErrText = await retryRes.text().catch(() => '');
+          throw new Error(`OpenRouter API error with key #${i + 1} (${retryRes.status}): ${retryErrText}`);
+        }
+        // 429/402 again — try next key
+      }
+      // All keys exhausted
+      throw new Error(`OpenRouter rate limited (429) on all ${allKeys.length} keys: ${errText}`);
+    }
     const errText = await res.text();
     throw new Error(`OpenRouter rate limited (429): ${errText}`);
   }
@@ -197,9 +294,18 @@ export async function openRouterChatCall(
 }
 
 /**
- * Quick check whether OpenRouter is configured (API key present).
+ * Get all configured OpenRouter API keys for external use (e.g., the vision
+ * call in gemini.ts needs to try each key when one is rate-limited).
+ * Returns keys in round-robin order starting from the current index.
+ */
+export function getOpenRouterApiKeys(): string[] {
+  return getAllKeysForRetry();
+}
+
+/**
+ * Quick check whether OpenRouter is configured (at least one API key present).
  * Used by the chat route to decide whether to call OpenRouter at all.
  */
 export function isOpenRouterConfigured(): boolean {
-  return !!process.env.OPENROUTER_API_KEY;
+  return getAllApiKeys().length > 0;
 }

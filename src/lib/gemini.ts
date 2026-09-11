@@ -93,7 +93,17 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
   // quality). OpenRouter's Gemma 4 models reliably output JSON with high
   // confidence (0.97+). So we try OpenRouter first, then Groq as fallback.
 
-  const orApiKey = process.env.OPENROUTER_API_KEY;
+  // ─── Multi-key support ───────────────────────────────────────────────
+  // Get all configured OpenRouter API keys so we can rotate on 429/402.
+  // Each key has its own daily quota, so more keys = more total throughput.
+  const orApiKeys = process.env.OPENROUTER_API_KEY
+    ? [process.env.OPENROUTER_API_KEY,
+       process.env.OPENROUTER_API_KEY_2,
+       process.env.OPENROUTER_API_KEY_3,
+       process.env.OPENROUTER_API_KEY_4,
+       process.env.OPENROUTER_API_KEY_5,
+      ].filter(Boolean) as string[]
+    : [];
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://omniparse-ai.vercel.app';
 
   const openRouterVisionModels = [
@@ -108,73 +118,89 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
     'openrouter/free',                           // Auto-router
   ];
 
-  // Try OpenRouter first
-  if (orApiKey) {
+  // Try OpenRouter first — iterate models × keys
+  if (orApiKeys.length > 0) {
     for (const model of openRouterVisionModels) {
-      try {
-        console.warn(`[gemini] Trying OpenRouter vision model: ${model}...`);
-        const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${orApiKey}`,
-            'Content-Type': 'application/json',
-            'HTTP-Referer': appUrl,
-            'X-Title': 'OmniParse AI',
-          },
-          body: JSON.stringify({
-            model,
-            messages: openaiMessages,
-            max_tokens: 4096,
-            temperature: 0.1,
-            response_format: { type: 'json_object' },
-          }),
-        });
+      // Try each key for this model until one succeeds or all are rate-limited
+      for (let keyIdx = 0; keyIdx < orApiKeys.length; keyIdx++) {
+        const orApiKey = orApiKeys[keyIdx];
+        try {
+          console.warn(`[gemini] Trying OpenRouter vision model: ${model} (key ${keyIdx + 1}/${orApiKeys.length})...`);
+          const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${orApiKey}`,
+              'Content-Type': 'application/json',
+              'HTTP-Referer': appUrl,
+              'X-Title': 'OmniParse AI',
+            },
+            body: JSON.stringify({
+              model,
+              messages: openaiMessages,
+              max_tokens: 4096,
+              temperature: 0.1,
+              response_format: { type: 'json_object' },
+            }),
+          });
 
-        if (res.ok) {
-          const data = await res.json();
-          const content = data.choices?.[0]?.message?.content || '';
-          if (content) {
-            console.warn(`[gemini] OpenRouter vision model ${model} succeeded (JSON mode)!`);
-            return content;
-          }
-        }
-
-        // If JSON mode failed (400/422), try WITHOUT response_format
-        if (res.status === 400 || res.status === 422) {
-          const errText = await res.text().catch(() => '');
-          if (errText.includes('structured-outputs') || errText.includes('json_object') ||
-              errText.includes('INVALID_REQUEST_BODY') || errText.includes('response_format')) {
-            console.warn(`[gemini] ${model} doesn't support JSON mode. Retrying WITHOUT response_format...`);
-            const fallbackRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${orApiKey}`,
-                'Content-Type': 'application/json',
-                'HTTP-Referer': appUrl,
-                'X-Title': 'OmniParse AI',
-              },
-              body: JSON.stringify({
-                model,
-                messages: openaiMessages,
-                max_tokens: 4096,
-                temperature: 0.1,
-              }),
-            });
-            if (fallbackRes.ok) {
-              const fallbackData = await fallbackRes.json();
-              const fallbackContent = fallbackData.choices?.[0]?.message?.content || '';
-              if (fallbackContent) {
-                console.warn(`[gemini] OpenRouter vision ${model} succeeded (free-text mode)!`);
-                return fallbackContent;
-              }
+          if (res.ok) {
+            const data = await res.json();
+            const content = data.choices?.[0]?.message?.content || '';
+            if (content) {
+              console.warn(`[gemini] OpenRouter vision model ${model} succeeded (JSON mode, key ${keyIdx + 1})!`);
+              return content;
             }
-            continue;
           }
-        }
 
-        console.warn(`[gemini] OpenRouter vision ${model} failed (${res.status})`);
-      } catch (err) {
-        console.warn(`[gemini] OpenRouter vision ${model} error:`, err instanceof Error ? err.message : String(err));
+          // If JSON mode failed (400/422), try WITHOUT response_format
+          if (res.status === 400 || res.status === 422) {
+            const errText = await res.text().catch(() => '');
+            if (errText.includes('structured-outputs') || errText.includes('json_object') ||
+                errText.includes('INVALID_REQUEST_BODY') || errText.includes('response_format')) {
+              console.warn(`[gemini] ${model} doesn't support JSON mode. Retrying WITHOUT response_format...`);
+              const fallbackRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${orApiKey}`,
+                  'Content-Type': 'application/json',
+                  'HTTP-Referer': appUrl,
+                  'X-Title': 'OmniParse AI',
+                },
+                body: JSON.stringify({
+                  model,
+                  messages: openaiMessages,
+                  max_tokens: 4096,
+                  temperature: 0.1,
+                }),
+              });
+              if (fallbackRes.ok) {
+                const fallbackData = await fallbackRes.json();
+                const fallbackContent = fallbackData.choices?.[0]?.message?.content || '';
+                if (fallbackContent) {
+                  console.warn(`[gemini] OpenRouter vision ${model} succeeded (free-text mode, key ${keyIdx + 1})!`);
+                  return fallbackContent;
+                }
+              }
+              // Model doesn't support JSON mode at all — skip to next model
+              break; // breaks out of key loop, continues to next model
+            }
+          }
+
+          // 429 or 402 — this key is rate-limited, try the next key
+          if (res.status === 429 || res.status === 402) {
+            console.warn(`[gemini] OpenRouter key ${keyIdx + 1} rate limited (${res.status}) for ${model}. Trying next key...`);
+            continue; // try next key for the same model
+          }
+
+          // Other error (404 = model doesn't exist, 500 = server error, etc.)
+          // Skip to next model
+          console.warn(`[gemini] OpenRouter vision ${model} failed with key ${keyIdx + 1} (${res.status})`);
+          break; // breaks out of key loop, continues to next model
+        } catch (err) {
+          console.warn(`[gemini] OpenRouter vision ${model} error (key ${keyIdx + 1}):`, err instanceof Error ? err.message : String(err));
+          // Network error — try next key
+          continue;
+        }
       }
     }
   }
