@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Fix Email Badges</title></head>
+<body style="font-family:system-serif;max-width:500px;margin:80px auto;text-align:center">
+<h2>Fix Email Badges</h2>
+<p style="color:#666">Retroactively marks your existing email-sourced invoices with the 📧 badge.</p>
+<button onclick="fix()" style="background:#f59e0b;color:white;border:none;padding:12px 24px;border-radius:8px;cursor:pointer;font-size:15px">Fix Existing Invoices</button>
+<div id="result" style="margin-top:20px;padding:16px;border-radius:8px;display:none"></div>
+<script>
+async function fix() {
+  const token = localStorage.getItem('op_token');
+  if (!token) { document.getElementById('result').innerHTML = '<p style="color:red">Please log in to OmniParse first.</p>'; document.getElementById('result').style.display='block'; return; }
+  try {
+    const res = await fetch('/api/fix-email-badges', { method: 'POST', headers: { Authorization: 'Bearer ' + token } });
+    const data = await res.json();
+    const el = document.getElementById('result');
+    el.style.display = 'block';
+    if (res.ok) {
+      el.style.background = '#d1fae5'; el.style.color = '#065f46';
+      el.innerHTML = '✓ ' + data.message + '<br><br>Go to the <a href="/dashboard">Invoices tab</a> to see the badges.';
+    } else {
+      el.style.background = '#fee2e2'; el.style.color = '#991b1b';
+      el.innerHTML = '✗ ' + (data.error || 'Failed');
+    }
+  } catch(e) { document.getElementById('result').innerHTML = '<p style="color:red">Network error: ' + e.message + '</p>'; document.getElementById('result').style.display='block'; }
+}
+</script>
+</body></html>
