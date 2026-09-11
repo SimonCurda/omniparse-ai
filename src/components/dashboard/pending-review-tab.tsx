@@ -77,71 +77,50 @@ function ClassificationBadge({ classification }: { classification: string }) {
 }
 
 // ─── PDF preview component ──────────────────────────────────────────────────
-// Converts the base64 attachment to a Blob URL and embeds it in an iframe.
-// Vercel's Content-Security-Policy blocks `data:` URLs in iframes, but
-// `blob:` URLs are allowed — this is the workaround.
-// Falls back to an "Open in new tab" link if iframes are also blocked.
+// Vercel's Content-Security-Policy blocks blob: and data: URLs in iframes
+// (frame-src is restricted to 'self'), and we can't override Vercel's CSP.
+// Workaround: open the PDF in a new browser tab using window.open() with a
+// blob URL. Top-level navigations to blob: URLs are NOT subject to the
+// parent page's frame-src CSP — only embedded iframes are.
+//
+// The dialog shows a placeholder with a button to open the PDF in a new tab.
 
 function PdfPreview({ base64, mime, filename }: { base64: string; mime: string; filename: string }) {
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
-  const [iframeBlocked, setIframeBlocked] = useState(false);
 
   useEffect(() => {
     try {
-      // Convert base64 to binary
       const binary = atob(base64);
       const bytes = new Uint8Array(binary.length);
       for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      // Create a Blob + object URL
       const blob = new Blob([bytes], { type: mime });
       const url = URL.createObjectURL(blob);
       setBlobUrl(url);
-      // Clean up the URL when component unmounts to avoid memory leak
       return () => URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Failed to create blob URL:', err);
-      setIframeBlocked(true);
     }
   }, [base64, mime]);
 
-  if (iframeBlocked || !blobUrl) {
-    return (
-      <div className="p-8 text-center space-y-3">
-        <FileText className="h-10 w-10 mx-auto text-muted-foreground/40" />
-        <p className="text-sm text-muted-foreground">Inline PDF preview unavailable.</p>
-        {blobUrl && (
-          <a
-            href={blobUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-sm text-amber-500 hover:underline"
-          >
-            <Download className="h-4 w-4" /> Open {filename} in new tab
-          </a>
-        )}
-      </div>
-    );
-  }
+  const openInNewTab = () => {
+    if (blobUrl) {
+      window.open(blobUrl, '_blank', 'noopener,noreferrer');
+    }
+  };
 
   return (
-    <div className="space-y-2">
-      <iframe
-        src={blobUrl}
-        className="w-full h-[60vh] border-0 rounded-lg bg-white"
-        title={filename}
-        onError={() => setIframeBlocked(true)}
-      />
-      <div className="flex justify-end">
-        <a
-          href={blobUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          download={filename}
-          className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-        >
-          <Download className="h-3 w-3" /> Open in new tab
-        </a>
+    <div className="p-8 text-center space-y-4">
+      <FileText className="h-12 w-12 mx-auto text-muted-foreground/40" />
+      <div>
+        <p className="text-sm font-medium text-foreground">{filename}</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          PDF preview opens in a new browser tab (browser security policy blocks inline PDF rendering).
+        </p>
       </div>
+      <Button onClick={openInNewTab} disabled={!blobUrl} size="sm">
+        <Download className="h-4 w-4 mr-1" />
+        Open PDF in new tab
+      </Button>
     </div>
   );
 }
