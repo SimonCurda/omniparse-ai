@@ -34,14 +34,47 @@ const tooltipStyle = {
   fontSize: '12px',
 };
 
-function formatCurrency(value: number): string {
-  return '$' + value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// ─── Currency-aware formatting ────────────────────────────────────────────
+// Renders a number using the correct narrow symbol for the given ISO 4217 code.
+// e.g. fmtCurrency(1234.56, 'CZK') → "Kč 1,234.56"
+//      fmtCurrency(1234.56, 'EUR') → "€1,234.56"
+//      fmtCurrency(1234.56, 'USD') → "$1,234.56"
+// Falls back to "<code> <number>" if Intl doesn't recognise the code.
+function fmtCurrency(value: number, currency?: string | null): string {
+  const code = (currency || 'USD').toUpperCase();
+  try {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: code,
+      currencyDisplay: 'narrowSymbol',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value);
+  } catch {
+    return `${code} ${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+}
+
+// Returns the narrow symbol for a currency code, e.g. 'CZK' → 'Kč'.
+// Used for chart axis labels where we don't have a number to format yet.
+function currencySymbol(currency?: string | null): string {
+  const code = (currency || 'USD').toUpperCase();
+  try {
+    const parts = new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: code,
+      currencyDisplay: 'narrowSymbol',
+    }).formatToParts(0);
+    const symbol = parts.find((p) => p.type === 'currency')?.value;
+    return symbol || code;
+  } catch {
+    return code;
+  }
 }
 
 export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
   // --- Top Stats ---
   const totalParsed = invoices.length;
-  const totalAmount = invoices.reduce((s, inv) => s + (inv.total ?? 0), 0);
   const avgConfidence =
     invoices.length > 0
       ? invoices.reduce((s, inv) => s + (inv.confidence ?? 0), 0) / invoices.length
@@ -53,27 +86,75 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
       inv.status === 'review',
   ).length;
 
+  // --- Per-currency breakdown ---
+  // Group invoices by currency so totals are never summed across currencies.
+  const byCurrency = useMemo(() => {
+    const map: Record<string, { count: number; total: number; avg: number; vendors: Set<string> }> = {};
+    for (const inv of invoices) {
+      const cur = (inv.currency || 'USD').toUpperCase();
+      if (!map[cur]) map[cur] = { count: 0, total: 0, avg: 0, vendors: new Set() };
+      map[cur].count++;
+      map[cur].total += inv.total ?? 0;
+      if (inv.vendor) map[cur].vendors.add(inv.vendor);
+    }
+    // Compute averages + sort by count desc so dominant currency shows first
+    return Object.entries(map)
+      .map(([cur, data]) => ({
+        currency: cur,
+        count: data.count,
+        total: data.total,
+        avg: data.count > 0 ? data.total / data.count : 0,
+        vendorCount: data.vendors.size,
+      }))
+      .sort((a, b) => b.count - a.count);
+  }, [invoices]);
+
+  const currencies = byCurrency.map((c) => c.currency);
+  const isMixedCurrency = currencies.length > 1;
+  const dominantCurrency = currencies[0] || 'USD';
+
+  // Lookup map: invoice ID → currency code. Used to show the right currency
+  // symbol next to each duplicate / outlier (which reference invoice IDs).
+  const currencyById = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const inv of invoices) m[inv.id] = (inv.currency || 'USD').toUpperCase();
+    return m;
+  }, [invoices]);
+
+  // Total amount string — per currency, joined with ' + ' when mixed
+  const totalAmountStr = byCurrency.length > 0
+    ? byCurrency.map((c) => fmtCurrency(c.total, c.currency)).join(' + ')
+    : fmtCurrency(0);
+
   // --- Processing Metrics (invoice-engine) ---
   const metrics: ProcessingMetrics = useMemo(() => calculateMetrics(invoices), [invoices]);
 
   // --- Chart Data ---
+  // Monthly chart — when multiple currencies are present we show one series per
+  // currency so amounts are never summed across currencies.
   const monthlyData = useMemo(() => {
-    const monthMap: Record<string, { count: number; amount: number }> = {};
+    const monthMap: Record<string, { count: number; totals: Record<string, number> }> = {};
     for (const inv of invoices) {
       const month = (inv.invDate || inv.createdAt || '').slice(0, 7);
       if (!month) continue;
-      if (!monthMap[month]) monthMap[month] = { count: 0, amount: 0 };
+      if (!monthMap[month]) monthMap[month] = { count: 0, totals: {} };
       monthMap[month].count++;
-      monthMap[month].amount += inv.total ?? 0;
+      const cur = (inv.currency || 'USD').toUpperCase();
+      monthMap[month].totals[cur] = (monthMap[month].totals[cur] || 0) + (inv.total ?? 0);
     }
     return Object.entries(monthMap)
       .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([month, data]) => ({
-        month: new Date(month + '-01').toLocaleDateString('en-US', { month: 'short' }),
-        parsed: data.count,
-        amount: data.amount,
-      }));
-  }, [invoices]);
+      .map(([month, data]) => {
+        const row: Record<string, number | string> = {
+          month: new Date(month + '-01').toLocaleDateString('en-US', { month: 'short' }),
+          parsed: data.count,
+        };
+        for (const cur of currencies) {
+          row[cur] = Math.round((data.totals[cur] || 0) * 100) / 100;
+        }
+        return row;
+      });
+  }, [invoices, currencies]);
 
   const vendorData = useMemo(() => {
     const vendorMap: Record<string, number> = {};
@@ -195,7 +276,7 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
   // --- Stats row data ---
   const stats = [
     { label: 'Documents Parsed', value: totalParsed, icon: FileText, color: 'text-amber-500' },
-    { label: 'Total Amount', value: formatCurrency(totalAmount), icon: DollarSign, color: 'text-emerald-500' },
+    { label: 'Total Amount', value: totalAmountStr, icon: DollarSign, color: 'text-emerald-500' },
     { label: 'Avg. Confidence', value: (avgConfidence * 100).toFixed(1) + '%', icon: TrendingUp, color: 'text-amber-500' },
     { label: 'Needs Review', value: reviewNeeded, icon: Receipt, color: 'text-orange-500' },
   ];
@@ -232,6 +313,64 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
             ))}
           </div>
 
+          {/* ============ Currencies Breakdown — new ============ */}
+          <Card className="border-border/50">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <DollarSign className="h-4 w-4 text-emerald-500" />
+                Currencies
+                <Badge variant="secondary" className="bg-muted text-muted-foreground border-0 text-xs ml-auto">
+                  {currencies.length} {currencies.length === 1 ? 'currency' : 'currencies'}
+                </Badge>
+              </CardTitle>
+              <CardDescription>
+                {isMixedCurrency
+                  ? 'Your invoices span multiple currencies — totals are kept separate per currency.'
+                  : 'All your invoices are in the same currency.'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {byCurrency.map((c, i) => (
+                  <div
+                    key={c.currency}
+                    className="rounded-lg border bg-muted/30 p-3 space-y-1.5"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-foreground">
+                        {currencySymbol(c.currency)}
+                      </span>
+                      <Badge
+                        variant="secondary"
+                        className="border-0 text-[10px] px-1.5 py-0"
+                        style={{ backgroundColor: `${PIE_COLORS[i % PIE_COLORS.length]}20`, color: PIE_COLORS[i % PIE_COLORS.length] }}
+                      >
+                        {c.currency}
+                      </Badge>
+                    </div>
+                    <div className="text-lg font-bold text-foreground">
+                      {fmtCurrency(c.total, c.currency)}
+                    </div>
+                    <div className="text-xs text-muted-foreground space-y-0.5">
+                      <div className="flex justify-between">
+                        <span>Invoices</span>
+                        <span className="font-medium text-foreground">{c.count}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Avg / invoice</span>
+                        <span className="font-medium text-foreground">{fmtCurrency(c.avg, c.currency)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Vendors</span>
+                        <span className="font-medium text-foreground">{c.vendorCount}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
           {/* ============ Cost Metrics Section ============ */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card className="border-border/50">
@@ -265,7 +404,7 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Cost Per Invoice</span>
                     <span className="text-sm font-semibold text-emerald-500">
-                      {formatCurrency(metrics.costPerInvoice)}
+                      {fmtCurrency(metrics.costPerInvoice, 'USD')}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
@@ -286,18 +425,22 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
                 </CardTitle>
                 <CardDescription>Invoice amounts and totals</CardDescription>
               </CardHeader>
-              <CardContent>
+                <CardContent>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Total Amount</span>
+                    <span className="text-sm text-muted-foreground">Total by Currency</span>
                     <span className="text-sm font-semibold text-foreground">
-                      {formatCurrency(metrics.totalAmount)}
+                      {byCurrency.length === 0
+                        ? fmtCurrency(0)
+                        : byCurrency.map((c) => fmtCurrency(c.total, c.currency)).join(' + ')}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Average Invoice Amount</span>
                     <span className="text-sm font-semibold text-foreground">
-                      {formatCurrency(metrics.avgInvoiceAmount)}
+                      {byCurrency.length === 0
+                        ? fmtCurrency(0)
+                        : byCurrency.map((c) => fmtCurrency(c.avg, c.currency)).join(' + ')}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
@@ -312,7 +455,13 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
                       <span className="text-xs font-medium text-muted-foreground">Largest Invoice</span>
                     </div>
                     <span className="text-lg font-bold text-foreground">
-                      {formatCurrency(Math.max(...invoices.map((inv) => inv.total ?? 0), 0))}
+                      {(() => {
+                        if (invoices.length === 0) return fmtCurrency(0);
+                        const largest = invoices.reduce((max, inv) =>
+                          (inv.total ?? 0) > (max.total ?? 0) ? inv : max,
+                          invoices[0]);
+                        return fmtCurrency(largest.total ?? 0, largest.currency);
+                      })()}
                     </span>
                   </div>
                 </div>
@@ -351,7 +500,12 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
             {monthlyData.length > 0 && (
               <Card className="border-border/50">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-lg">Processing Amount</CardTitle>
+                  <CardTitle className="text-lg">Processing Amount{isMixedCurrency ? ' (by currency)' : ''}</CardTitle>
+                  {isMixedCurrency && (
+                    <p className="text-xs text-muted-foreground">
+                      Amounts are shown per currency — never summed across currencies.
+                    </p>
+                  )}
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={280}>
@@ -361,13 +515,26 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
                       <YAxis
                         stroke="hsl(var(--muted-foreground))"
                         fontSize={12}
-                        tickFormatter={(v) => '$' + (v / 1000).toFixed(0) + 'k'}
+                        tickFormatter={(v) => {
+                          if (isMixedCurrency) return (Number(v) / 1000).toFixed(0) + 'k';
+                          return currencySymbol(dominantCurrency) + (Number(v) / 1000).toFixed(0) + 'k';
+                        }}
                       />
                       <Tooltip
                         contentStyle={tooltipStyle}
-                        formatter={(v) => ['$' + Number(v).toLocaleString(), 'Amount']}
+                        formatter={(v, name) => [
+                          fmtCurrency(Number(v), String(name)),
+                          String(name),
+                        ]}
                       />
-                      <Bar dataKey="amount" fill="#10b981" radius={[4, 4, 0, 0]} />
+                      {currencies.map((cur, i) => (
+                        <Bar
+                          key={cur}
+                          dataKey={cur}
+                          fill={PIE_COLORS[i % PIE_COLORS.length]}
+                          radius={[4, 4, 0, 0]}
+                        />
+                      ))}
                     </BarChart>
                   </ResponsiveContainer>
                 </CardContent>
@@ -473,11 +640,11 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
                   </div>
                   <div className="bg-muted rounded-lg p-3">
                     <p className="text-xs text-muted-foreground">Avg. Amount</p>
-                    <p className="text-lg font-bold text-foreground">{formatCurrency(batchAnalysis.summary.avgAmount)}</p>
+                    <p className="text-lg font-bold text-foreground">{fmtCurrency(batchAnalysis.summary.avgAmount, dominantCurrency)}</p>
                   </div>
                   <div className="bg-muted rounded-lg p-3">
                     <p className="text-xs text-muted-foreground">Total Amount</p>
-                    <p className="text-lg font-bold text-foreground">{formatCurrency(batchAnalysis.summary.totalAmount)}</p>
+                    <p className="text-lg font-bold text-foreground">{fmtCurrency(batchAnalysis.summary.totalAmount, dominantCurrency)}</p>
                   </div>
                   <div className="bg-muted rounded-lg p-3">
                     <p className="text-xs text-muted-foreground">Vendors</p>
@@ -516,7 +683,7 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
                           <div className="min-w-0">
                             <p className="text-sm font-medium text-foreground">{dup.vendor}</p>
                             <p className="text-xs text-muted-foreground">
-                              {formatCurrency(dup.amount)} &middot; {dup.reason}
+                              {fmtCurrency(dup.amount, dup.ids?.[0] ? currencyById[dup.ids[0]] : dominantCurrency)} &middot; {dup.reason}
                             </p>
                           </div>
                         </div>
@@ -544,7 +711,7 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
                           <div className="min-w-0">
                             <p className="text-sm font-medium text-foreground">{out.vendor}</p>
                             <p className="text-xs text-muted-foreground">
-                              {formatCurrency(out.amount)} &middot; {out.reason}
+                              {fmtCurrency(out.amount, out.id ? currencyById[out.id] : dominantCurrency)} &middot; {out.reason}
                             </p>
                           </div>
                         </div>
@@ -737,7 +904,7 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
                                 </div>
                                 <p className="text-xs text-foreground/80">{alert.description}</p>
                                 <p className="text-xs text-muted-foreground mt-1">
-                                  {formatCurrency(alert.oldVal)} → {formatCurrency(alert.newVal)}
+                                  {fmtCurrency(alert.oldVal, dominantCurrency)} → {fmtCurrency(alert.newVal, dominantCurrency)}
                                   <span className="ml-2">{alert.prevDate} → {alert.invDate}</span>
                                 </p>
                               </div>
@@ -849,7 +1016,7 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
                                 </div>
                                 <div>
                                   <p className="text-muted-foreground">Total Amount</p>
-                                  <p className="font-medium text-foreground">{formatCurrency(sc.totalAmount)}</p>
+                                  <p className="font-medium text-foreground">{fmtCurrency(sc.totalAmount, dominantCurrency)}</p>
                                 </div>
                                 <div>
                                   <p className="text-muted-foreground">Avg Confidence</p>
