@@ -83,13 +83,40 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const parseResult = await parseResponse.json();
   const invoiceId = parseResult.id || parseResult.invoice?.id;
 
-  // Mark the pending item as approved
+  // Store email source info on the Invoice record so we can show a 📧 badge
+  // in the Invoices tab and display "from email" info in the detail dialog.
+  if (invoiceId) {
+    const invoice = await db.invoice.findFirst({
+      where: { id: invoiceId, userId: auth.userId },
+      select: { id: true, customFields: true },
+    });
+    if (invoice) {
+      const existing = (invoice.customFields as Record<string, unknown> | null) ?? {};
+      await db.invoice.update({
+        where: { id: invoiceId },
+        data: {
+          customFields: {
+            ...existing,
+            source: 'email',
+            emailFromAddress: item.fromAddress,
+            emailFromName: item.fromName,
+            emailSubject: item.subject,
+            emailDate: item.receivedAt,
+            pendingReviewId: id,
+          },
+        },
+      });
+    }
+  }
+
+  // Mark the pending item as approved (keep attachmentData for potential un-approve)
   await db.pendingReview.update({
     where: { id },
     data: {
       status: 'approved',
-      attachmentData: '', // free up storage — file is now in Invoice.fileData
-      extractedData: parseResult,
+      // Don't delete attachmentData — keep it so the user can un-approve
+      // and restore the pending item if they made a mistake.
+      extractedData: { ...parseResult, invoiceId },
     },
   });
 

@@ -36,7 +36,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     where: { id },
     data: {
       status: 'blocked',
-      attachmentData: '', // free up storage
+      // Keep attachmentData so the user can unblock + re-approve if they change their mind
     },
   });
 

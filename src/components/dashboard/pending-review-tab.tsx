@@ -14,9 +14,11 @@ import {
 } from '@/components/ui/dialog';
 import {
   Inbox, CheckCircle2, XCircle, Ban, Loader2, FileText, Mail, RefreshCw,
-  CheckSquare, AlertCircle, Clock, Download,
+  CheckSquare, AlertCircle, Clock, Download, RotateCcw, Undo2, ExternalLink,
 } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
+import { useAppStore } from '@/stores/app-store';
 
 interface PendingItem {
   id: string;
@@ -118,25 +120,43 @@ export function PendingReviewTab() {
   const [previewItem, setPreviewItem] = useState<PendingItem | null>(null);
   const [previewData, setPreviewData] = useState<{ attachmentData: string; attachmentMime: string } | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [filter, setFilter] = useState('pending');
+  const [counts, setCounts] = useState({ pending: 0, approved: 0, skipped: 0, blocked: 0 });
 
-  const loadItems = useCallback(async () => {
+  const loadItems = useCallback(async (status?: string) => {
     const token = getToken();
     if (!token) return;
     setLoading(true);
     try {
-      const res = await fetch('/api/pending-review?status=pending', {
+      const s = status || filter;
+      const res = await fetch(`/api/pending-review?status=${s}`, {
         headers: { Authorization: 'Bearer ' + token },
       });
       if (res.ok) {
         const data = await res.json();
         setItems(Array.isArray(data) ? data : []);
       }
+      // Also load counts for all statuses
+      const countRes = await fetch('/api/pending-review?status=all', {
+        headers: { Authorization: 'Bearer ' + token },
+      });
+      if (countRes.ok) {
+        const allItems = await countRes.json();
+        if (Array.isArray(allItems)) {
+          setCounts({
+            pending: allItems.filter((i: PendingItem) => i.status === 'pending').length,
+            approved: allItems.filter((i: PendingItem) => i.status === 'approved').length,
+            skipped: allItems.filter((i: PendingItem) => i.status === 'skipped').length,
+            blocked: allItems.filter((i: PendingItem) => i.status === 'blocked').length,
+          });
+        }
+      }
     } catch {
       // silent
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [filter]);
 
   useEffect(() => {
     loadItems();
@@ -153,13 +173,8 @@ export function PendingReviewTab() {
         body: JSON.stringify({ addToTrustedSenders: addToTrusted }),
       });
       if (res.ok) {
-        const data = await res.json();
         toast.success(addToTrusted ? 'Approved + sender added to trusted' : 'Invoice approved');
-        setItems(items.filter((i) => i.id !== id));
-        if (data.invoiceId) {
-          // Refresh invoices list in the background
-          // (the dashboard shell will pick it up on next invoices tab load)
-        }
+        loadItems(); // reload to move item to 'approved' tab
       } else {
         const err = await res.json().catch(() => ({}));
         toast.error(err.error || 'Failed to approve');
@@ -182,7 +197,7 @@ export function PendingReviewTab() {
       });
       if (res.ok) {
         toast.success('Skipped');
-        setItems(items.filter((i) => i.id !== id));
+        loadItems();
       } else {
         toast.error('Failed to skip');
       }
@@ -205,9 +220,54 @@ export function PendingReviewTab() {
       });
       if (res.ok) {
         toast.success('Sender blocked');
-        setItems(items.filter((i) => i.id !== id));
+        loadItems();
       } else {
         toast.error('Failed to block sender');
+      }
+    } catch {
+      toast.error('Network error');
+    } finally {
+      setProcessing(null);
+    }
+  };
+
+  const restore = async (id: string) => {
+    const token = getToken();
+    if (!token) return;
+    setProcessing(id);
+    try {
+      const res = await fetch(`/api/pending-review/${id}/restore`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      });
+      if (res.ok) {
+        toast.success('Restored to pending');
+        loadItems();
+      } else {
+        toast.error('Failed to restore');
+      }
+    } catch {
+      toast.error('Network error');
+    } finally {
+      setProcessing(null);
+    }
+  };
+
+  const unapprove = async (id: string) => {
+    if (!confirm('Un-approve this item? The invoice will be DELETED and the item will go back to pending.')) return;
+    const token = getToken();
+    if (!token) return;
+    setProcessing(id);
+    try {
+      const res = await fetch(`/api/pending-review/${id}/unapprove`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      });
+      if (res.ok) {
+        toast.success('Un-approved — invoice deleted, item back in pending');
+        loadItems();
+      } else {
+        toast.error('Failed to un-approve');
       }
     } catch {
       toast.error('Network error');
@@ -298,21 +358,41 @@ export function PendingReviewTab() {
             Pending Review
           </h2>
           <p className="text-muted-foreground mt-1">
-            {items.length > 0
-              ? `${items.length} email${items.length !== 1 ? 's' : ''} waiting for your review. Nothing auto-imports to your Invoices list until you approve.`
-              : 'No emails waiting for review. Scan your inboxes in Settings to find new invoices.'}
+            {filter === 'pending' && items.length > 0
+              ? `${items.length} email${items.length !== 1 ? 's' : ''} waiting for your review.`
+              : filter === 'pending'
+                ? 'No emails waiting for review. Scan your inboxes in Settings to find new invoices.'
+                : `${items.length} ${filter} item${items.length !== 1 ? 's' : ''}.`}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={loadItems} disabled={loading}>
+          <Button variant="outline" size="sm" onClick={() => loadItems()} disabled={loading}>
             {loading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1" />}
             Refresh
           </Button>
         </div>
       </div>
 
-      {/* Bulk actions bar */}
-      {hasSelection && (
+      {/* Filter tabs */}
+      <Tabs value={filter} onValueChange={(v) => { setFilter(v); loadItems(v); }}>
+        <TabsList>
+          <TabsTrigger value="pending">
+            Pending {counts.pending > 0 && `(${counts.pending})`}
+          </TabsTrigger>
+          <TabsTrigger value="approved">
+            Approved {counts.approved > 0 && `(${counts.approved})`}
+          </TabsTrigger>
+          <TabsTrigger value="skipped">
+            Skipped {counts.skipped > 0 && `(${counts.skipped})`}
+          </TabsTrigger>
+          <TabsTrigger value="blocked">
+            Blocked {counts.blocked > 0 && `(${counts.blocked})`}
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      {/* Bulk actions bar — only for pending items */}
+      {filter === 'pending' && hasSelection && (
         <div className="sticky top-14 z-30 bg-background border rounded-lg shadow-sm p-3 flex items-center justify-between gap-2">
           <span className="text-sm font-medium">{selectedIds.size} selected</span>
           <div className="flex items-center gap-2">
@@ -351,21 +431,25 @@ export function PendingReviewTab() {
         </CardContent></Card>
       ) : (
         <div className="space-y-2">
-          {/* Select all header */}
-          <div className="flex items-center gap-2 px-2 py-1">
-            <Checkbox checked={allSelected} onCheckedChange={toggleSelectAll} />
-            <span className="text-xs text-muted-foreground">Select all ({items.length})</span>
-          </div>
+          {/* Select all header — only for pending */}
+          {filter === 'pending' && (
+            <div className="flex items-center gap-2 px-2 py-1">
+              <Checkbox checked={allSelected} onCheckedChange={toggleSelectAll} />
+              <span className="text-xs text-muted-foreground">Select all ({items.length})</span>
+            </div>
+          )}
           {items.map((item) => (
             <Card key={item.id} className={`border-border/50 ${selectedIds.has(item.id) ? 'ring-2 ring-amber-500/30' : ''}`}>
               <CardContent className="p-3">
                 <div className="flex items-start gap-3">
-                  <div className="pt-1">
-                    <Checkbox
-                      checked={selectedIds.has(item.id)}
-                      onCheckedChange={() => toggleSelect(item.id)}
-                    />
-                  </div>
+                  {filter === 'pending' && (
+                    <div className="pt-1">
+                      <Checkbox
+                        checked={selectedIds.has(item.id)}
+                        onCheckedChange={() => toggleSelect(item.id)}
+                      />
+                    </div>
+                  )}
                   <div className="flex-1 min-w-0">
                     {/* Header row */}
                     <div className="flex items-center gap-2 flex-wrap mb-1">
@@ -384,56 +468,111 @@ export function PendingReviewTab() {
                       <FileText className="h-3 w-3" />
                       <span className="truncate">{item.attachmentFilename}</span>
                     </div>
-                    {/* Actions */}
+                    {/* Actions — different per status */}
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => approve(item.id)}
-                        disabled={processing === item.id}
-                        className="h-7 text-xs"
-                      >
-                        {processing === item.id ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <CheckCircle2 className="h-3 w-3 mr-1 text-emerald-500" />}
-                        Approve
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => approve(item.id, true)}
-                        disabled={processing === item.id}
-                        className="h-7 text-xs"
-                      >
-                        <CheckSquare className="h-3 w-3 mr-1" />
-                        Approve + Trust Sender
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => skip(item.id)}
-                        disabled={processing === item.id}
-                        className="h-7 text-xs"
-                      >
-                        <XCircle className="h-3 w-3 mr-1" />
-                        Skip
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => block(item.id)}
-                        disabled={processing === item.id}
-                        className="h-7 text-xs text-muted-foreground hover:text-destructive"
-                      >
-                        <Ban className="h-3 w-3 mr-1" />
-                        Block Sender
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => openPreview(item)}
-                        className="h-7 text-xs ml-auto"
-                      >
-                        Preview
-                      </Button>
+                      {item.status === 'pending' && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => approve(item.id)}
+                            disabled={processing === item.id}
+                            className="h-7 text-xs"
+                          >
+                            {processing === item.id ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <CheckCircle2 className="h-3 w-3 mr-1 text-emerald-500" />}
+                            Approve
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => approve(item.id, true)}
+                            disabled={processing === item.id}
+                            className="h-7 text-xs"
+                          >
+                            <CheckSquare className="h-3 w-3 mr-1" />
+                            Approve + Trust
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => skip(item.id)}
+                            disabled={processing === item.id}
+                            className="h-7 text-xs"
+                          >
+                            <XCircle className="h-3 w-3 mr-1" />
+                            Skip
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => block(item.id)}
+                            disabled={processing === item.id}
+                            className="h-7 text-xs text-muted-foreground hover:text-destructive"
+                          >
+                            <Ban className="h-3 w-3 mr-1" />
+                            Block Sender
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => openPreview(item)}
+                            className="h-7 text-xs ml-auto"
+                          >
+                            Preview
+                          </Button>
+                        </>
+                      )}
+                      {item.status === 'approved' && (
+                        <>
+                          <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 border-0 text-xs gap-1">
+                            <CheckCircle2 className="h-3 w-3" /> Approved → Invoice created
+                          </Badge>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => unapprove(item.id)}
+                            disabled={processing === item.id}
+                            className="h-7 text-xs text-amber-600 hover:text-amber-700 ml-auto"
+                          >
+                            {processing === item.id ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Undo2 className="h-3 w-3 mr-1" />}
+                            Un-approve
+                          </Button>
+                        </>
+                      )}
+                      {item.status === 'skipped' && (
+                        <>
+                          <Badge variant="secondary" className="bg-muted text-muted-foreground border-0 text-xs gap-1">
+                            <XCircle className="h-3 w-3" /> Skipped
+                          </Badge>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => restore(item.id)}
+                            disabled={processing === item.id}
+                            className="h-7 text-xs text-amber-600 hover:text-amber-700 ml-auto"
+                          >
+                            {processing === item.id ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <RotateCcw className="h-3 w-3 mr-1" />}
+                            Restore to Pending
+                          </Button>
+                        </>
+                      )}
+                      {item.status === 'blocked' && (
+                        <>
+                          <Badge variant="secondary" className="bg-red-500/10 text-red-500 border-0 text-xs gap-1">
+                            <Ban className="h-3 w-3" /> Sender blocked
+                          </Badge>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => restore(item.id)}
+                            disabled={processing === item.id}
+                            className="h-7 text-xs text-amber-600 hover:text-amber-700 ml-auto"
+                          >
+                            {processing === item.id ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <RotateCcw className="h-3 w-3 mr-1" />}
+                            Unblock + Restore
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>

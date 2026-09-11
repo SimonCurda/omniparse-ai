@@ -892,6 +892,12 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
           <DialogHeader>
             <DialogTitle className="text-lg flex items-center gap-2 flex-wrap">
               {inv.vendor || 'Unknown Vendor'} — {inv.invNumber || 'N/A'}
+              {(inv.customFields as Record<string, unknown> | null)?.source === 'email' && (
+                <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 border-0 text-xs gap-1">
+                  <Mail className="h-3 w-3" />
+                  From Email
+                </Badge>
+              )}
               {isReviewed(inv) && (
                 <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 border-0 text-xs">
                   <CheckCircle2 className="h-3 w-3 mr-1" />
@@ -1617,6 +1623,9 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                     <td className="px-4 py-3">
                       <div className="font-medium flex items-center gap-1.5">
                         {showNormalized && inv.normalizedVendor ? inv.normalizedVendor : inv.vendor}
+                        {(inv.customFields as Record<string, unknown> | null)?.source === 'email' && (
+                          <Mail className="h-3 w-3 text-amber-500 shrink-0" aria-label="From email" />
+                        )}
                         {inv.isDuplicate && (
                           <Badge variant="secondary" className="bg-amber-500/10 text-amber-500 border-0 text-[10px] px-1.5 py-0">
                             Duplicate

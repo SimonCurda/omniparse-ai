@@ -10,8 +10,11 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const status = searchParams.get('status') || 'pending';
 
+  // If status is 'all', return all items regardless of status
+  const where = status === 'all' ? { userId: auth.userId } : { userId: auth.userId, status };
+
   const items = await db.pendingReview.findMany({
-    where: { userId: auth.userId, status },
+    where,
     orderBy: { receivedAt: 'desc' },
     select: {
       id: true,

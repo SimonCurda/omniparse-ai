@@ -17,7 +17,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     where: { id },
     data: {
       status: 'skipped',
-      attachmentData: '', // free up storage
+      // Keep attachmentData so the user can restore + re-approve if they change their mind
     },
   });
 
