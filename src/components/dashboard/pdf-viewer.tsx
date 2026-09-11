@@ -52,17 +52,24 @@ export function PdfViewer({ base64, filename }: PdfViewerProps) {
         // Dynamic import pdfjs-dist (client-side only)
         const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
 
-        // Configure the worker — required for pdf.js to function
-        // We use the CDN URL to avoid bundler worker path issues
-        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/legacy/build/pdf.worker.min.mjs`;
+        // Disable the worker entirely. pdf.js can run in "fake worker" mode
+        // where it processes the PDF on the main thread. This is slower than
+        // using a real worker but avoids CSP issues with loading external
+        // worker scripts (Vercel's CSP blocks cdn.jsdelivr.net in script-src,
+        // and bundling the worker as a static asset is unreliable with
+        // Turbopack).
+        //
+        // For small PDFs (which is what we're rendering here — invoices), the
+        // performance difference is negligible.
+        pdfjsLib.GlobalWorkerOptions.workerSrc = '';
 
         // Decode base64 → Uint8Array
         const binary = atob(base64);
         const bytes = new Uint8Array(binary.length);
         for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
 
-        // Load the PDF document
-        const loadingTask = pdfjsLib.getDocument({ data: bytes });
+        // Load the PDF document (will use fake worker since workerSrc is empty)
+        const loadingTask = pdfjsLib.getDocument({ data: bytes, useWorkerFetch: false, isEvalSupported: false });
         const pdf = await loadingTask.promise;
         if (cancelled) return;
 
