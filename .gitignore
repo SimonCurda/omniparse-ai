@@ -47,3 +47,4 @@ logs
 # Cache
 .cache
 .turbo
+package-lock.json

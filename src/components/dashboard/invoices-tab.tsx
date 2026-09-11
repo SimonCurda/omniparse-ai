@@ -47,6 +47,8 @@ import {
   AlertCircle,
   AlertTriangle,
   CheckCircle,
+  CheckCircle2,
+  Circle,
   XCircle,
   Clock,
   Timer,
@@ -132,6 +134,10 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
   const [customStatuses, setCustomStatuses] = useState<Array<{ id: string; name: string; color: string; isBasic: boolean }>>([]);
   const [statusChanging, setStatusChanging] = useState<string | null>(null);
 
+  // Reviewed (manually-checked) tracking — independent of auto validationStatus
+  const [reviewing, setReviewing] = useState<string | null>(null);
+  const [hideReviewed, setHideReviewed] = useState(false);
+
   // Basic lifecycle statuses available to all Pro+ users
   const basicStatuses = [
     { id: 'pending', name: 'Pending', color: 'amber', isBasic: true },
@@ -142,6 +148,10 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
 
   const allStatuses = [...basicStatuses, ...customStatuses.filter((s) => !s.isBasic)];
 
+  // Helper: was this invoice manually marked as checked by the user?
+  const isReviewed = (inv: InvoiceRow): boolean =>
+    Boolean((inv.customFields as Record<string, unknown> | null)?.reviewed === true);
+
   const filtered = filter === 'all'
     ? invoices
     : filter === 'duplicates'
@@ -149,7 +159,7 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
       : invoices.filter((inv) => inv.status === filter);
 
   // Apply search query if present
-  const searched = searchQuery.trim()
+  const searched = (searchQuery.trim()
     ? filtered.filter((inv) => {
         const q = searchQuery.toLowerCase();
         return (
@@ -158,7 +168,8 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
           (inv.invDate ?? '').toLowerCase().includes(q)
         );
       })
-    : filtered;
+    : filtered
+  ).filter((inv) => (hideReviewed ? !isReviewed(inv) : true));
 
   // Apply sorting
   const displayed = useMemo(() => {
@@ -401,6 +412,86 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
     }
   };
 
+  const toggleReviewed = async (invoiceId: string, currentlyReviewed: boolean) => {
+    const token = getToken();
+    if (!token) {
+      toast.error('Session expired. Please sign in again.');
+      return;
+    }
+    setReviewing(invoiceId);
+    try {
+      const res = await fetch(`/api/invoices/${encodeURIComponent(invoiceId)}/review`, {
+        method: 'PATCH',
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reviewed: !currentlyReviewed }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        // Merge reviewed flag into customFields for both list and selected invoice
+        const updatedInvoices = invoices.map((inv) =>
+          inv.id === invoiceId
+            ? {
+                ...inv,
+                customFields: { ...(inv.customFields as Record<string, unknown> | null ?? {}), reviewed: data.reviewed, reviewedAt: data.reviewedAt },
+              }
+            : inv
+        );
+        setInvoices(updatedInvoices);
+        if (selectedInvoice?.id === invoiceId) {
+          setSelectedInvoice({
+            ...selectedInvoice,
+            customFields: { ...(selectedInvoice.customFields as Record<string, unknown> | null ?? {}), reviewed: data.reviewed, reviewedAt: data.reviewedAt },
+          });
+        }
+        toast.success(data.reviewed ? 'Marked as checked' : 'Marked as needs review');
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error || 'Failed to update review state');
+      }
+    } catch {
+      toast.error('Network error');
+    } finally {
+      setReviewing(null);
+    }
+  };
+
+  const bulkMarkReviewed = async (reviewed: boolean) => {
+    const token = getToken();
+    if (!token) return;
+    setBulkDeleting(true);
+    try {
+      const res = await fetch('/api/bulk-actions', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: reviewed ? 'set_reviewed' : 'set_unreviewed', invoiceIds: Array.from(selectedIds) }),
+      });
+      if (res.ok) {
+        // Update local state — merge reviewed flag into customFields
+        const updatedInvoices = invoices.map((inv) => {
+          if (!selectedIds.has(inv.id)) return inv;
+          return {
+            ...inv,
+            customFields: {
+              ...(inv.customFields as Record<string, unknown> | null ?? {}),
+              reviewed,
+              reviewedAt: reviewed ? new Date().toISOString() : null,
+            },
+          };
+        });
+        setInvoices(updatedInvoices);
+        toast.success(`${selectedIds.size} invoice${selectedIds.size !== 1 ? 's' : ''} ${reviewed ? 'marked as checked' : 'marked as needs review'}`);
+        setSelectedIds(new Set());
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error || 'Bulk update failed');
+      }
+    } catch {
+      toast.error('Network error');
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
   const deleteInvoice = async (id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     const token = getToken();
@@ -567,24 +658,82 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
 
   const renderValidationBadge = (inv: InvoiceRow) => {
     const vs = inv.validationStatus;
+    // If the user has manually marked this invoice as checked, show a calm
+    // "Reviewed" badge instead of the auto-detected Warning/Fail. The full
+    // validation details are still visible inside the detail dialog.
+    if (isReviewed(inv)) {
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button type="button" className="cursor-help">
+              <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-500 border-0 gap-1">
+                <CheckCircle2 className="h-3 w-3" /> Reviewed
+              </Badge>
+            </button>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-[260px] text-left">
+            <div className="space-y-1">
+              <p className="font-semibold">You marked this invoice as checked</p>
+              <p className="text-muted-foreground">The automated validation rules may still have flagged issues — open the detail view to see them. This badge just means you have reviewed the invoice manually.</p>
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      );
+    }
     if (!vs) return <span className="text-xs text-muted-foreground">—</span>;
     if (vs === 'fail')
       return (
-        <Badge variant="secondary" className="bg-red-500/10 text-red-500 border-0 gap-1">
-          <AlertCircle className="h-3 w-3" /> Fail
-        </Badge>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button type="button" className="cursor-help">
+              <Badge variant="secondary" className="bg-red-500/10 text-red-500 border-0 gap-1">
+                <AlertCircle className="h-3 w-3" /> Fail
+              </Badge>
+            </button>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-[260px] text-left">
+            <div className="space-y-1">
+              <p className="font-semibold">Hard validation error or possible tampering detected</p>
+              <p className="text-muted-foreground">Do not approve this invoice until the issue is resolved. Open the detail view to see which rule failed — for example: invoice date after due date, negative amount, line items summing wrong, or PDF metadata suggesting the file was edited.</p>
+            </div>
+          </TooltipContent>
+        </Tooltip>
       );
     if (vs === 'warning')
       return (
-        <Badge variant="secondary" className="bg-amber-500/10 text-amber-500 border-0 gap-1">
-          <AlertTriangle className="h-3 w-3" /> Warning
-        </Badge>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button type="button" className="cursor-help">
+              <Badge variant="secondary" className="bg-amber-500/10 text-amber-500 border-0 gap-1">
+                <AlertTriangle className="h-3 w-3" /> Warning
+              </Badge>
+            </button>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-[260px] text-left">
+            <div className="space-y-1">
+              <p className="font-semibold">A soft validation rule flagged this invoice</p>
+              <p className="text-muted-foreground">The invoice was extracted successfully, but something looks unusual and you should manually verify it before approving. Common triggers: VAT rate over 30%, due date more than a year out, invoice date in the future, blank vendor name, or line items not summing to the total. Open the detail view to see which rules fired.</p>
+            </div>
+          </TooltipContent>
+        </Tooltip>
       );
     if (vs === 'pass')
       return (
-        <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-500 border-0 gap-1">
-          <CheckCircle className="h-3 w-3" /> Pass
-        </Badge>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button type="button" className="cursor-help">
+              <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-500 border-0 gap-1">
+                <CheckCircle className="h-3 w-3" /> Pass
+              </Badge>
+            </button>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-[260px] text-left">
+            <div className="space-y-1">
+              <p className="font-semibold">All validation rules passed</p>
+              <p className="text-muted-foreground">The extracted data is internally consistent (dates are in order, VAT rate is reasonable, line items sum to the total, no tampering detected). You can proceed without manual verification.</p>
+            </div>
+          </TooltipContent>
+        </Tooltip>
       );
     return <span className="text-xs text-muted-foreground">N/A</span>;
   };
@@ -628,8 +777,24 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
     );
   };
 
-  const fmtCurrency = (v: number | null | undefined) =>
-    '$' + (v ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 });
+  const fmtCurrency = (v: number | null | undefined, currency?: string | null) => {
+    if (v == null || v === undefined) return '—';
+    const code = (currency || 'USD').toUpperCase();
+    try {
+      // Use Intl.NumberFormat to render the correct currency symbol
+      // (e.g. CZK → "Kč", EUR → "€", USD → "$", GBP → "£").
+      // `currencyDisplay: 'narrowSymbol'` gives the short symbol where one exists.
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: code,
+        currencyDisplay: 'narrowSymbol',
+        minimumFractionDigits: 2,
+      }).format(v);
+    } catch {
+      // Fallback for unknown currency codes: show raw number + code
+      return `${v.toLocaleString('en-US', { minimumFractionDigits: 2 })} ${code}`;
+    }
+  };
 
   const fmtRelativeTime = (dateStr: string) => {
     try {
@@ -724,14 +889,47 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
       <Dialog open={!!selectedInvoice} onOpenChange={(open) => { if (!open) setSelectedInvoice(null); }}>
         <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
-            <DialogTitle className="text-lg">
+            <DialogTitle className="text-lg flex items-center gap-2 flex-wrap">
               {inv.vendor || 'Unknown Vendor'} — {inv.invNumber || 'N/A'}
+              {isReviewed(inv) && (
+                <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 border-0 text-xs">
+                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                  {(() => {
+                    const ts = (inv.customFields as Record<string, unknown> | null)?.reviewedAt;
+                    if (typeof ts === 'string' && ts) {
+                      try {
+                        return `Checked ${fmtRelativeTime(ts)}`;
+                      } catch {
+                        return 'Checked';
+                      }
+                    }
+                    return 'Checked';
+                  })()}
+                </Badge>
+              )}
             </DialogTitle>
             <DialogDescription className="sr-only">
               Invoice details for {inv.vendor || 'Unknown Vendor'}
             </DialogDescription>
           </DialogHeader>
           <div className="flex items-center justify-end gap-2 -mt-2">
+                {/* Mark as checked / needs review — available on all plans */}
+                <Button
+                  variant={isReviewed(inv) ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => toggleReviewed(inv.id, isReviewed(inv))}
+                  disabled={reviewing === inv.id}
+                  className={isReviewed(inv) ? 'bg-emerald-500 hover:bg-emerald-600 text-white' : ''}
+                >
+                  {reviewing === inv.id ? (
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  ) : isReviewed(inv) ? (
+                    <CheckCircle2 className="h-4 w-4 mr-1" />
+                  ) : (
+                    <Circle className="h-4 w-4 mr-1" />
+                  )}
+                  {isReviewed(inv) ? 'Checked' : 'Mark as Checked'}
+                </Button>
                 {canEdit ? (
                   isEditing ? (
                     <>
@@ -804,9 +1002,9 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                 <DetailField label="Invoice #" value={inv.invNumber} mono />
                 <DetailField label="Date" value={inv.invDate} />
                 <DetailField label="Due Date" value={inv.dueDate} />
-                <DetailField label="Amount" value={inv.amount != null ? fmtCurrency(inv.amount) : null} />
-                <DetailField label="VAT" value={inv.vatAmount != null ? fmtCurrency(inv.vatAmount) : null} />
-                <DetailField label="Total" value={fmtCurrency(inv.total)} />
+                <DetailField label="Amount" value={inv.amount != null ? fmtCurrency(inv.amount, inv.currency) : null} />
+                <DetailField label="VAT" value={inv.vatAmount != null ? fmtCurrency(inv.vatAmount, inv.currency) : null} />
+                <DetailField label="Total" value={fmtCurrency(inv.total, inv.currency)} />
                 <DetailField label="Currency" value={inv.currency} />
                 <DetailField
                   label="Status"
@@ -899,10 +1097,10 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                         <td className="px-3 py-2">{String(item.description ?? item.name ?? '')}</td>
                         <td className="px-3 py-2 text-right font-mono">{String(item.quantity ?? item.qty ?? '')}</td>
                         <td className="px-3 py-2 text-right font-mono">
-                          {item.unitPrice != null ? '$' + Number(item.unitPrice).toFixed(2) : '—'}
+                          {item.unitPrice != null ? fmtCurrency(Number(item.unitPrice), inv.currency) : '—'}
                         </td>
                         <td className="px-3 py-2 text-right font-mono">
-                          {item.total != null ? '$' + Number(item.total).toFixed(2) : '—'}
+                          {item.total != null ? fmtCurrency(Number(item.total), inv.currency) : '—'}
                         </td>
                       </tr>
                     ))}
@@ -1102,8 +1300,8 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                   <div className="flex justify-between text-xs">
                     <span className="font-medium text-muted-foreground">Total</span>
                     <span>
-                      <span className="line-through text-muted-foreground mr-2">{fmtCurrency(inv.total)}</span>
-                      <span className="font-medium">{fmtCurrency(inv.normalizedTotal)}</span>
+                      <span className="line-through text-muted-foreground mr-2">{fmtCurrency(inv.total, inv.currency)}</span>
+                      <span className="font-medium">{fmtCurrency(inv.normalizedTotal, inv.normalizedCurrency || inv.currency)}</span>
                     </span>
                   </div>
                 )}
@@ -1181,7 +1379,28 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
           <h2 className="text-2xl font-bold">Invoices</h2>
           <p className="text-muted-foreground mt-1">
             {displayed.length} invoice{displayed.length !== 1 ? 's' : ''} — Total:{' '}
-            {fmtCurrency(totalAmount)}
+            {(() => {
+              // If all visible invoices share the same currency, show the
+              // sum in that currency. Otherwise list each currency's subtotal.
+              const currencies = new Set(
+                displayed
+                  .map((inv) => (showNormalized && inv.normalizedCurrency ? inv.normalizedCurrency : inv.currency) || 'USD')
+                  .filter(Boolean)
+              );
+              if (currencies.size <= 1) {
+                const cur = currencies.values().next().value as string | undefined;
+                return fmtCurrency(totalAmount, cur);
+              }
+              // Mixed currencies: show subtotals per currency
+              const subtotals = new Map<string, number>();
+              for (const inv of displayed) {
+                const cur = (showNormalized && inv.normalizedCurrency ? inv.normalizedCurrency : inv.currency) || 'USD';
+                subtotals.set(cur, (subtotals.get(cur) ?? 0) + (inv.total ?? 0));
+              }
+              return Array.from(subtotals.entries())
+                .map(([cur, amt]) => fmtCurrency(amt, cur))
+                .join(' + ');
+            })()}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -1221,15 +1440,27 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
         <Tabs value={filter} onValueChange={setFilter}>
           <TabsList>
             <TabsTrigger value="all">All ({invoices.length})</TabsTrigger>
-            <TabsTrigger value="done">Done</TabsTrigger>
             <TabsTrigger value="review">
-              Review ({invoices.filter((inv) => inv.status === 'review').length})
+              Needs Review ({invoices.filter((inv) => !isReviewed(inv)).length})
             </TabsTrigger>
+            <TabsTrigger value="done">Done</TabsTrigger>
             <TabsTrigger value="duplicates">
               Duplicates ({invoices.filter((inv) => inv.isDuplicate).length})
             </TabsTrigger>
           </TabsList>
         </Tabs>
+
+        {/* "Needs Review" filter — only show invoices the user hasn't manually marked as checked */}
+        <div className="flex items-center gap-2 sm:ml-2">
+          <Switch
+            id="hide-reviewed"
+            checked={hideReviewed}
+            onCheckedChange={setHideReviewed}
+          />
+          <Label htmlFor="hide-reviewed" className="text-sm text-muted-foreground cursor-pointer whitespace-nowrap">
+            Hide checked
+          </Label>
+        </div>
 
         {/* Sort controls */}
         <div className="flex items-center gap-2 ml-auto">
@@ -1303,13 +1534,14 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                 <th className="text-center px-4 py-3 font-medium hidden lg:table-cell">Aging</th>
                 <th className="text-center px-4 py-3 font-medium hidden xl:table-cell">Proc. Time</th>
                 <th className="text-center px-4 py-3 font-medium hidden md:table-cell">Lifecycle</th>
+                <th className="text-center px-3 py-3 font-medium w-[88px]">Checked</th>
                 <th className="px-3 py-3"></th>
               </tr>
             </thead>
             <tbody>
               {displayed.length === 0 ? (
                 <tr>
-                  <td colSpan={14} className="text-center py-12 text-muted-foreground">
+                  <td colSpan={15} className="text-center py-12 text-muted-foreground">
                     <Inbox className="h-10 w-10 mx-auto mb-3 opacity-40" />
                     <p>No invoices found</p>
                   </td>
@@ -1318,7 +1550,9 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                 displayed.map((inv) => (
                   <tr
                     key={inv.id}
-                    className={"border-b last:border-0 hover:bg-muted/30 transition-colors cursor-pointer " + (selectedIds.has(inv.id) ? 'bg-amber-500/5' : '')}
+                    className={"border-b last:border-0 hover:bg-muted/30 transition-colors cursor-pointer "
+                      + (selectedIds.has(inv.id) ? 'bg-amber-500/5 ' : '')
+                      + (isReviewed(inv) ? 'bg-emerald-500/[0.03] ' : '')}
                     onClick={() => openDetail(inv)}
                   >
                     {/* Checkbox */}
@@ -1350,8 +1584,8 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                     </td>
                     <td className="px-4 py-3 text-right font-medium">
                       {showNormalized && inv.normalizedTotal != null
-                        ? fmtCurrency(inv.normalizedTotal)
-                        : fmtCurrency(inv.total)}
+                        ? fmtCurrency(inv.normalizedTotal, inv.normalizedCurrency || inv.currency)
+                        : fmtCurrency(inv.total, inv.currency)}
                     </td>
                     <td className="px-4 py-3 text-center">
                       {inv.isDuplicate ? (
@@ -1450,6 +1684,42 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                         </Tooltip>
                       )}
                     </td>
+                    {/* Manual "Checked" toggle */}
+                    <td
+                      className="px-3 py-3 text-center"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className={`h-8 w-8 ${isReviewed(inv) ? 'text-emerald-500 hover:text-emerald-600' : 'text-muted-foreground hover:text-foreground'}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleReviewed(inv.id, isReviewed(inv));
+                            }}
+                            disabled={reviewing === inv.id}
+                          >
+                            {reviewing === inv.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : isReviewed(inv) ? (
+                              <CheckCircle2 className="h-5 w-5" />
+                            ) : (
+                              <Circle className="h-5 w-5" />
+                            )}
+                            <span className="sr-only">
+                              {isReviewed(inv) ? 'Mark as needs review' : 'Mark as checked'}
+                            </span>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {isReviewed(inv)
+                            ? 'Checked — click to mark as needs review'
+                            : 'Click to mark this invoice as checked'}
+                        </TooltipContent>
+                      </Tooltip>
+                    </td>
                     {/* View button */}
                     <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                       <Tooltip>
@@ -1499,6 +1769,24 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
               {selectedIds.size} selected
             </span>
             <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => bulkMarkReviewed(true)}
+                disabled={bulkDeleting}
+              >
+                {bulkDeleting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-1 text-emerald-500" />}
+                Mark Checked
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => bulkMarkReviewed(false)}
+                disabled={bulkDeleting}
+              >
+                <Circle className="h-4 w-4 mr-1 text-muted-foreground" />
+                Mark Needs Review
+              </Button>
               <Button
                 variant="destructive"
                 size="sm"

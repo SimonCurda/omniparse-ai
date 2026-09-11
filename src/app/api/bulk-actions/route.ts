@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getUserFromRequest, hasFeature } from '@/lib/auth';
 
-const VALID_BULK_ACTIONS = ['delete', 'change_lifecycle_status'];
+const VALID_BULK_ACTIONS = ['delete', 'change_lifecycle_status', 'set_reviewed', 'set_unreviewed'];
 
 export async function POST(req: NextRequest) {
   try {
@@ -77,6 +77,34 @@ export async function POST(req: NextRequest) {
           invoiceId: invId,
           action: 'edited',
           details: { bulk: true, field: 'lifecycleStatus', newValue: newStatus },
+        })),
+      });
+    } else if (action === 'set_reviewed' || action === 'set_unreviewed') {
+      const reviewed = action === 'set_reviewed';
+      const reviewedAt = reviewed ? new Date().toISOString() : null;
+
+      // customFields is a JSON column — fetch each invoice's existing
+      // customFields, merge in the reviewed flag, and write back.
+      const invoicesToUpdate = await db.invoice.findMany({
+        where: { id: { in: Array.from(ownedIds) } },
+        select: { id: true, customFields: true },
+      });
+
+      await Promise.all(invoicesToUpdate.map((inv) => {
+        const existing = (inv.customFields as Record<string, unknown> | null) ?? {};
+        const merged: Record<string, unknown> = { ...existing, reviewed, reviewedAt };
+        return db.invoice.update({
+          where: { id: inv.id },
+          data: { customFields: merged as any },
+        });
+      }));
+
+      await db.auditLog.createMany({
+        data: invoicesToUpdate.map((inv) => ({
+          userId: user.id,
+          invoiceId: inv.id,
+          action: reviewed ? 'reviewed' : 'unreviewed',
+          details: { bulk: true, reviewed, reviewedAt },
         })),
       });
     }
