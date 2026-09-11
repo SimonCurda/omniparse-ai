@@ -148,6 +148,7 @@ export function DashboardShell() {
     const tabMap: Record<string, string> = {
       [sc.tabUpload]: 'upload',
       [sc.tabInvoices]: 'invoices',
+      [sc.tabPending]: 'pending',
       [sc.tabAnalytics]: 'analytics',
       [sc.tabChat]: 'chat',
       [sc.tabSettings]: 'settings',

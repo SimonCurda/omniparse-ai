@@ -5,6 +5,7 @@ export const DEFAULT_SHORTCUTS: Record<string, string> = {
   altSearch: '/',
   tabUpload: 'u',
   tabInvoices: 'i',
+  tabPending: 'p',
   tabAnalytics: 'a',
   tabChat: 'c',
   tabSettings: 's',

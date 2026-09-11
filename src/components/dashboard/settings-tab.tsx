@@ -1221,6 +1221,7 @@ const SHORTCUT_LABELS: Record<string, { label: string; description: string; fixe
   altSearch: { label: 'Alt Search', description: 'Alternate search shortcut (always /)' },
   tabUpload: { label: 'Upload Tab', description: 'Switch to Upload tab' },
   tabInvoices: { label: 'Invoices Tab', description: 'Switch to Invoices tab' },
+  tabPending: { label: 'Pending Tab', description: 'Switch to Pending Review tab' },
   tabAnalytics: { label: 'Analytics Tab', description: 'Switch to Analytics tab' },
   tabChat: { label: 'Chat Tab', description: 'Switch to AI Chat tab' },
   tabSettings: { label: 'Settings Tab', description: 'Switch to Settings tab' },
