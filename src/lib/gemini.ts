@@ -272,6 +272,110 @@ export async function geminiChatCall(
     ...messages.map((m) => ({ role: m.role, content: m.content })),
   ];
 
+  // ─── Try OpenRouter first (same pattern as geminiVisionCall) ──────────
+  // This is critical for text-based PDF extraction — when Groq is rate-limited,
+  // OpenRouter provides a separate quota pool so the extraction still works.
+  const orApiKeys = process.env.OPENROUTER_API_KEY
+    ? [process.env.OPENROUTER_API_KEY,
+       process.env.OPENROUTER_API_KEY_2,
+       process.env.OPENROUTER_API_KEY_3,
+       process.env.OPENROUTER_API_KEY_4,
+       process.env.OPENROUTER_API_KEY_5,
+      ].filter(Boolean) as string[]
+    : [];
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://omniparse-ai.vercel.app';
+
+  // OpenRouter text models (same list as openrouter.ts)
+  const OR_PRIMARY = 'inclusionai/ling-3.0-flash-fin:free';
+  const OR_FALLBACKS = [
+    'nvidia/llama-3.1-nemotron-70b-instruct:free',
+    'meta-llama/llama-3.3-70b-instruct:free',
+    'mistralai/mistral-7b-instruct:free',
+    'qwen/qwen-2.5-72b-instruct:free',
+    'openrouter/free',
+  ];
+
+  if (orApiKeys.length > 0) {
+    for (let keyIdx = 0; keyIdx < orApiKeys.length; keyIdx++) {
+      const orKey = orApiKeys[keyIdx];
+      try {
+        console.warn(`[gemini-chat] Trying OpenRouter (key ${keyIdx + 1}/${orApiKeys.length})...`);
+        const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${orKey}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': appUrl,
+            'X-Title': 'OmniParse AI',
+          },
+          body: JSON.stringify({
+            model: OR_PRIMARY,
+            fallbacks: OR_FALLBACKS,
+            messages: openaiMessages,
+            max_tokens: 4096,
+            temperature: 0.7,
+            response_format: { type: 'json_object' },
+          }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          const content = data.choices?.[0]?.message?.content || '';
+          if (content) {
+            console.warn(`[gemini-chat] OpenRouter succeeded (key ${keyIdx + 1})!`);
+            return content;
+          }
+        }
+
+        // JSON mode not supported — retry without response_format
+        if (res.status === 400 || res.status === 422) {
+          console.warn(`[gemini-chat] JSON mode not supported. Retrying without response_format (key ${keyIdx + 1})...`);
+          const fbRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${orKey}`,
+              'Content-Type': 'application/json',
+              'HTTP-Referer': appUrl,
+              'X-Title': 'OmniParse AI',
+            },
+            body: JSON.stringify({
+              model: OR_PRIMARY,
+              fallbacks: OR_FALLBACKS,
+              messages: openaiMessages,
+              max_tokens: 4096,
+              temperature: 0.7,
+            }),
+          });
+          if (fbRes.ok) {
+            const fbData = await fbRes.json();
+            const fbContent = fbData.choices?.[0]?.message?.content || '';
+            if (fbContent) {
+              console.warn(`[gemini-chat] OpenRouter succeeded (free-text, key ${keyIdx + 1})!`);
+              return fbContent;
+            }
+          }
+          continue; // try next key
+        }
+
+        // 429/402 — rate limited, try next key
+        if (res.status === 429 || res.status === 402) {
+          console.warn(`[gemini-chat] OpenRouter key ${keyIdx + 1} rate limited. Trying next key...`);
+          continue;
+        }
+
+        // Other error — try next key
+        console.warn(`[gemini-chat] OpenRouter failed (key ${keyIdx + 1}, status ${res.status})`);
+        continue;
+      } catch (err) {
+        console.warn(`[gemini-chat] OpenRouter error (key ${keyIdx + 1}):`, err instanceof Error ? err.message : String(err));
+        continue;
+      }
+    }
+    console.warn('[gemini-chat] All OpenRouter keys exhausted. Falling back to Groq...');
+  }
+
+  // ─── Fall back to Groq (original code below) ───────────────────────────
+
   const modelConfigs = [
     // `supportsJsonMode` controls whether we set `response_format: { type: "json_object" }`
     // in the request body. JSON mode forces the model to output valid JSON only,
