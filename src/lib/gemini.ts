@@ -154,6 +154,10 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
           messages: openaiMessages,
           max_tokens: 4096,
           temperature: 0.1,
+          // Request JSON output format — many OpenRouter models support this
+          // even for vision tasks. If the model doesn't support it, OpenRouter
+          // will return a 400/422 and we fall through to the next model.
+          response_format: { type: 'json_object' },
         }),
       });
 
@@ -161,11 +165,48 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
         const data = await res.json();
         const content = data.choices?.[0]?.message?.content || '';
         if (content) {
-          console.warn(`[gemini] OpenRouter vision model ${model} succeeded!`);
+          console.warn(`[gemini] OpenRouter vision model ${model} succeeded (JSON mode)!`);
           return content;
         }
       }
 
+      // If JSON mode failed (400/422), try the SAME model WITHOUT response_format
+      // before moving to the next model in the cascade
+      if (res.status === 400 || res.status === 422) {
+        const errText = await res.text().catch(() => '');
+        if (errText.includes('structured-outputs') || errText.includes('json_object') ||
+            errText.includes('INVALID_REQUEST_BODY') || errText.includes('response_format')) {
+          console.warn(`[gemini] ${model} doesn't support JSON mode. Retrying WITHOUT response_format...`);
+          const fallbackRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${orApiKey}`,
+              'Content-Type': 'application/json',
+              'HTTP-Referer': appUrl,
+              'X-Title': 'OmniParse AI',
+            },
+            body: JSON.stringify({
+              model,
+              messages: openaiMessages,
+              max_tokens: 4096,
+              temperature: 0.1,
+              // No response_format — free-text mode
+            }),
+          });
+          if (fallbackRes.ok) {
+            const fallbackData = await fallbackRes.json();
+            const fallbackContent = fallbackData.choices?.[0]?.message?.content || '';
+            if (fallbackContent) {
+              console.warn(`[gemini] OpenRouter vision ${model} succeeded (free-text mode)!`);
+              return fallbackContent;
+            }
+          }
+          console.warn(`[gemini] ${model} also failed in free-text mode (${fallbackRes.status})`);
+          continue; // Move to next model
+        }
+      }
+
+      // Rate limited or other error — move to next model
       const errText = await res.text().catch(() => '');
       console.warn(`[gemini] OpenRouter vision ${model} failed (${res.status})`);
     } catch (err) {
