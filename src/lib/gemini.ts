@@ -264,13 +264,14 @@ export async function geminiChatCall(
     // `supportsJsonMode` controls whether we set `response_format: { type: "json_object" }`
     // in the request body. JSON mode forces the model to output valid JSON only,
     // eliminating the "Thinking Process:" / "Output:" / "Draft:" leak class entirely.
-    // All 3 chat models try JSON mode first. If a model returns 422 (JSON mode not
-    // supported) or 400 (model_decommissioned), the request falls through to the
-    // next model in the cascade. If JSON mode is supported but the model fails to
-    // produce valid JSON (json_validate_failed), we retry without response_format.
+    // Only use non-reasoning models for text extraction — reasoning models (qwen)
+    // leak their thinking into JSON values (e.g. vendor="High confidence").
     { model: CHAT_MODEL, maxTokens: MAX_TOKENS_HIGH, supportsJsonMode: true },            // llama-3.1-8b-instant
     { model: CHAT_MODEL_FALLBACK_1, maxTokens: MAX_TOKENS_HIGH, supportsJsonMode: true }, // llama-4-scout-17b-16e-instruct
-    { model: CHAT_MODEL_FALLBACK_2, maxTokens: MAX_TOKENS_LOW, supportsJsonMode: true },  // qwen3.6-27b — try JSON mode, 422/400 fallback handles unsupported
+    // NOTE: qwen3.6-27b (CHAT_MODEL_FALLBACK_2) is intentionally EXCLUDED from the
+    // text cascade. It's a reasoning model that leaks thinking into JSON values,
+    // producing garbage like vendor="High confidence" and invoiceNumber="High".
+    // If both llama models fail, we fall through to the OpenRouter fallback below.
   ];
 
   const triedModels: string[] = [];
