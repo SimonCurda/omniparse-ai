@@ -120,7 +120,10 @@ export async function scanInbox(
     });
     await client.connect();
 
-    // Open INBOX (read-write so we can mark messages as seen)
+    // Open INBOX in READ-ONLY mode. We do NOT mark emails as \Seen
+    // because that would mess up the user's unread count in their email client.
+    // Instead, we track which UIDs we've already processed via the
+    // lastSeenUID field on the EmailInbox record (purely on our side).
     const lock = await client.getMailboxLock('INBOX');
     try {
       // Search for messages with UID > lastSeenUID
@@ -167,8 +170,7 @@ export async function scanInbox(
         // ─── Stage 2: Sender blocklist check (free) ────────────────────
         if (fromAddr && blocklist.has(fromAddr)) {
           result.blocked++;
-          // Mark as seen so we don't reprocess
-          await client.messageFlagsAdd(uid, ['\\Seen'], { uid: true });
+          // Don.t mark as seen — we track via lastSeenUID
           if (uid > lastProcessedUID) lastProcessedUID = uid;
           continue;
         }
@@ -177,9 +179,8 @@ export async function scanInbox(
         // Walk the body structure to find PDF/image parts
         const attachment = findAttachment(msg.bodyStructure);
         if (!attachment) {
-          // No usable attachment — skip + mark seen
+          // No usable attachment — skip
           result.skipped++;
-          await client.messageFlagsAdd(uid, ['\\Seen'], { uid: true });
           if (uid > lastProcessedUID) lastProcessedUID = uid;
           continue;
         }
@@ -197,7 +198,6 @@ export async function scanInbox(
         // 10 MB limit (matches /api/parse)
         if (attachmentBytes.length > 10 * 1024 * 1024) {
           result.skipped++;
-          await client.messageFlagsAdd(uid, ['\\Seen'], { uid: true });
           if (uid > lastProcessedUID) lastProcessedUID = uid;
           continue;
         }
@@ -281,8 +281,7 @@ export async function scanInbox(
           result.pending++;
         }
 
-        // Mark email as seen so we don't reprocess
-        await client.messageFlagsAdd(uid, ['\\Seen'], { uid: true });
+        // Don.t mark email as seen — we track via lastSeenUID
         if (uid > lastProcessedUID) lastProcessedUID = uid;
 
         // Re-check pending queue cap
