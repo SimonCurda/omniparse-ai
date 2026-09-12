@@ -363,73 +363,142 @@ export function EmailInboxSettings() {
             </>
           )}
 
-          {/* Add Inbox Form */}
+          {/* Add Inbox Form — simplified */}
           {showAddForm && (
-            <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
-              <h4 className="text-sm font-semibold">Connect a new inbox</h4>
+            <div className="rounded-lg border bg-muted/30 p-5 space-y-4">
+              <div>
+                <h4 className="text-sm font-semibold">Connect your email inbox</h4>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  OmniParse will scan your inbox for invoice emails. Every email goes to Pending Review first — nothing auto-imports until you approve it.
+                </p>
+              </div>
+
+              {/* Step 1: Pick provider */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium">1. What email do you use?</Label>
+                <Select value={provider} onValueChange={(v) => { handleProviderChange(v); if (v !== 'other') { setUsername(emailAddress); } }}>
+                  <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="gmail">📧 Gmail</SelectItem>
+                    <SelectItem value="outlook">📧 Outlook / Office 365</SelectItem>
+                    <SelectItem value="yahoo">📧 Yahoo</SelectItem>
+                    <SelectItem value="icloud">📧 iCloud</SelectItem>
+                    <SelectItem value="zoho">📧 Zoho</SelectItem>
+                    <SelectItem value="other">⚙️ Other (advanced settings)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Step 2: Email + label */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Email Provider</Label>
-                  <Select value={provider} onValueChange={handleProviderChange}>
-                    <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="gmail">Gmail</SelectItem>
-                      <SelectItem value="outlook">Outlook / Office 365</SelectItem>
-                      <SelectItem value="yahoo">Yahoo</SelectItem>
-                      <SelectItem value="icloud">iCloud</SelectItem>
-                      <SelectItem value="zoho">Zoho</SelectItem>
-                      <SelectItem value="other">Other (custom)</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Label className="text-xs font-medium">2. Your email address</Label>
+                  <Input
+                    value={emailAddress}
+                    onChange={(e) => { setEmailAddress(e.target.value); setUsername(e.target.value); }}
+                    placeholder="you@gmail.com"
+                    className="h-10"
+                  />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Label (your nickname)</Label>
-                  <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Work invoices" className="h-9 text-sm" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Email Address</Label>
-                  <Input value={emailAddress} onChange={(e) => setEmailAddress(e.target.value)} placeholder="you@company.com" className="h-9 text-sm" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">IMAP Username (usually email)</Label>
-                  <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="you@company.com" className="h-9 text-sm" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">IMAP Host</Label>
-                  <Input value={imapHost} onChange={(e) => setImapHost(e.target.value)} placeholder="imap.gmail.com" className="h-9 text-sm" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">IMAP Port</Label>
-                  <Input type="number" value={imapPort} onChange={(e) => setImapPort(Number(e.target.value))} className="h-9 text-sm" />
-                </div>
-                <div className="space-y-1.5 sm:col-span-2">
-                  <Label className="text-xs">App Password (NOT your email password)</Label>
-                  <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="App-specific password" className="h-9 text-sm" />
-                  {provider !== 'other' && PROVIDER_PRESETS[provider]?.docs && (
-                    <p className="text-[11px] text-muted-foreground mt-1">
-                      Need help? <a href={PROVIDER_PRESETS[provider].docs} target="_blank" rel="noopener noreferrer" className="text-amber-500 hover:underline">How to get an app password →</a>
-                    </p>
-                  )}
-                </div>
-                <div className="space-y-1.5 sm:col-span-2">
-                  <Label className="text-xs">Scan Mode</Label>
-                  <Select value={scanMode} onValueChange={setScanMode}>
-                    <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="manual">Manual approval (safest — every email goes to Pending)</SelectItem>
-                      <SelectItem value="trusted">Trusted senders auto-import (others go to Pending)</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Label className="text-xs font-medium">Nickname (optional)</Label>
+                  <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Work invoices" className="h-10" />
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+
+              {/* Step 3: App password with inline instructions */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium">3. App password</Label>
+                <Input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Paste your app password here"
+                  className="h-10"
+                />
+
+                {/* Inline step-by-step instructions */}
+                {provider === 'gmail' && (
+                  <div className="rounded-md bg-amber-500/5 border border-amber-500/20 p-3 text-xs space-y-1.5">
+                    <p className="font-medium text-amber-600">How to get a Gmail app password:</p>
+                    <ol className="list-decimal list-inside space-y-0.5 text-muted-foreground">
+                      <li>Go to your Google Account → <a href="https://myaccount.google.com/security" target="_blank" rel="noopener noreferrer" className="text-amber-500 hover:underline">Security settings</a></li>
+                      <li>Turn on <b>2-Step Verification</b> (required)</li>
+                      <li>Search for "App passwords" in the search bar</li>
+                      <li>Create a new app password (name it "OmniParse")</li>
+                      <li>Copy the 16-character password and paste it above</li>
+                    </ol>
+                    <p className="text-muted-foreground pt-1">This is NOT your regular Gmail password. It's a separate password just for apps.</p>
+                  </div>
+                )}
+                {provider === 'outlook' && (
+                  <div className="rounded-md bg-amber-500/5 border border-amber-500/20 p-3 text-xs space-y-1.5">
+                    <p className="font-medium text-amber-600">How to get an Outlook app password:</p>
+                    <ol className="list-decimal list-inside space-y-0.5 text-muted-foreground">
+                      <li>Go to <a href="https://account.microsoft.com/security" target="_blank" rel="noopener noreferrer" className="text-amber-500 hover:underline">Microsoft account security</a></li>
+                      <li>Turn on <b>Two-step verification</b> (required)</li>
+                      <li>Click "Create a new app password"</li>
+                      <li>Copy the password and paste it above</li>
+                    </ol>
+                  </div>
+                )}
+                {provider === 'yahoo' && (
+                  <div className="rounded-md bg-amber-500/5 border border-amber-500/20 p-3 text-xs space-y-1.5">
+                    <p className="font-medium text-amber-600">How to get a Yahoo app password:</p>
+                    <ol className="list-decimal list-inside space-y-0.5 text-muted-foreground">
+                      <li>Go to <a href="https://login.yahoo.com/account/security" target="_blank" rel="noopener noreferrer" className="text-amber-500 hover:underline">Yahoo Account Security</a></li>
+                      <li>Turn on <b>Two-step verification</b></li>
+                      <li>Click "Manage app passwords" → Generate</li>
+                      <li>Copy the password and paste it above</li>
+                    </ol>
+                  </div>
+                )}
+                {provider === 'icloud' && (
+                  <div className="rounded-md bg-amber-500/5 border border-amber-500/20 p-3 text-xs space-y-1.5">
+                    <p className="font-medium text-amber-600">How to get an iCloud app password:</p>
+                    <ol className="list-decimal list-inside space-y-0.5 text-muted-foreground">
+                      <li>Go to <a href="https://appleid.apple.com/account/manage" target="_blank" rel="noopener noreferrer" className="text-amber-500 hover:underline">Apple ID</a></li>
+                      <li>Sign in → Security → App-Specific Passwords</li>
+                      <li>Click "Generate Password"</li>
+                      <li>Copy the password and paste it above</li>
+                    </ol>
+                  </div>
+                )}
+                {provider === 'zoho' && (
+                  <div className="rounded-md bg-amber-500/5 border border-amber-500/20 p-3 text-xs space-y-1.5">
+                    <p className="font-medium text-amber-600">How to get a Zoho app password:</p>
+                    <ol className="list-decimal list-inside space-y-0.5 text-muted-foreground">
+                      <li>Go to <a href="https://accounts.zoho.com/app-specific-password" target="_blank" rel="noopener noreferrer" className="text-amber-500 hover:underline">Zoho App Passwords</a></li>
+                      <li>Click "Generate New Password"</li>
+                      <li>Copy the password and paste it above</li>
+                    </ol>
+                  </div>
+                )}
+
+                {/* Advanced settings (only for "Other" provider) */}
+                {provider === 'other' && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">IMAP Host</Label>
+                      <Input value={imapHost} onChange={(e) => setImapHost(e.target.value)} placeholder="imap.yourprovider.com" className="h-9 text-sm" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">IMAP Port</Label>
+                      <Input type="number" value={imapPort} onChange={(e) => setImapPort(Number(e.target.value))} className="h-9 text-sm" />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Buttons */}
+              <div className="flex items-center gap-2 pt-2">
                 <Button variant="outline" size="sm" onClick={handleTest} disabled={testing}>
                   {testing ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <ShieldCheck className="h-4 w-4 mr-1" />}
                   Test Connection
                 </Button>
                 <Button size="sm" onClick={handleSave} disabled={testing}>
                   {testing ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-1" />}
-                  Save Inbox
+                  Connect Inbox
                 </Button>
                 <Button variant="ghost" size="sm" onClick={() => setShowAddForm(false)}>
                   Cancel
