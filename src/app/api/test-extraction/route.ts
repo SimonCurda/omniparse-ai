@@ -61,8 +61,8 @@ Output ONLY valid JSON:
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
 
     // Try to parse the response
-    let parsed = null;
-    let parseError = null;
+    let parsed: Record<string, unknown> | null = null;
+    let parseError: string | null = null;
     try {
       // Extract JSON from response
       const jsonMatch = response.match(/\{[\s\S]*\}/);
