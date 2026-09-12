@@ -87,15 +87,42 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
     openaiMessages.push({ role: msg.role === 'model' ? 'assistant' : 'user', content: parts });
   }
 
-  // ─── Try OpenRouter vision models first (they support JSON mode better) ─
-  // Groq's qwen3.6-27b is a reasoning model that often outputs prose instead
-  // of JSON, which means the prose fallback regex has to parse it (lower
-  // quality). OpenRouter's Gemma 4 models reliably output JSON with high
-  // confidence (0.97+). So we try OpenRouter first, then Groq as fallback.
+  // ─── Try Groq vision model first (better at Czech/European invoices) ──
+  // Groq's qwen3.6-27b is a reasoning model that handles Czech, German,
+  // French invoices well. OpenRouter's free models are less reliable for
+  // non-English documents, so we try Groq first and fall back to OpenRouter.
+  try {
+    console.warn(`[gemini] Trying Groq vision model: ${VISION_MODEL}...`);
+    const res = await fetch(GROQ_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: VISION_MODEL,
+        messages: openaiMessages,
+        max_tokens: MAX_TOKENS_LOW,
+        temperature: 0.1,
+      }),
+    });
 
-  // ─── Multi-key support ───────────────────────────────────────────────
-  // Get all configured OpenRouter API keys so we can rotate on 429/402.
-  // Each key has its own daily quota, so more keys = more total throughput.
+    if (res.ok) {
+      const data = await res.json();
+      const content = data.choices?.[0]?.message?.content || '';
+      if (content) {
+        console.warn(`[gemini] Groq vision model ${VISION_MODEL} succeeded!`);
+        return content;
+      }
+    }
+
+    // Groq rate-limited or failed — fall through to OpenRouter
+    console.warn(`[gemini] Groq vision model ${VISION_MODEL} failed (${res.status}), falling back to OpenRouter...`);
+  } catch (err) {
+    console.warn('[gemini] Groq vision call failed, falling back to OpenRouter...', err instanceof Error ? err.message : String(err));
+  }
+
+  // ─── Multi-key OpenRouter fallback ───────────────────────────────────
   const orApiKeys = process.env.OPENROUTER_API_KEY
     ? [process.env.OPENROUTER_API_KEY,
        process.env.OPENROUTER_API_KEY_2,
@@ -107,34 +134,26 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://omniparse-ai.vercel.app';
 
   const openRouterVisionModels = [
-    'google/gemma-4-31b-it:free',               // Best results so far (0.98 confidence)
-    'google/gemma-4-26b-a4b-it:free',           // Also excellent (0.97 confidence)
-    'inclusionai/ling-3.0-flash-vl:free',       // Finance-focused VL model
-    'nex-agi/nex-n2.5-pro:free',                // Nex AGI Pro
-    'thinkingmachines/inkling:free',             // Inkling, 1M context
-    'nex-agi/nex-n2.5-mini:free',               // Nex AGI Mini
-    'thinkingmachines/inkling-small:free',       // Inkling Small
+    'google/gemma-4-31b-it:free',
+    'google/gemma-4-26b-a4b-it:free',
+    'inclusionai/ling-3.0-flash-vl:free',
+    'nex-agi/nex-n2.5-pro:free',
+    'thinkingmachines/inkling:free',
+    'nex-agi/nex-n2.5-mini:free',
+    'thinkingmachines/inkling-small:free',
     'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
-    'openrouter/free',                           // Auto-router — OpenRouter picks any available free model
+    'openrouter/free',
   ];
 
-  // Try OpenRouter first using the `fallbacks` array — ONE API call per key.
-  // OpenRouter's server tries the primary model, and if it's rate-limited,
-  // automatically tries each fallback in order (server-side, no extra API
-  // calls from us). This is the "auto-swapping" feature the user asked about.
-  //
-  // We only make a new API call when a KEY is rate-limited (429/402), at
-  // which point we rotate to the next key and let OpenRouter's fallback
-  // array handle model switching again.
+  // Try OpenRouter using the `fallbacks` array — ONE API call per key.
   if (orApiKeys.length > 0) {
     for (let keyIdx = 0; keyIdx < orApiKeys.length; keyIdx++) {
       const orApiKey = orApiKeys[keyIdx];
       try {
-        // Primary model = best vision model; fallbacks = all others + auto-router
         const primaryModel = openRouterVisionModels[0];
         const fallbackModels = openRouterVisionModels.slice(1);
 
-        console.warn(`[gemini] Trying OpenRouter vision (key ${keyIdx + 1}/${orApiKeys.length}, ${openRouterVisionModels.length} models via fallbacks)...`);
+        console.warn(`[gemini] Trying OpenRouter vision (key ${keyIdx + 1}/${orApiKeys.length})...`);
 
         const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
           method: 'POST',
@@ -164,14 +183,13 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
           }
         }
 
-        // If JSON mode failed (400/422), retry WITHOUT response_format
-        // (some vision models don't support structured outputs)
+        // JSON mode not supported — retry without response_format
         if (res.status === 400 || res.status === 422) {
           const errText = await res.text().catch(() => '');
           if (errText.includes('structured-outputs') || errText.includes('json_object') ||
               errText.includes('INVALID_REQUEST_BODY') || errText.includes('response_format')) {
             console.warn(`[gemini] JSON mode not supported. Retrying WITHOUT response_format (key ${keyIdx + 1})...`);
-            const fallbackRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+            const fbRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
               method: 'POST',
               headers: {
                 'Authorization': `Bearer ${orApiKey}`,
@@ -185,75 +203,37 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
                 messages: openaiMessages,
                 max_tokens: 4096,
                 temperature: 0.1,
-                // No response_format — free-text mode
               }),
             });
-            if (fallbackRes.ok) {
-              const fallbackData = await fallbackRes.json();
-              const fallbackContent = fallbackData.choices?.[0]?.message?.content || '';
-              if (fallbackContent) {
-                const usedModel = fallbackData.model || primaryModel;
+            if (fbRes.ok) {
+              const fbData = await fbRes.json();
+              const fbContent = fbData.choices?.[0]?.message?.content || '';
+              if (fbContent) {
+                const usedModel = fbData.model || primaryModel;
                 console.warn(`[gemini] OpenRouter vision succeeded (free-text, model: ${usedModel}, key ${keyIdx + 1})!`);
-                return fallbackContent;
+                return fbContent;
               }
             }
-            // Free-text mode also failed — try next key
             continue;
           }
         }
 
-        // 429 or 402 — this key is rate-limited, rotate to next key
+        // 429/402 — rate limited, try next key
         if (res.status === 429 || res.status === 402) {
-          console.warn(`[gemini] OpenRouter key ${keyIdx + 1} rate limited (${res.status}). All ${openRouterVisionModels.length} models exhausted for this key. Trying next key...`);
+          console.warn(`[gemini] OpenRouter key ${keyIdx + 1} rate limited. Trying next key...`);
           continue;
         }
 
-        // Other error (404, 500, etc.) — try next key
-        console.warn(`[gemini] OpenRouter vision failed with key ${keyIdx + 1} (${res.status})`);
+        console.warn(`[gemini] OpenRouter vision failed (key ${keyIdx + 1}, status ${res.status})`);
         continue;
       } catch (err) {
         console.warn(`[gemini] OpenRouter vision error (key ${keyIdx + 1}):`, err instanceof Error ? err.message : String(err));
-        // Network error — try next key
         continue;
       }
     }
   }
 
-  // ─── Fall back to Groq vision model (last resort) ─────────────────────
-  // Groq's qwen3.6-27b is a reasoning model that often outputs prose.
-  // The prose-to-JSON fallback in parse/route.ts will handle its output.
-  try {
-    console.warn(`[gemini] Trying Groq vision model: ${VISION_MODEL} (last resort)...`);
-    const res = await fetch(GROQ_API_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: VISION_MODEL,
-        messages: openaiMessages,
-        max_tokens: MAX_TOKENS_LOW,
-        temperature: 0.1,
-      }),
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-      const content = data.choices?.[0]?.message?.content || '';
-      if (content) {
-        console.warn(`[gemini] Groq vision model succeeded (last resort)!`);
-        return content;
-      }
-    }
-
-    const errText = await res.text().catch(() => '');
-    console.warn(`[gemini] Groq vision model ${VISION_MODEL} also failed (${res.status})`);
-  } catch (err) {
-    console.warn('[gemini] Groq vision call failed:', err instanceof Error ? err.message : String(err));
-  }
-
-  throw new Error('All vision models (OpenRouter + Groq) are temporarily unavailable. Please try again in a moment.');
+  throw new Error('All vision models (Groq + OpenRouter) are temporarily unavailable. Please try again in a moment.');
 }
 
 /**
@@ -272,109 +252,13 @@ export async function geminiChatCall(
     ...messages.map((m) => ({ role: m.role, content: m.content })),
   ];
 
-  // ─── Try OpenRouter first (same pattern as geminiVisionCall) ──────────
-  // This is critical for text-based PDF extraction — when Groq is rate-limited,
-  // OpenRouter provides a separate quota pool so the extraction still works.
-  const orApiKeys = process.env.OPENROUTER_API_KEY
-    ? [process.env.OPENROUTER_API_KEY,
-       process.env.OPENROUTER_API_KEY_2,
-       process.env.OPENROUTER_API_KEY_3,
-       process.env.OPENROUTER_API_KEY_4,
-       process.env.OPENROUTER_API_KEY_5,
-      ].filter(Boolean) as string[]
-    : [];
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://omniparse-ai.vercel.app';
+  // ─── Try Groq first (better at Czech/European invoice text extraction) ──
+  // Groq's models are more reliable for non-English documents.
+  // OpenRouter text models produce lower-quality extraction.
+  // We try Groq first; if ALL Groq models are rate-limited, we catch
+  // the throw and try OpenRouter as a last resort.
 
-  // OpenRouter text models (same list as openrouter.ts)
-  const OR_PRIMARY = 'inclusionai/ling-3.0-flash-fin:free';
-  const OR_FALLBACKS = [
-    'nvidia/llama-3.1-nemotron-70b-instruct:free',
-    'meta-llama/llama-3.3-70b-instruct:free',
-    'mistralai/mistral-7b-instruct:free',
-    'qwen/qwen-2.5-72b-instruct:free',
-    'openrouter/free',
-  ];
-
-  if (orApiKeys.length > 0) {
-    for (let keyIdx = 0; keyIdx < orApiKeys.length; keyIdx++) {
-      const orKey = orApiKeys[keyIdx];
-      try {
-        console.warn(`[gemini-chat] Trying OpenRouter (key ${keyIdx + 1}/${orApiKeys.length})...`);
-        const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${orKey}`,
-            'Content-Type': 'application/json',
-            'HTTP-Referer': appUrl,
-            'X-Title': 'OmniParse AI',
-          },
-          body: JSON.stringify({
-            model: OR_PRIMARY,
-            fallbacks: OR_FALLBACKS,
-            messages: openaiMessages,
-            max_tokens: 4096,
-            temperature: 0.7,
-            response_format: { type: 'json_object' },
-          }),
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          const content = data.choices?.[0]?.message?.content || '';
-          if (content) {
-            console.warn(`[gemini-chat] OpenRouter succeeded (key ${keyIdx + 1})!`);
-            return content;
-          }
-        }
-
-        // JSON mode not supported — retry without response_format
-        if (res.status === 400 || res.status === 422) {
-          console.warn(`[gemini-chat] JSON mode not supported. Retrying without response_format (key ${keyIdx + 1})...`);
-          const fbRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${orKey}`,
-              'Content-Type': 'application/json',
-              'HTTP-Referer': appUrl,
-              'X-Title': 'OmniParse AI',
-            },
-            body: JSON.stringify({
-              model: OR_PRIMARY,
-              fallbacks: OR_FALLBACKS,
-              messages: openaiMessages,
-              max_tokens: 4096,
-              temperature: 0.7,
-            }),
-          });
-          if (fbRes.ok) {
-            const fbData = await fbRes.json();
-            const fbContent = fbData.choices?.[0]?.message?.content || '';
-            if (fbContent) {
-              console.warn(`[gemini-chat] OpenRouter succeeded (free-text, key ${keyIdx + 1})!`);
-              return fbContent;
-            }
-          }
-          continue; // try next key
-        }
-
-        // 429/402 — rate limited, try next key
-        if (res.status === 429 || res.status === 402) {
-          console.warn(`[gemini-chat] OpenRouter key ${keyIdx + 1} rate limited. Trying next key...`);
-          continue;
-        }
-
-        // Other error — try next key
-        console.warn(`[gemini-chat] OpenRouter failed (key ${keyIdx + 1}, status ${res.status})`);
-        continue;
-      } catch (err) {
-        console.warn(`[gemini-chat] OpenRouter error (key ${keyIdx + 1}):`, err instanceof Error ? err.message : String(err));
-        continue;
-      }
-    }
-    console.warn('[gemini-chat] All OpenRouter keys exhausted. Falling back to Groq...');
-  }
-
-  // ─── Fall back to Groq (original code below) ───────────────────────────
+  // ─── Groq cascade (original code) ────────────────────────────────────
 
   const modelConfigs = [
     // `supportsJsonMode` controls whether we set `response_format: { type: "json_object" }`
@@ -570,6 +454,49 @@ export async function geminiChatCall(
           throw err;
         }
       }
+    }
+  }
+
+  // ─── OpenRouter fallback (only if ALL Groq models failed) ─────────────
+  const orApiKeys = process.env.OPENROUTER_API_KEY
+    ? [process.env.OPENROUTER_API_KEY,
+       process.env.OPENROUTER_API_KEY_2,
+       process.env.OPENROUTER_API_KEY_3,
+       process.env.OPENROUTER_API_KEY_4,
+       process.env.OPENROUTER_API_KEY_5,
+      ].filter(Boolean) as string[]
+    : [];
+  const orAppUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://omniparse-ai.vercel.app';
+
+  if (orApiKeys.length > 0) {
+    console.warn('[gemini-chat] All Groq models exhausted. Trying OpenRouter as last resort...');
+    for (let keyIdx = 0; keyIdx < orApiKeys.length; keyIdx++) {
+      const orKey = orApiKeys[keyIdx];
+      try {
+        const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${orKey}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': orAppUrl,
+            'X-Title': 'OmniParse AI',
+          },
+          body: JSON.stringify({
+            model: 'inclusionai/ling-3.0-flash-fin:free',
+            fallbacks: ['nvidia/llama-3.1-nemotron-70b-instruct:free', 'meta-llama/llama-3.3-70b-instruct:free', 'openrouter/free'],
+            messages: openaiMessages,
+            max_tokens: 4096,
+            temperature: 0.7,
+            response_format: { type: 'json_object' },
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const content = data.choices?.[0]?.message?.content || '';
+          if (content) return content;
+        }
+        if (res.status === 429 || res.status === 402) continue;
+      } catch { continue; }
     }
   }
 
