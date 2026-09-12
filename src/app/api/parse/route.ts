@@ -532,6 +532,19 @@ export async function POST(req: NextRequest) {
         const textHint = pdfText.length < 30
           ? '\n\nNOTE: The extracted text is very short. Do your best to extract any useful information from it.'
           : '';
+
+        // Pre-process: convert European number formats to standard format
+        // so the AI doesn't misparse "12 705,00" as "7.00"
+        // Pattern: digits, space/dot, 3 digits, comma, 2 digits → standard float
+        // Example: "12 705,00" → "12705.00", "1.234,56" → "1234.56"
+        const normalizedText = pdfText
+          // Replace "12 705,00" → "12705.00" (space as thousands separator)
+          .replace(/(\d)\s(\d{3}),(\d{2})/g, '$1$2.$3')
+          // Replace "12.705,00" → "12705.00" (dot as thousands separator)
+          .replace(/(\d)\.(\d{3}),(\d{2})/g, '$1$2.$3')
+          // Replace remaining "1234,56" → "1234.56" (comma as decimal separator)
+          .replace(/(\d),(\d{2})\b/g, '$1.$2');
+
         const textPrompt = `You are an expert invoice parser. I will give you the extracted text from a PDF invoice. Parse it and return ONLY valid JSON.
 
 The invoice may be in ANY language. Map foreign labels:
@@ -562,7 +575,7 @@ Return ONLY valid JSON with no markdown, no code fences, no explanation. Use thi
 }
 
 IMPORTANT: For each field, estimate your extraction confidence (0.0 to 1.0). If a field is not found, use null. Extract all line items if present. Be precise with numbers — parse European number formats correctly.${customFieldPrompt}${textHint}`;
-        responseText = await geminiChatCall(textPrompt, [{ role: 'user', content: `Here is the invoice text:\n\n${pdfText}` }]);
+        responseText = await geminiChatCall(textPrompt, [{ role: 'user', content: `Here is the invoice text (numbers normalized to standard format):\n\n${normalizedText}` }]);
       }
     } else {
       // Image files: send to vision model
