@@ -44,7 +44,11 @@ function extractFieldsFromProse(text: string): Record<string, unknown> {
   // a value (after a colon, equals, or "is").
 
   // Vendor: English, Czech, Slovak, German, French, Spanish, Italian, Polish, Portuguese
+  // Also handles reasoning model format: **Vendor (Dodavatel):** "Alfa Tech s.r.o."
   const vendorPatterns = [
+    // Reasoning model format: **Vendor (Dodavatel):** "value" or **Vendor:** value
+    /\*{0,2}vendor\s*\(?(?:dodavatel|prodávající|lieferant|fournisseur|proveedor)?\)?\*{0,2}\s*[:=]\s*["']?([A-Za-z][A-Za-z0-9\s&.,ěščřžýáíéúůťďňóöüäëïçàâîûôąćęłńóśźżãõáàéêóô]+?)["']?(?:\s*[.\n,(]|$)/i,
+    // Standard format
     /(?:vendor|company|from|supplier|seller)\s*(?:is|:|=)\s*["']?([A-Za-z][A-Za-z0-9\s&.,ěščřžýáíéúůťďňóöüäëïçàâîûôąćęłńóśźżãõáàéêóô]+?)["']?(?:\s*[.\n,]|$)/i,
     // Czech
     /(?:dodavatel|poskytovatel|prodávající)\s*(?:is|:|=|je)?\s*["']?([A-Za-z][A-Za-z0-9\s&.,ěščřžýáíéúůťďňóöüäëïçàâîûôąćęłńóśźż]+?)["']?(?:\s*[.\n,]|$)/i,
@@ -76,6 +80,8 @@ function extractFieldsFromProse(text: string): Record<string, unknown> {
 
   // Invoice number: match patterns in multiple languages
   const invNumPatterns = [
+    // Reasoning model format: **Invoice Number (Číslo dokladu):** "202609015"
+    /\*{0,2}invoice\s*number\s*\(?(?:číslo\s*dokladu|variabilný\s*symbol|rechnungsnummer|numéro)?\)?\*{0,2}\s*[:=]?\s*["']?([0-9A-Z][0-9A-Z\-\/.]+)["']?/i,
     // English
     /(?:invoice\s*(?:number|#|no))\s*(?:is|:|=)?\s*["']?([A-Z0-9][A-Z0-9\-\/.]+)["']?/i,
     // Czech
@@ -593,7 +599,7 @@ IMPORTANT: For each field, estimate your extraction confidence (0.0 to 1.0). If 
     // ─── Clean the AI response before parsing as JSON ────────────────────
     // The vision model (qwen3.6-27b) is a reasoning model and may leak its
     // thinking process before the JSON output. We need to extract just the
-    // JSON from the response. Same patterns as the chat cleanup system.
+    // JSON from the response.
     let cleanResponse = responseText;
 
     // Strategy 1: Extract from markdown code fences (```json ... ```)
@@ -602,24 +608,35 @@ IMPORTANT: For each field, estimate your extraction confidence (0.0 to 1.0). If 
       cleanResponse = fenceMatch[1].trim();
     }
 
-    // Strategy 2: If no fence, find the first { and last } — extract JSON object
+    // Strategy 2: Find the ACTUAL JSON object by looking for {"vendor" or
+    // { "vendor" — this is the start of our expected JSON schema.
+    // The reasoning model writes thinking text that may contain { characters
+    // inside prose (e.g. "Vendor (Dodavatel): {Alfa Tech}"), so we can't
+    // just use the first {.
     if (!fenceMatch) {
-      const firstBrace = cleanResponse.indexOf('{');
-      const lastBrace = cleanResponse.lastIndexOf('}');
-      if (firstBrace >= 0 && lastBrace > firstBrace) {
-        cleanResponse = cleanResponse.slice(firstBrace, lastBrace + 1);
+      // Try to find the JSON object that starts with {"vendor or { "vendor
+      const jsonStartMatch = cleanResponse.match(/\{\s*"vendor"\s*:/);
+      if (jsonStartMatch && jsonStartMatch.index !== undefined) {
+        const lastBrace = cleanResponse.lastIndexOf('}');
+        if (lastBrace > jsonStartMatch.index) {
+          cleanResponse = cleanResponse.slice(jsonStartMatch.index, lastBrace + 1);
+        }
+      } else {
+        // Fallback: find first { and last }
+        const firstBrace = cleanResponse.indexOf('{');
+        const lastBrace = cleanResponse.lastIndexOf('}');
+        if (firstBrace >= 0 && lastBrace > firstBrace) {
+          cleanResponse = cleanResponse.slice(firstBrace, lastBrace + 1);
+        }
       }
     }
 
-    // Strategy 3: Remove common thinking prefixes (same patterns as chat)
-    // The vision model sometimes writes "The user wants me to..." before the JSON
+    // Strategy 3: Remove common thinking prefixes
     cleanResponse = cleanResponse.replace(/^[\s\S]*?(?=\{)/, (match) => {
-      // Only strip if the text before the first { looks like thinking
       const beforeJson = match.trim();
       if (beforeJson.length < 5) return match;
-      // Check for common thinking patterns
       if (/the user wants|I need to|I should|I will|I'll|I'm going to|Let me|The user is/i.test(beforeJson)) {
-        return ''; // Strip everything before the first {
+        return '';
       }
       return match;
     });
