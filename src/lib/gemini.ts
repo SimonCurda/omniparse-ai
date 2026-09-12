@@ -87,42 +87,19 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
     openaiMessages.push({ role: msg.role === 'model' ? 'assistant' : 'user', content: parts });
   }
 
-  // ─── Try Groq vision model first (better at Czech/European invoices) ──
-  // Groq's qwen3.6-27b is a reasoning model that handles Czech, German,
-  // French invoices well. OpenRouter's free models are less reliable for
-  // non-English documents, so we try Groq first and fall back to OpenRouter.
-  try {
-    console.warn(`[gemini] Trying Groq vision model: ${VISION_MODEL}...`);
-    const res = await fetch(GROQ_API_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: VISION_MODEL,
-        messages: openaiMessages,
-        max_tokens: MAX_TOKENS_LOW,
-        temperature: 0.1,
-      }),
-    });
+  // ─── Try OpenRouter vision models FIRST ──────────────────────────────
+  // OpenRouter's Gemma 4 models produce clean JSON without thinking leaks.
+  // Groq's qwen3.6-27b is a reasoning model that leaks its thinking into
+  // JSON values (e.g. vendor="High confidence", invoiceNumber="High"),
+  // producing garbage for non-English invoices.
+  //
+  // So for VISION (image) extraction, we try OpenRouter first (clean JSON),
+  // and only fall back to Groq's qwen as a last resort.
+  //
+  // NOTE: This is the OPPOSITE of the TEXT path (geminiChatCall), which
+  // tries Groq first because Groq's llama models are better at text parsing
+  // and don't have the thinking-leak problem.
 
-    if (res.ok) {
-      const data = await res.json();
-      const content = data.choices?.[0]?.message?.content || '';
-      if (content) {
-        console.warn(`[gemini] Groq vision model ${VISION_MODEL} succeeded!`);
-        return content;
-      }
-    }
-
-    // Groq rate-limited or failed — fall through to OpenRouter
-    console.warn(`[gemini] Groq vision model ${VISION_MODEL} failed (${res.status}), falling back to OpenRouter...`);
-  } catch (err) {
-    console.warn('[gemini] Groq vision call failed, falling back to OpenRouter...', err instanceof Error ? err.message : String(err));
-  }
-
-  // ─── Multi-key OpenRouter fallback ───────────────────────────────────
   const orApiKeys = process.env.OPENROUTER_API_KEY
     ? [process.env.OPENROUTER_API_KEY,
        process.env.OPENROUTER_API_KEY_2,
@@ -233,7 +210,42 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
     }
   }
 
-  throw new Error('All vision models (Groq + OpenRouter) are temporarily unavailable. Please try again in a moment.');
+  // ─── Last resort: Groq vision model (qwen3.6-27b) ────────────────────
+  // This is a reasoning model that may leak thinking into JSON values.
+  // Only used when ALL OpenRouter models are unavailable.
+  // The prose-to-JSON fallback in parse/route.ts will attempt to clean up.
+  try {
+    console.warn(`[gemini] Trying Groq vision model: ${VISION_MODEL} (last resort)...`);
+    const res = await fetch(GROQ_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: VISION_MODEL,
+        messages: openaiMessages,
+        max_tokens: MAX_TOKENS_LOW,
+        temperature: 0.1,
+      }),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      const content = data.choices?.[0]?.message?.content || '';
+      if (content) {
+        console.warn(`[gemini] Groq vision model ${VISION_MODEL} succeeded (last resort)!`);
+        return content;
+      }
+    }
+
+    const errText = await res.text().catch(() => '');
+    console.warn(`[gemini] Groq vision model ${VISION_MODEL} also failed (${res.status})`);
+  } catch (err) {
+    console.warn('[gemini] Groq vision call failed:', err instanceof Error ? err.message : String(err));
+  }
+
+  throw new Error('All vision models (OpenRouter + Groq) are temporarily unavailable. Please try again in a moment.');
 }
 
 /**

@@ -639,19 +639,86 @@ IMPORTANT: For each field, estimate your extraction confidence (0.0 to 1.0). If 
           parsed = JSON.parse(jsonMatch[0]);
         } catch {
           // ─── LAST RESORT: Prose-to-JSON extraction ──────────────────
-          // If the model wrote its analysis as prose (e.g. "The vendor is
-          // Acme Corp. The invoice number is INV-2026-001..."), try to
-          // extract the fields from the text using pattern matching.
           parsed = extractFieldsFromProse(responseText);
           if (Object.keys(parsed).length === 0) {
             return NextResponse.json({ error: 'AI response could not be parsed as valid JSON.', raw: responseText }, { status: 500 });
           }
         }
       } else {
-        // No JSON found at all — try prose extraction
         parsed = extractFieldsFromProse(responseText);
         if (Object.keys(parsed).length === 0) {
           return NextResponse.json({ error: 'AI response could not be parsed as valid JSON.', raw: responseText }, { status: 500 });
+        }
+      }
+    }
+
+    // ─── Post-parse cleanup: detect and fix thinking-leak field values ──
+    // Reasoning models (qwen3.6-27b) sometimes leak their thinking into
+    // JSON values. Examples:
+    //   vendor: "High confidence" → should be the actual vendor name
+    //   invoiceNumber: "High" → should be the actual invoice number
+    //   vendor: "The vendor is Acme Corp" → should be "Acme Corp"
+    // We detect and clean these patterns.
+    const THINKING_LEAK_PATTERNS = /^(high|low|medium|none|n\/a|not found|unknown|the vendor is|the invoice number is|confidence:?\s)/i;
+    const stringFields = ['vendor', 'invoiceNumber', 'invoiceDate', 'dueDate', 'currency'];
+    for (const field of stringFields) {
+      if (typeof parsed[field] === 'string') {
+        const val = (parsed[field] as string).trim();
+        // Check for thinking leaks
+        if (THINKING_LEAK_PATTERNS.test(val) || val.toLowerCase() === 'high confidence') {
+          console.warn(`[parse] Detected thinking-leak in field "${field}": "${val}" → setting to null`);
+          parsed[field] = null;
+        }
+        // Check for "The vendor is X" pattern → extract X
+        const prefixMatch = val.match(/^the\s+(?:vendor|invoice\s+number|date|currency)\s+is\s+(.+)/i);
+        if (prefixMatch) {
+          parsed[field] = prefixMatch[1].trim();
+        }
+      }
+    }
+
+    // ─── Post-parse cleanup: fix European number format in numeric fields ──
+    // The AI might return numbers as strings with European format
+    // (e.g. "12 705,00" or "12705,00"). Convert to proper float.
+    const numericFields = ['amount', 'vatAmount', 'total'];
+    for (const field of numericFields) {
+      if (typeof parsed[field] === 'string') {
+        const strVal = parsed[field] as string;
+        // Remove currency symbols, spaces, and convert comma to dot
+        const cleaned = strVal
+          .replace(/[€$£¥Kč\sczk]/gi, '')
+          .replace(/(\d)\.(\d{3})/g, '$1$2')  // remove dot-separated thousands
+          .replace(/,/g, '.');                   // comma → dot
+        const num = parseFloat(cleaned);
+        if (!isNaN(num)) {
+          parsed[field] = num;
+          console.warn(`[parse] Converted field "${field}" from string "${strVal}" to number ${num}`);
+        }
+      }
+    }
+
+    // ─── Post-parse cleanup: detect VAT rate mistaken for VAT amount ──
+    // If vatAmount is a small number that looks like a percentage (e.g. 21.00
+    // when the VAT rate is 21%), it's probably the rate, not the amount.
+    // Fix: if vatAmount < 100 and total > 0, calculate the actual VAT from
+    // the total (assuming the total includes VAT).
+    if (typeof parsed.vatAmount === 'number' && typeof parsed.total === 'number' && parsed.total > 0) {
+      const vat = parsed.vatAmount as number;
+      const total = parsed.total as number;
+      // If the VAT "amount" looks like a percentage (0-100) and is much
+      // smaller than what the actual VAT should be, recalculate
+      if (vat > 0 && vat <= 100 && vat < total * 0.01) {
+        // Try to find the VAT rate from the document
+        const possibleRates = [21, 20, 19, 15, 10, 25, 12, 5, 0]; // common EU rates
+        for (const rate of possibleRates) {
+          if (Math.abs(vat - rate) < 0.5) {
+            // Found the rate — calculate actual VAT amount
+            const calculatedVat = Math.round(total * rate / (100 + rate) * 100) / 100;
+            console.warn(`[parse] VAT ${vat} looks like rate ${rate}%, not amount. Recalculated VAT amount: ${calculatedVat} (from total ${total})`);
+            parsed.vatAmount = calculatedVat;
+            parsed.amount = Math.round((total - calculatedVat) * 100) / 100;
+            break;
+          }
         }
       }
     }
