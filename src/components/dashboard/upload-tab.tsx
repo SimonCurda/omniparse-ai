@@ -315,7 +315,18 @@ export function UploadTab() {
                         <td className="px-4 py-2.5 font-medium">{r.vendor || 'Unknown'}</td>
                         <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground hidden md:table-cell">{r.invNumber || '-'}</td>
                         <td className="px-4 py-2.5 text-muted-foreground hidden sm:table-cell">{r.invDate || '-'}</td>
-                        <td className="px-4 py-2.5 text-right font-medium">${(r.total ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                        <td className="px-4 py-2.5 text-right font-medium">{(() => {
+                          try {
+                            return new Intl.NumberFormat('en-US', {
+                              style: 'currency',
+                              currency: (r.currency || 'USD').toUpperCase(),
+                              currencyDisplay: 'narrowSymbol',
+                              minimumFractionDigits: 2,
+                            }).format(r.total ?? 0);
+                          } catch {
+                            return `${(r.total ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} ${r.currency || 'USD'}`;
+                          }
+                        })()}</td>
                         <td className="px-4 py-2.5 text-center hidden sm:table-cell">
                           {r.validationStatus === 'fail' ? (
                             <Badge variant="secondary" className="bg-red-500/10 text-red-500 gap-1"><ShieldX className="h-3 w-3" /> Fail</Badge>
