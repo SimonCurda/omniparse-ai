@@ -341,9 +341,18 @@ function buildVlmPrompt(customFieldsPart: string): string {
   const customSuffix = customFieldsPart ? ',\n  ...customFieldsHere' : '';
   return `You are an invoice parser. Extract ALL visible fields from the document image.
 
-IMPORTANT: The invoice may be in ANY language (English, Czech, German, French, Spanish, etc.). Extract the fields regardless of the document language. Map foreign-language labels to their English equivalents (e.g. "Dodavatel" = vendor, "Číslo dokladu" = invoice number, "Celkem" = total, "DPH" = VAT, "Kč" = CZK, "Datum" = date).
+IMPORTANT: The invoice may be in ANY language (English, Czech, German, French, Spanish, etc.). Extract the fields regardless of the document language. Map foreign-language labels to their English equivalents:
+- Czech: Dodavatel/Prodávající = vendor, Číslo dokladu/č. faktury = invoice number, Datum vystavení = invoice date, Datum splatnosti = due date, Celkem/Celkem uhradit = total, DPH = VAT, Kč = CZK, Sazba DPH = VAT rate, Základ = amount (net), Položka = line item
+- German: Lieferant/Verkäufer = vendor, Rechnungsnummer = invoice number, Rechnungsdatum = invoice date, Fälligkeitsdatum = due date, Gesamtbetrag = total, MwSt/USt = VAT, € = EUR
+- French: Fournisseur/Vendeur = vendor, Numéro de facture = invoice number, Date de facture = invoice date, Date d'échéance = due date, Total/Montant TTC = total, TVA = VAT
 
-CRITICAL: Output ONLY the JSON object. Do NOT explain, do NOT analyze, do NOT write any text before or after the JSON.
+CRITICAL NUMBER PARSING RULES:
+- European number format: "12 705,00" or "12.705,00" means 12705.00 (space/dot = thousands separator, comma = decimal)
+- Always convert to standard float: "12 705,00 Kč" → 12705.00
+- "7 000,00" → 7000.00 (NOT 7.00 — the space means thousands, not decimal)
+- If a number has a space followed by 3 digits and then a comma, it's thousands: "15 300,50" → 15300.50
+
+CRITICAL: Output ONLY the JSON object. Do NOT explain, do NOT analyze, do NOT write any text before or after the JSON. Do NOT include confidence labels or field names as values — only actual data from the document.
 
 Output this EXACT JSON schema (fill in the values, use null for missing fields):
 {
@@ -371,7 +380,9 @@ Output this EXACT JSON schema (fill in the values, use null for missing fields):
 
 IMPORTANT: For each field, estimate your extraction confidence (0.0 to 1.0) in the fieldConfidence object. The overall confidence is the average of all field confidences. Be honest - if a field is unclear or smudged, give it a lower confidence. If you cannot find a field at all, use null and give that field a confidence of 0.
 
-If a field is not found, use null. Extract all line items if present. Be precise with numbers.${customFieldsPart}`;
+NEVER put confidence labels (like "High", "Low", "Medium") as field values. Only extract actual data from the document.
+
+If a field is not found, use null. Extract all line items if present. Be precise with numbers — parse European number formats correctly (space = thousands separator, comma = decimal separator).${customFieldsPart}`;
 }
 
 function extractPdfMetadata(buffer: Buffer): Record<string, unknown> | null {
@@ -523,6 +534,15 @@ export async function POST(req: NextRequest) {
           : '';
         const textPrompt = `You are an expert invoice parser. I will give you the extracted text from a PDF invoice. Parse it and return ONLY valid JSON.
 
+The invoice may be in ANY language. Map foreign labels:
+- Czech: Dodavatel=vendor, Číslo dokladu=invoice number, Datum vystavení=invoice date, Datum splatnosti=due date, Celkem/Celkem uhradit=total, DPH=VAT, Kč=CZK, Základ=amount(net)
+- German: Lieferant=vendor, Rechnungsnummer=invoice number, Rechnungsdatum=invoice date, Fälligkeitsdatum=due date, Gesamtbetrag=total, MwSt=VAT
+- French: Fournisseur=vendor, Numéro de facture=invoice number, Date d'échéance=due date, Montant TTC=total, TVA=VAT
+
+EUROPEAN NUMBER FORMAT: "12 705,00" or "12.705,00" = 12705.00 (space/dot=thousands, comma=decimal). "7 000,00" = 7000.00 NOT 7.00.
+
+NEVER put confidence labels ("High", "Low") as field values. Only extract actual data.
+
 Return ONLY valid JSON with no markdown, no code fences, no explanation. Use this EXACT schema:
 {
   "vendor": "company name or null",
@@ -541,7 +561,7 @@ Return ONLY valid JSON with no markdown, no code fences, no explanation. Use thi
   "confidence": 0.93${customFieldPrompt ? ',\n  ...customFieldsHere' : ''}
 }
 
-IMPORTANT: For each field, estimate your extraction confidence (0.0 to 1.0). If a field is not found, use null. Extract all line items if present. Be precise with numbers.${customFieldPrompt}${textHint}`;
+IMPORTANT: For each field, estimate your extraction confidence (0.0 to 1.0). If a field is not found, use null. Extract all line items if present. Be precise with numbers — parse European number formats correctly.${customFieldPrompt}${textHint}`;
         responseText = await geminiChatCall(textPrompt, [{ role: 'user', content: `Here is the invoice text:\n\n${pdfText}` }]);
       }
     } else {
