@@ -31,7 +31,7 @@ const CHAT_MODEL_FALLBACK_2 = 'qwen/qwen3.6-27b'; // last resort — reasoning m
 // Max tokens per request: stay well under the per-minute limit.
 // Responses with artifacts (tables/charts) need more tokens for the JSON.
 const MAX_TOKENS_HIGH = 4096;    // llama-3.1-8b-instant, llama-4-scout, llama-3.3-70b
-const MAX_TOKENS_LOW = 900;      // qwen — 1k OTPM limit, keep under (artifacts may truncate)
+const MAX_TOKENS_LOW = 4096;     // qwen — was 900 (truncated JSON output), now 4096 so the reasoning + JSON fits
 
 const RETRY_DELAY_MS = 2000;            // base delay before retrying a rate-limited model (doubles each retry)
 const MAX_RETRIES = 2;                  // retry each model up to 2 times on 429 (was 1)
