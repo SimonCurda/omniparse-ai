@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Test Extraction</title></head>
+<body style="font-family:monospace;max-width:900px;margin:20px auto;padding:20px">
+<h2>Test Czech Invoice Extraction</h2>
+<p>Upload the Czech invoice image and see what the AI returns.</p>
+<input type="file" id="file" accept="image/*">
+<button onclick="test()" style="background:#f59e0b;color:white;border:none;padding:10px 20px;border-radius:8px;cursor:pointer">Test Extraction</button>
+<div id="result" style="margin-top:20px;padding:16px;border:1px solid #ccc;border-radius:8px;white-space:pre-wrap;display:none"></div>
+<script>
+async function test() {
+  const file = document.getElementById('file').files[0];
+  if (!file) { alert('Pick a file first'); return; }
+  const el = document.getElementById('result');
+  el.style.display = 'block';
+  el.textContent = 'Converting image...';
+  
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    const base64 = e.target.result.split(',')[1];
+    const mime = file.type;
+    el.textContent = `Sending to AI (${base64.length} chars base64)...`;
+    
+    const token = localStorage.getItem('op_token');
+    try {
+      const res = await fetch('/api/test-extraction', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ base64, mime })
+      });
+      const data = await res.json();
+      el.innerHTML = `<b>Success:</b> ${data.success}\n<b>Elapsed:</b> ${data.elapsed}\n<b>Response length:</b> ${data.responseLength} chars\n\n<b>Raw response (first 1000 chars):</b>\n${(data.rawResponse || '').slice(0, 1000)}\n\n<b>Parsed JSON:</b>\n${data.parsed ? JSON.stringify(data.parsed, null, 2) : 'Parse error: ' + data.parseError}\n\n<b>Error:</b> ${data.error || 'none'}`;
+    } catch(err) {
+      el.textContent = 'Error: ' + err.message;
+    }
+  };
+  reader.readAsDataURL(file);
+}
+</script>
+</body></html>
