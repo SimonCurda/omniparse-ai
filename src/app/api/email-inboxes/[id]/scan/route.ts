@@ -22,7 +22,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Inbox is paused. Activate it in Settings first.' }, { status: 400 });
   }
 
-  const result = await scanInbox(id, auth.userId, { maxDurationMs: 50_000 });
+  // Parse direction from request body or query
+  const body = await req.json().catch(() => ({}));
+  const direction = body.direction === 'newest' ? 'newest' : 'oldest';
+
+  const result = await scanInbox(id, auth.userId, { maxDurationMs: 50_000, direction });
 
   return NextResponse.json(result);
 }

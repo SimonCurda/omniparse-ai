@@ -222,6 +222,9 @@ model EmailInbox {
   encryptedPassword String
   // Resume point for chunked scanning — highest UID we've already processed
   lastSeenUID       Int      @default(0)
+  // Track individually processed UIDs so "newest first" mode doesn't re-scan
+  // emails that were already processed out of order. JSON array of integers.
+  scannedUIDs       Json?
   // "manual" = every email goes to Pending Review (default, safest)
   // "trusted" = emails from trusted senders auto-import, others go to Pending
   scanMode          String   @default("manual")

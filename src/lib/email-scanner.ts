@@ -52,9 +52,10 @@ export interface ScanResult {
 export async function scanInbox(
   inboxId: string,
   userId: string,
-  options: { maxDurationMs?: number } = {},
+  options: { maxDurationMs?: number; direction?: 'oldest' | 'newest' } = {},
 ): Promise<ScanResult> {
   const maxDurationMs = options.maxDurationMs ?? 50_000; // 50s default (leaves 10s buffer under Vercel's 60s)
+  const direction = options.direction ?? 'oldest'; // default: oldest first
   const startTime = Date.now();
 
   const result: ScanResult = {
@@ -123,17 +124,39 @@ export async function scanInbox(
     // Open INBOX in READ-ONLY mode. We do NOT mark emails as \Seen
     // because that would mess up the user's unread count in their email client.
     // Instead, we track which UIDs we've already processed via the
-    // lastSeenUID field on the EmailInbox record (purely on our side).
+    // lastSeenUID field + scannedUIDs JSON array on the EmailInbox record.
     const lock = await client.getMailboxLock('INBOX');
     try {
+      // Load previously scanned UIDs (to avoid re-processing in "newest" mode)
+      const scannedSet = new Set<number>(
+        (inbox.scannedUIDs as number[] | null) ?? []
+      );
+
       // Search for messages with UID > lastSeenUID
       const searchCriteria = { uid: inbox.lastSeenUID > 0 ? `${inbox.lastSeenUID + 1}:*` : '1:*' };
-      const uids = await client.search(searchCriteria, { uid: true });
+      let uids = await client.search(searchCriteria, { uid: true });
 
       if (!uids || uids.length === 0) {
         // Nothing new
         result.nextUID = inbox.lastSeenUID;
         return result;
+      }
+
+      // Filter out UIDs we've already scanned (important for "newest" mode
+      // where we process out of order)
+      uids = uids.filter((uid: number) => !scannedSet.has(uid));
+
+      if (uids.length === 0) {
+        // All remaining emails already scanned
+        result.nextUID = inbox.lastSeenUID;
+        return result;
+      }
+
+      // Sort UIDs: ascending for "oldest", descending for "newest"
+      if (direction === 'newest') {
+        uids.sort((a: number, b: number) => b - a); // newest (highest UID) first
+      } else {
+        uids.sort((a: number, b: number) => a - b); // oldest (lowest UID) first
       }
 
       // Cap at MAX_EMAILS_PER_SCAN
@@ -296,11 +319,34 @@ export async function scanInbox(
 
       result.nextUID = lastProcessedUID;
 
-      // Update inbox with new lastSeenUID + timestamp
+      // Add processed UIDs to the scannedUIDs set (prevents re-processing
+      // in "newest" mode where we process out of order)
+      for (const uid of uidsToProcess) {
+        scannedSet.add(uid);
+      }
+
+      // In "oldest" mode, we can safely advance lastSeenUID to the highest
+      // processed UID (since we process sequentially, no gaps).
+      // In "newest" mode, we DON'T advance lastSeenUID (there are gaps —
+      // older emails between lastSeenUID and the newest batch are still
+      // unprocessed). The scannedUIDs set prevents re-processing.
+      let newLastSeenUID = inbox.lastSeenUID;
+      if (direction === 'oldest') {
+        newLastSeenUID = Math.max(inbox.lastSeenUID, ...uidsToProcess);
+      }
+
+      // Cap scannedUIDs array size to prevent unbounded growth
+      // (keep last 5000 UIDs — enough for most inboxes)
+      let scannedArray = Array.from(scannedSet).sort((a, b) => a - b);
+      if (scannedArray.length > 5000) {
+        scannedArray = scannedArray.slice(-5000); // keep the newest 5000
+      }
+
       await db.emailInbox.update({
         where: { id: inboxId },
         data: {
-          lastSeenUID: lastProcessedUID,
+          lastSeenUID: newLastSeenUID,
+          scannedUIDs: scannedArray,
           lastScannedAt: new Date(),
           lastScanError: null,
         },

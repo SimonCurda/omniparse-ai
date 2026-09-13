@@ -214,13 +214,14 @@ export function EmailInboxSettings() {
     }
   };
 
-  const handleScan = async (id: string) => {
+  const handleScan = async (id: string, direction: 'oldest' | 'newest' = 'oldest') => {
     setScanning(id);
     const token = localStorage.getItem('op_token');
     try {
       const res = await fetch(`/api/email-inboxes/${id}/scan`, {
         method: 'POST',
-        headers: { Authorization: 'Bearer ' + token },
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ direction }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -327,12 +328,24 @@ export function EmailInboxSettings() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => handleScan(inbox.id)}
+                          onClick={() => handleScan(inbox.id, 'oldest')}
                           disabled={scanning === inbox.id || !inbox.active}
                           className="h-7 text-xs"
+                          title="Scan oldest 25 unprocessed emails"
                         >
                           {scanning === inbox.id ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <RefreshCw className="h-3 w-3 mr-1" />}
-                          Scan Now
+                          Scan Oldest
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleScan(inbox.id, 'newest')}
+                          disabled={scanning === inbox.id || !inbox.active}
+                          className="h-7 text-xs"
+                          title="Scan newest 25 unprocessed emails"
+                        >
+                          {scanning === inbox.id ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <RefreshCw className="h-3 w-3 mr-1" />}
+                          Scan Newest
                         </Button>
                         <Button
                           size="sm"
