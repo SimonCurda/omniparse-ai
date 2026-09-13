@@ -184,21 +184,23 @@ export async function scanInbox(
 
         result.scanned++;
 
-        // Extract sender address from envelope
+        // Extract sender address from envelope (available from search results,
+        // before we even fetch the full message body)
         const fromAddr = msg.envelope?.from?.[0]?.address?.toLowerCase() ?? '';
         const fromName = msg.envelope?.from?.[0]?.name ?? null;
         const subject = msg.envelope?.subject ?? '(no subject)';
         const receivedAt = msg.envelope?.date ? new Date(msg.envelope.date) : new Date();
 
-        // ─── Stage 2: Sender blocklist check (free) ────────────────────
+        // ─── Stage 1: Sender blocklist check (free, instant) ───────────────
+        // Checked FIRST so we skip blocked senders before doing any work
+        // (no attachment download, no body structure parsing needed).
         if (fromAddr && blocklist.has(fromAddr)) {
           result.blocked++;
-          // Don.t mark as seen — we track via lastSeenUID
           if (uid > lastProcessedUID) lastProcessedUID = uid;
           continue;
         }
 
-        // ─── Stage 1: Find attachment ───────────────────────────────────
+        // ─── Stage 2: Find attachment ───────────────────────────────────────
         // Walk the body structure to find PDF/image parts
         const attachment = findAttachment(msg.bodyStructure);
         if (!attachment) {
