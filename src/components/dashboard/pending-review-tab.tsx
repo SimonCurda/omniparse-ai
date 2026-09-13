@@ -15,8 +15,17 @@ import {
 import {
   Inbox, CheckCircle2, XCircle, Ban, Loader2, FileText, Mail, RefreshCw,
   CheckSquare, AlertCircle, Clock, Download, RotateCcw, Undo2, ExternalLink,
+  ChevronDown, ArrowDownWideNarrow, ArrowUpWideNarrow,
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import { useAppStore } from '@/stores/app-store';
 
@@ -123,6 +132,11 @@ export function PendingReviewTab() {
   const [filter, setFilter] = useState('pending');
   const [counts, setCounts] = useState({ pending: 0, approved: 0, skipped: 0, blocked: 0 });
 
+  // Inbox list + scan state
+  const [inboxes, setInboxes] = useState<Array<{ id: string; label: string; emailAddress: string; active: boolean }>>([]);
+  const [scanning, setScanning] = useState(false);
+  const [inboxFilter, setInboxFilter] = useState<string>('all'); // 'all' or inbox ID
+
   const loadItems = useCallback(async (status?: string) => {
     const token = getToken();
     if (!token) return;
@@ -158,9 +172,76 @@ export function PendingReviewTab() {
     }
   }, [filter]);
 
+  // Load inbox list for the scan dropdown
+  const loadInboxes = useCallback(async () => {
+    const token = getToken();
+    if (!token) return;
+    try {
+      const res = await fetch('/api/email-inboxes', {
+        headers: { Authorization: 'Bearer ' + token },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setInboxes((data.inboxes || []).filter((i: { active: boolean }) => i.active));
+      }
+    } catch {
+      // silent
+    }
+  }, []);
+
+  // Scan from the Pending tab (no need to go to Settings)
+  const handleScan = async (direction: 'oldest' | 'newest') => {
+    if (inboxes.length === 0) {
+      toast.error('No active inboxes. Add one in Settings first.');
+      return;
+    }
+    setScanning(true);
+    const token = getToken();
+    if (!token) { setScanning(false); return; }
+
+    // If only one inbox, scan it directly. Otherwise scan all active inboxes.
+    let totalScanned = 0, totalPending = 0, totalSkipped = 0, totalRemaining = 0;
+    let error: string | null = null;
+
+    for (const inbox of inboxes) {
+      try {
+        const res = await fetch(`/api/email-inboxes/${inbox.id}/scan`, {
+          method: 'POST',
+          headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ direction }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          totalScanned += data.scanned || 0;
+          totalPending += data.pending || 0;
+          totalSkipped += data.skipped || 0;
+          totalRemaining += data.remaining || 0;
+          if (data.error) error = data.error;
+        } else {
+          error = data.error || 'Scan failed';
+        }
+      } catch {
+        error = 'Network error';
+      }
+    }
+
+    setScanning(false);
+
+    if (totalScanned === 0 && totalPending === 0 && !error) {
+      toast.success('No new emails to scan. All caught up!');
+    } else {
+      let msg = `Scanned: ${totalScanned} | New pending: ${totalPending} | Skipped: ${totalSkipped}`;
+      if (totalRemaining > 0) msg += ` | ${totalRemaining} remaining`;
+      if (error) msg += ` | Error: ${error}`;
+      toast.success(msg);
+    }
+    loadItems(); // refresh the pending list
+  };
+
   useEffect(() => {
     loadItems();
-  }, [loadItems]);
+    loadInboxes();
+  }, [loadItems, loadInboxes]);
 
   const approve = async (id: string, addToTrusted = false) => {
     const token = getToken();
@@ -347,6 +428,17 @@ export function PendingReviewTab() {
     else setSelectedIds(new Set(items.map((i) => i.id)));
   };
 
+  // Filter items by inbox
+  const filteredItems = inboxFilter === 'all'
+    ? items
+    : items.filter((i) => i.inboxId === inboxFilter);
+
+  // Get unique inbox labels for the filter
+  const inboxLabels: Record<string, string> = {};
+  for (const inbox of inboxes) {
+    inboxLabels[inbox.id] = inbox.label || inbox.emailAddress;
+  }
+
   const hasSelection = selectedIds.size > 0;
 
   return (
@@ -358,14 +450,45 @@ export function PendingReviewTab() {
             Pending Review
           </h2>
           <p className="text-muted-foreground mt-1">
-            {filter === 'pending' && items.length > 0
-              ? `${items.length} email${items.length !== 1 ? 's' : ''} waiting for your review.`
+            {filter === 'pending' && filteredItems.length > 0
+              ? `${filteredItems.length} email${filteredItems.length !== 1 ? 's' : ''} waiting for your review.`
               : filter === 'pending'
-                ? 'No emails waiting for review. Scan your inboxes in Settings to find new invoices.'
-                : `${items.length} ${filter} item${items.length !== 1 ? 's' : ''}.`}
+                ? 'No emails waiting. Click "Scan" below to check your inbox for new invoices.'
+                : `${filteredItems.length} ${filter} item${filteredItems.length !== 1 ? 's' : ''}.`}
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {/* Scan dropdown — replaces the need to go to Settings */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" disabled={scanning || inboxes.length === 0}>
+                {scanning ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1" />}
+                Scan Inboxes
+                <ChevronDown className="h-3 w-3 ml-1" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Scan direction</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => handleScan('newest')} className="cursor-pointer">
+                <ArrowDownWideNarrow className="h-4 w-4 mr-2" />
+                <div>
+                  <p className="font-medium">Newest first</p>
+                  <p className="text-xs text-muted-foreground">Scan the 25 most recent unprocessed emails</p>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleScan('oldest')} className="cursor-pointer">
+                <ArrowUpWideNarrow className="h-4 w-4 mr-2" />
+                <div>
+                  <p className="font-medium">Oldest first</p>
+                  <p className="text-xs text-muted-foreground">Scan the 25 oldest unprocessed emails</p>
+                </div>
+              </DropdownMenuItem>
+              {inboxes.length === 0 && (
+                <p className="text-xs text-muted-foreground px-2 py-1">No active inboxes. Add one in Settings.</p>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button variant="outline" size="sm" onClick={() => loadItems()} disabled={loading}>
             {loading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1" />}
             Refresh
@@ -373,23 +496,42 @@ export function PendingReviewTab() {
         </div>
       </div>
 
-      {/* Filter tabs */}
-      <Tabs value={filter} onValueChange={(v) => { setFilter(v); loadItems(v); }}>
-        <TabsList>
-          <TabsTrigger value="pending">
-            Pending {counts.pending > 0 && `(${counts.pending})`}
-          </TabsTrigger>
-          <TabsTrigger value="approved">
-            Approved {counts.approved > 0 && `(${counts.approved})`}
-          </TabsTrigger>
-          <TabsTrigger value="skipped">
-            Skipped {counts.skipped > 0 && `(${counts.skipped})`}
-          </TabsTrigger>
-          <TabsTrigger value="blocked">
-            Blocked {counts.blocked > 0 && `(${counts.blocked})`}
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
+      {/* Status tabs + inbox filter */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+        <Tabs value={filter} onValueChange={(v) => { setFilter(v); loadItems(v); }}>
+          <TabsList>
+            <TabsTrigger value="pending">
+              Pending {counts.pending > 0 && `(${counts.pending})`}
+            </TabsTrigger>
+            <TabsTrigger value="approved">
+              Approved {counts.approved > 0 && `(${counts.approved})`}
+            </TabsTrigger>
+            <TabsTrigger value="skipped">
+              Skipped {counts.skipped > 0 && `(${counts.skipped})`}
+            </TabsTrigger>
+            <TabsTrigger value="blocked">
+              Blocked {counts.blocked > 0 && `(${counts.blocked})`}
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        {/* Inbox/domain filter — only show if user has multiple inboxes */}
+        {inboxes.length > 1 && (
+          <div className="flex items-center gap-2 ml-auto">
+            <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+            <select
+              value={inboxFilter}
+              onChange={(e) => setInboxFilter(e.target.value)}
+              className="text-xs border rounded-md px-2 py-1.5 bg-background"
+            >
+              <option value="all">All inboxes</option>
+              {inboxes.map((inbox) => (
+                <option key={inbox.id} value={inbox.id}>{inbox.label || inbox.emailAddress}</option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
 
       {/* Bulk actions bar — only for pending items */}
       {filter === 'pending' && hasSelection && (
@@ -435,10 +577,10 @@ export function PendingReviewTab() {
           {filter === 'pending' && (
             <div className="flex items-center gap-2 px-2 py-1">
               <Checkbox checked={allSelected} onCheckedChange={toggleSelectAll} />
-              <span className="text-xs text-muted-foreground">Select all ({items.length})</span>
+              <span className="text-xs text-muted-foreground">Select all ({filteredItems.length})</span>
             </div>
           )}
-          {items.map((item) => (
+          {filteredItems.map((item) => (
             <Card key={item.id} className={`border-border/50 ${selectedIds.has(item.id) ? 'ring-2 ring-amber-500/30' : ''}`}>
               <CardContent className="p-3">
                 <div className="flex items-start gap-3">
@@ -582,51 +724,93 @@ export function PendingReviewTab() {
         </div>
       )}
 
-      {/* Preview Dialog */}
+      {/* Preview Dialog — shows full email info + attachment */}
       <Dialog open={!!previewItem} onOpenChange={(open) => { if (!open) { setPreviewItem(null); setPreviewData(null); } }}>
         <DialogContent className="sm:max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-base flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              {previewItem?.attachmentFilename || 'Attachment'}
+              <Mail className="h-4 w-4 text-amber-500" />
+              {previewItem?.subject || '(no subject)'}
             </DialogTitle>
-            <DialogDescription>
-              From {previewItem?.fromName || previewItem?.fromAddress} — {previewItem?.subject}
+            <DialogDescription className="space-y-1">
+              <div className="flex items-center gap-2 text-sm">
+                <span className="font-medium text-foreground">{previewItem?.fromName || previewItem?.fromAddress}</span>
+                {previewItem?.fromName && <span className="text-muted-foreground">&lt;{previewItem.fromAddress}&gt;</span>}
+              </div>
+              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {previewItem ? fmtRelativeTime(previewItem.receivedAt) : ''}</span>
+                <span className="flex items-center gap-1"><FileText className="h-3 w-3" /> {previewItem?.attachmentFilename}</span>
+              </div>
             </DialogDescription>
           </DialogHeader>
-          {previewLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : previewData ? (
-            <div className="rounded-lg border overflow-hidden bg-muted/30">
-              {previewData.attachmentMime.startsWith('image/') ? (
-                <img
-                  src={`data:${previewData.attachmentMime};base64,${previewData.attachmentData}`}
-                  alt={previewItem?.attachmentFilename || 'Attachment'}
-                  className="w-full h-auto max-h-[60vh] object-contain bg-white"
-                />
-              ) : previewData.attachmentMime === 'application/pdf' ? (
-                <div className="p-4">
-                  {/* Convert base64 to a Blob URL so browsers don't block it
-                      (Vercel's CSP blocks data: URLs in iframes, but blob: URLs work) */}
-                  <PdfPreview
-                    base64={previewData.attachmentData}
-                    mime={previewData.attachmentMime}
-                    filename={previewItem?.attachmentFilename || 'attachment.pdf'}
-                  />
-                </div>
-              ) : (
-                <div className="p-8 text-center text-sm text-muted-foreground">
-                  Preview not available for this file type.
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="py-8 text-center text-sm text-muted-foreground">
-              Failed to load attachment.
+
+          {/* Email info card */}
+          {previewItem && (
+            <div className="rounded-lg border bg-muted/30 p-3 space-y-2 text-sm">
+              <div className="flex items-start gap-2">
+                <span className="text-xs text-muted-foreground font-medium w-20 shrink-0">From:</span>
+                <span className="text-sm">{previewItem.fromName || previewItem.fromAddress}</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-xs text-muted-foreground font-medium w-20 shrink-0">Subject:</span>
+                <span className="text-sm">{previewItem.subject}</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-xs text-muted-foreground font-medium w-20 shrink-0">Received:</span>
+                <span className="text-sm">{new Date(previewItem.receivedAt).toLocaleString()}</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-xs text-muted-foreground font-medium w-20 shrink-0">File:</span>
+                <span className="text-sm font-mono">{previewItem.attachmentFilename}</span>
+              </div>
+              <ClassificationBadge classification={previewItem.classification} />
             </div>
           )}
+
+          {/* Attachment preview */}
+          <div>
+            <h4 className="text-sm font-semibold mb-2">Attachment Preview</h4>
+            {previewLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                <span className="text-sm text-muted-foreground ml-2">Loading...</span>
+              </div>
+            ) : previewData ? (
+              <div className="rounded-lg border overflow-hidden bg-muted/30">
+                {previewData.attachmentMime.startsWith('image/') ? (
+                  <img
+                    src={`data:${previewData.attachmentMime};base64,${previewData.attachmentData}`}
+                    alt={previewItem?.attachmentFilename || 'Attachment'}
+                    className="w-full h-auto max-h-[50vh] object-contain bg-white"
+                  />
+                ) : previewData.attachmentMime === 'application/pdf' ? (
+                  <div className="p-4">
+                    <PdfPreview
+                      base64={previewData.attachmentData}
+                      mime={previewData.attachmentMime}
+                      filename={previewItem?.attachmentFilename || 'attachment.pdf'}
+                    />
+                  </div>
+                ) : (
+                  <div className="p-8 text-center text-sm text-muted-foreground">
+                    Preview not available for this file type ({previewData.attachmentMime}).
+                    <a
+                      href={`data:${previewData.attachmentMime};base64,${previewData.attachmentData}`}
+                      download={previewItem?.attachmentFilename}
+                      className="block mt-2 text-amber-500 hover:underline"
+                    >
+                      Download file
+                    </a>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="py-8 text-center text-sm text-muted-foreground">
+                Failed to load attachment.
+              </div>
+            )}
+          </div>
+
           {previewItem && (
             <div className="flex justify-end gap-2 mt-4">
               <Button variant="ghost" size="sm" onClick={() => skip(previewItem.id)}>
