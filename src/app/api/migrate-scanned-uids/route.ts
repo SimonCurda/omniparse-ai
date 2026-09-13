@@ -3,9 +3,19 @@ import { db } from '@/lib/db';
 
 // ⚠️ TEMPORARY MIGRATION — adds the scannedUIDs column to EmailInbox table.
 // DELETE after running.
-export async function POST(req: NextRequest) {
-  const auth = await import('@/lib/auth').then(m => m.getUserFromRequest(req));
-  if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+// Auth-gated via MIGRATION_KEY (temporary env var set via Vercel API).
+
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const key = searchParams.get('key');
+  const expectedKey = process.env.MIGRATION_KEY || process.env.JWT_SECRET;
+
+  if (!expectedKey) {
+    return NextResponse.json({ error: 'Neither MIGRATION_KEY nor JWT_SECRET is set' }, { status: 500 });
+  }
+  if (key !== expectedKey) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
 
   try {
     await db.$executeRaw`ALTER TABLE "EmailInbox" ADD COLUMN IF NOT EXISTS "scannedUIDs" JSONB;`;
