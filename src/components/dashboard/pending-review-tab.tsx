@@ -98,41 +98,47 @@ function ClassificationBadge({ classification }: { classification: string }) {
 
 function detectFileType(base64: string): { type: 'pdf' | 'jpeg' | 'png' | 'webp' | 'html' | 'text' | 'unknown'; mime: string } {
   try {
-    // Decode first 16 bytes
-    const binary = atob(base64.slice(0, 32));
+    // Decode first 2000 characters of base64 (~1500 bytes) — enough to detect
+    // HTML even if it starts with whitespace, MIME headers, or encoding declarations
+    const binary = atob(base64.slice(0, 2000));
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
 
-    // Check magic bytes
+    // Check magic bytes (first 4 bytes are enough for binary formats)
     if (bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46) {
       return { type: 'pdf', mime: 'application/pdf' }; // %PDF
     }
     if (bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF) {
-      return { type: 'jpeg', mime: 'image/jpeg' }; // JPEG
+      return { type: 'jpeg', mime: 'image/jpeg' };
     }
     if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47) {
-      return { type: 'png', mime: 'image/png' }; // PNG
+      return { type: 'png', mime: 'image/png' };
     }
     if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
-        bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50) {
-      return { type: 'webp', mime: 'image/webp' }; // RIFF...WEBP
+        bytes.length > 11 && bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50) {
+      return { type: 'webp', mime: 'image/webp' };
     }
 
-    // Check for HTML (forwarded emails often come as HTML attachments)
-    const text = binary.slice(0, 200).toLowerCase();
-    if (text.includes('<!doctype html') || text.includes('<html') || text.includes('<head>') || text.includes('<body')) {
+    // Check for HTML anywhere in the first 1500 bytes.
+    // Forwarded emails often start with MIME headers like:
+    //   "Content-Type: text/html; charset=utf-8\r\nContent-Transfer-Encoding: ..."
+    // before the actual <html> tag. We need to scan more bytes.
+    const text = binary.toLowerCase();
+    if (text.includes('<!doctype html') || text.includes('<html') || text.includes('<head') ||
+        text.includes('<body') || text.includes('<table') || text.includes('<div') ||
+        text.includes('content-type: text/html') || text.includes('<meta ')) {
       return { type: 'html', mime: 'text/html' };
     }
     if (text.includes('<?xml')) {
-      return { type: 'html', mime: 'text/html' }; // XML is similar enough
+      return { type: 'html', mime: 'text/html' };
     }
 
-    // Check if it's plain text
+    // Check if it's plain text (high ratio of printable ASCII characters)
     let printable = 0;
-    for (let i = 0; i < Math.min(bytes.length, 100); i++) {
+    for (let i = 0; i < Math.min(bytes.length, 200); i++) {
       if ((bytes[i] >= 32 && bytes[i] <= 126) || bytes[i] === 9 || bytes[i] === 10 || bytes[i] === 13) printable++;
     }
-    if (printable > 80 && bytes.length > 10) {
+    if (printable > 160 && bytes.length > 20) {
       return { type: 'text', mime: 'text/plain' };
     }
   } catch {
@@ -214,10 +220,22 @@ function SmartAttachmentPreview({ base64, mime, filename }: { base64: string; mi
     // Render HTML in a sandboxed iframe via blob URL
     let blobUrl: string | null = null;
     try {
-      const binary = atob(base64);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      const blob = new Blob([bytes], { type: 'text/html' });
+      let htmlContent = atob(base64);
+
+      // If the content starts with MIME headers (e.g., "Content-Type: text/html..."),
+      // strip everything before the first <html> or <!DOCTYPE tag
+      const htmlStartIdx = htmlContent.search(/<(!doctype|html|head|body|meta|table|div)/i);
+      if (htmlStartIdx > 0) {
+        htmlContent = htmlContent.slice(htmlStartIdx);
+      }
+
+      // Wrap in a basic HTML structure if not already
+      if (!htmlContent.toLowerCase().includes('<html')) {
+        htmlContent = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:system-ui,sans-serif;padding:20px;color:#333;line-height:1.5;} table{border-collapse:collapse;width:100%;} td,th{padding:8px;border:1px solid #ddd;}</style></head><body>${htmlContent}</body></html>`;
+      }
+
+      const bytes = new TextEncoder().encode(htmlContent);
+      const blob = new Blob([bytes], { type: 'text/html;charset=utf-8' });
       blobUrl = URL.createObjectURL(blob);
     } catch {}
 
@@ -230,7 +248,7 @@ function SmartAttachmentPreview({ base64, mime, filename }: { base64: string; mi
               src={blobUrl}
               className="w-full h-[50vh] border-0 rounded bg-white"
               title="Email HTML preview"
-              sandbox="allow-same-origin"
+              sandbox="allow-same-origin allow-popups"
             />
           ) : (
             <div className="p-8 text-center text-sm text-muted-foreground">Failed to render HTML.</div>
