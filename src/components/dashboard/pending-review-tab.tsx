@@ -87,13 +87,61 @@ function ClassificationBadge({ classification }: { classification: string }) {
   );
 }
 
-// ─── PDF preview component ──────────────────────────────────────────────────
-// Uses pdf.js to render the PDF onto a <canvas> element. This avoids
-// Content-Security-Policy issues with iframes — Vercel's CSP blocks blob:
-// URLs in frame-src, but canvas rendering is pure JavaScript and isn't
-// subject to frame-src restrictions.
+// ─── Smart attachment preview ──────────────────────────────────────────────
+// Detects the actual file type from magic bytes (first few bytes of the file)
+// instead of trusting the MIME type from the email scanner, which can be wrong.
 //
-// The actual rendering logic lives in the PdfViewer component.
+// This fixes cases where:
+// - MIME says application/pdf but the file is actually an image or HTML
+// - MIME says application/octet-stream but it's actually a PDF
+// - The file is a forwarded email body (HTML) stored as an attachment
+
+function detectFileType(base64: string): { type: 'pdf' | 'jpeg' | 'png' | 'webp' | 'html' | 'text' | 'unknown'; mime: string } {
+  try {
+    // Decode first 16 bytes
+    const binary = atob(base64.slice(0, 32));
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+
+    // Check magic bytes
+    if (bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46) {
+      return { type: 'pdf', mime: 'application/pdf' }; // %PDF
+    }
+    if (bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF) {
+      return { type: 'jpeg', mime: 'image/jpeg' }; // JPEG
+    }
+    if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47) {
+      return { type: 'png', mime: 'image/png' }; // PNG
+    }
+    if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
+        bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50) {
+      return { type: 'webp', mime: 'image/webp' }; // RIFF...WEBP
+    }
+
+    // Check for HTML (forwarded emails often come as HTML attachments)
+    const text = binary.slice(0, 200).toLowerCase();
+    if (text.includes('<!doctype html') || text.includes('<html') || text.includes('<head>') || text.includes('<body')) {
+      return { type: 'html', mime: 'text/html' };
+    }
+    if (text.includes('<?xml')) {
+      return { type: 'html', mime: 'text/html' }; // XML is similar enough
+    }
+
+    // Check if it's plain text
+    let printable = 0;
+    for (let i = 0; i < Math.min(bytes.length, 100); i++) {
+      if ((bytes[i] >= 32 && bytes[i] <= 126) || bytes[i] === 9 || bytes[i] === 10 || bytes[i] === 13) printable++;
+    }
+    if (printable > 80 && bytes.length > 10) {
+      return { type: 'text', mime: 'text/plain' };
+    }
+  } catch {
+    // If decoding fails, fall through to unknown
+  }
+  return { type: 'unknown', mime: 'application/octet-stream' };
+}
+
+// ─── PDF preview component ──────────────────────────────────────────────────
 
 import { PdfViewer } from './pdf-viewer';
 
@@ -116,6 +164,118 @@ function PdfPreview({ base64, mime, filename }: { base64: string; mime: string; 
       >
         <Download className="h-4 w-4" /> Download {filename}
       </a>
+    </div>
+  );
+}
+
+// ─── Smart attachment preview wrapper ──────────────────────────────────────
+// Detects actual file type from magic bytes, then renders the appropriate
+// preview (PDF canvas, image inline, HTML rendered, text displayed).
+
+function SmartAttachmentPreview({ base64, mime, filename }: { base64: string; mime: string; filename: string }) {
+  const detected = detectFileType(base64);
+  const fileSizeKB = Math.round((base64.length * 3) / 4 / 1024);
+
+  // Show file info bar
+  const fileInfo = (
+    <div className="flex items-center justify-between px-3 py-1.5 text-xs text-muted-foreground border-b bg-muted/50">
+      <span className="truncate">{filename || 'attachment'}</span>
+      <span className="shrink-0 ml-2">
+        {detected.mime} · {fileSizeKB < 1024 ? `${fileSizeKB} KB` : `${(fileSizeKB / 1024).toFixed(1)} MB`}
+      </span>
+    </div>
+  );
+
+  // Render based on detected type (not the claimed MIME type)
+  if (detected.type === 'pdf') {
+    return (
+      <div className="rounded-lg border overflow-hidden bg-muted/30">
+        {fileInfo}
+        <div className="p-4">
+          <PdfViewer base64={base64} filename={filename} />
+        </div>
+      </div>
+    );
+  }
+
+  if (detected.type === 'jpeg' || detected.type === 'png' || detected.type === 'webp') {
+    return (
+      <div className="rounded-lg border overflow-hidden bg-muted/30">
+        {fileInfo}
+        <img
+          src={`data:${detected.mime};base64,${base64}`}
+          alt={filename || 'Attachment'}
+          className="w-full h-auto max-h-[50vh] object-contain bg-white"
+        />
+      </div>
+    );
+  }
+
+  if (detected.type === 'html') {
+    // Render HTML in a sandboxed iframe via blob URL
+    let blobUrl: string | null = null;
+    try {
+      const binary = atob(base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const blob = new Blob([bytes], { type: 'text/html' });
+      blobUrl = URL.createObjectURL(blob);
+    } catch {}
+
+    return (
+      <div className="rounded-lg border overflow-hidden bg-muted/30">
+        {fileInfo}
+        <div className="p-2">
+          {blobUrl ? (
+            <iframe
+              src={blobUrl}
+              className="w-full h-[50vh] border-0 rounded bg-white"
+              title="Email HTML preview"
+              sandbox="allow-same-origin"
+            />
+          ) : (
+            <div className="p-8 text-center text-sm text-muted-foreground">Failed to render HTML.</div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (detected.type === 'text') {
+    let text = '';
+    try {
+      text = atob(base64);
+    } catch {}
+    return (
+      <div className="rounded-lg border overflow-hidden bg-muted/30">
+        {fileInfo}
+        <pre className="p-4 text-xs whitespace-pre-wrap break-words max-h-[50vh] overflow-auto font-mono">
+          {text.slice(0, 5000)}{text.length > 5000 ? '\n\n... (truncated)' : ''}
+        </pre>
+      </div>
+    );
+  }
+
+  // Unknown file type — show download link
+  return (
+    <div className="rounded-lg border overflow-hidden bg-muted/30">
+      {fileInfo}
+      <div className="p-8 text-center space-y-3">
+        <FileText className="h-10 w-10 mx-auto text-muted-foreground/40" />
+        <p className="text-sm text-muted-foreground">
+          Preview not available for this file type.
+        </p>
+        <p className="text-xs text-muted-foreground">
+          Detected: {detected.mime} · {fileSizeKB < 1024 ? `${fileSizeKB} KB` : `${(fileSizeKB / 1024).toFixed(1)} MB`}
+        </p>
+        <a
+          href={`data:${detected.mime};base64,${base64}`}
+          download={filename}
+          className="inline-flex items-center gap-1.5 text-sm text-amber-500 hover:underline"
+        >
+          <Download className="h-4 w-4" /> Download file
+        </a>
+      </div>
     </div>
   );
 }
@@ -767,7 +927,7 @@ export function PendingReviewTab() {
             </div>
           )}
 
-          {/* Attachment preview */}
+          {/* Attachment preview — smart detection from magic bytes */}
           <div>
             <h4 className="text-sm font-semibold mb-2">Attachment Preview</h4>
             {previewLoading ? (
@@ -776,34 +936,11 @@ export function PendingReviewTab() {
                 <span className="text-sm text-muted-foreground ml-2">Loading...</span>
               </div>
             ) : previewData ? (
-              <div className="rounded-lg border overflow-hidden bg-muted/30">
-                {previewData.attachmentMime.startsWith('image/') ? (
-                  <img
-                    src={`data:${previewData.attachmentMime};base64,${previewData.attachmentData}`}
-                    alt={previewItem?.attachmentFilename || 'Attachment'}
-                    className="w-full h-auto max-h-[50vh] object-contain bg-white"
-                  />
-                ) : previewData.attachmentMime === 'application/pdf' ? (
-                  <div className="p-4">
-                    <PdfPreview
-                      base64={previewData.attachmentData}
-                      mime={previewData.attachmentMime}
-                      filename={previewItem?.attachmentFilename || 'attachment.pdf'}
-                    />
-                  </div>
-                ) : (
-                  <div className="p-8 text-center text-sm text-muted-foreground">
-                    Preview not available for this file type ({previewData.attachmentMime}).
-                    <a
-                      href={`data:${previewData.attachmentMime};base64,${previewData.attachmentData}`}
-                      download={previewItem?.attachmentFilename}
-                      className="block mt-2 text-amber-500 hover:underline"
-                    >
-                      Download file
-                    </a>
-                  </div>
-                )}
-              </div>
+              <SmartAttachmentPreview
+                base64={previewData.attachmentData}
+                mime={previewData.attachmentMime}
+                filename={previewItem?.attachmentFilename || 'attachment'}
+              />
             ) : (
               <div className="py-8 text-center text-sm text-muted-foreground">
                 Failed to load attachment.
