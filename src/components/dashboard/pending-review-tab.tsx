@@ -157,13 +157,12 @@ function PdfPreview({ base64, mime, filename }: { base64: string; mime: string; 
       <p className="text-sm text-muted-foreground">
         Preview not available for this file type ({mime}).
       </p>
-      <a
-        href={`data:${mime};base64,${base64}`}
-        download={filename}
+      <button
+        onClick={() => downloadBlob(base64, mime, filename)}
         className="inline-flex items-center gap-1.5 text-sm text-amber-500 hover:underline"
       >
         <Download className="h-4 w-4" /> Download {filename}
-      </a>
+      </button>
     </div>
   );
 }
@@ -268,16 +267,37 @@ function SmartAttachmentPreview({ base64, mime, filename }: { base64: string; mi
         <p className="text-xs text-muted-foreground">
           Detected: {detected.mime} · {fileSizeKB < 1024 ? `${fileSizeKB} KB` : `${(fileSizeKB / 1024).toFixed(1)} MB`}
         </p>
-        <a
-          href={`data:${detected.mime};base64,${base64}`}
-          download={filename}
+        <button
+          onClick={() => downloadBlob(base64, detected.mime, filename)}
           className="inline-flex items-center gap-1.5 text-sm text-amber-500 hover:underline"
         >
           <Download className="h-4 w-4" /> Download file
-        </a>
+        </button>
       </div>
     </div>
   );
+}
+
+// Download helper — uses Blob URL instead of data: URL to avoid browser crashes
+// on large files (data: URLs can exceed browser URL length limits)
+function downloadBlob(base64: string, mime: string, filename: string) {
+  try {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const blob = new Blob([bytes], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (err) {
+    console.error('Download failed:', err);
+    alert('Download failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
+  }
 }
 
 export function PendingReviewTab() {

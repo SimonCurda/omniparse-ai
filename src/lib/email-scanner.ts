@@ -387,6 +387,12 @@ interface AttachmentInfo {
 /**
  * Walk the MIME body structure to find the first PDF/image attachment.
  * Returns null if no usable attachment is found.
+ *
+ * Checks multiple properties because imapflow's BODYSTRUCTURE response
+ * format varies between email servers. We check:
+ * - node.type (e.g., "application/pdf" or "APPLICATION/PDF")
+ * - node.subtype (e.g., "pdf", "jpeg")
+ * - node.filename extension as fallback
  */
 function findAttachment(structure: unknown): AttachmentInfo | null {
   if (!structure || typeof structure !== 'object') return null;
@@ -394,17 +400,40 @@ function findAttachment(structure: unknown): AttachmentInfo | null {
 
   // If this is a leaf node with a content type, check it
   if (typeof node.type === 'string') {
-    const mimeType = node.type.toLowerCase();
+    // node.type from imapflow is usually just "application/pdf" (already clean)
+    // But some servers include parameters like "application/pdf; name=file.pdf"
+    const rawType = node.type.toLowerCase().split(';')[0].trim();
+    const subtype = (node.subtype as string | undefined)?.toLowerCase()?.trim() ?? '';
     const disposition = (node.disposition as string | undefined)?.toLowerCase() ?? '';
     const params = node.parameters as Record<string, unknown> | undefined;
     const filename =
       (node.filename as string | undefined) ??
       (params?.filename as string | undefined) ??
+      (params?.name as string | undefined) ??
       'attachment';
 
-    // Check by MIME type
-    if (ALLOWED_ATTACHMENT_TYPES.has(mimeType) && disposition !== 'inline') {
-      // Skip inline images (usually email signatures / logos)
+    // Check by MIME type (application/pdf, image/jpeg, etc.)
+    const isAllowedMime = ALLOWED_ATTACHMENT_TYPES.has(rawType);
+
+    // Also check by subtype (pdf, jpeg, png, webp) — some servers
+    // report type as "application" and subtype as "pdf" separately
+    const isAllowedSubtype = ALLOWED_ATTACHMENT_EXTENSIONS.includes(subtype);
+
+    // Also check by file extension as a last resort
+    const ext = filename.split('.').pop()?.toLowerCase() ?? '';
+    const isAllowedExt = ALLOWED_ATTACHMENT_EXTENSIONS.includes(ext);
+
+    // Determine the final MIME type
+    let mimeType = rawType;
+    if (!isAllowedMime && isAllowedExt) {
+      // Infer MIME type from extension
+      if (ext === 'pdf') mimeType = 'application/pdf';
+      else if (ext === 'jpg' || ext === 'jpeg') mimeType = 'image/jpeg';
+      else if (ext === 'png') mimeType = 'image/png';
+      else if (ext === 'webp') mimeType = 'image/webp';
+    }
+
+    if ((isAllowedMime || isAllowedSubtype || isAllowedExt) && disposition !== 'inline') {
       return {
         part: String(node.partNumber ?? ''),
         filename,
