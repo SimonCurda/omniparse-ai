@@ -65,6 +65,7 @@ interface PendingApproval {
   filename: string;
   vendor: string;
   total: number;
+  currency?: string;
   invDate: string;
   approvalStatus: string;
   approvalNote?: string | null;
@@ -257,7 +258,20 @@ function ApprovalsContent({ plan }: { plan: string }) {
     ? approvals
     : approvals.filter((a) => a.approvalStatus === approvalFilter);
 
-  const fmtCurrency = (v: number) => '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2 });
+  const fmtCurrency = (v: number, currency?: string | null) => {
+    if (v == null || v === undefined) return '—';
+    const code = (currency || 'USD').toUpperCase();
+    try {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: code,
+        currencyDisplay: 'narrowSymbol',
+        minimumFractionDigits: 2,
+      }).format(v);
+    } catch {
+      return `${v.toLocaleString('en-US', { minimumFractionDigits: 2 })} ${code}`;
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -378,7 +392,7 @@ function ApprovalsContent({ plan }: { plan: string }) {
                       {filteredApprovals.map((a) => (
                         <tr key={a.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
                           <td className="px-4 py-2.5 font-medium">{a.vendor}</td>
-                          <td className="px-4 py-2.5 text-right font-mono hidden sm:table-cell">{fmtCurrency(a.total)}</td>
+                          <td className="px-4 py-2.5 text-right font-mono hidden sm:table-cell">{fmtCurrency(a.total, a.currency)}</td>
                           <td className="px-4 py-2.5 text-muted-foreground hidden md:table-cell">{a.invDate || '—'}</td>
                           <td className="px-4 py-2.5 text-center">
                             <ApprovalStatusBadge status={a.approvalStatus} />

@@ -147,31 +147,9 @@ function detectFileType(base64: string): { type: 'pdf' | 'jpeg' | 'png' | 'webp'
   return { type: 'unknown', mime: 'application/octet-stream' };
 }
 
-// ─── PDF preview component ──────────────────────────────────────────────────
+// ─── PDF viewer import ─────────────────────────────────────────────────────
 
 import { PdfViewer } from './pdf-viewer';
-
-function PdfPreview({ base64, mime, filename }: { base64: string; mime: string; filename: string }) {
-  if (mime === 'application/pdf') {
-    return <PdfViewer base64={base64} filename={filename} />;
-  }
-
-  // Fallback for non-PDF attachments (images already handled by the parent)
-  return (
-    <div className="p-8 text-center space-y-3">
-      <FileText className="h-10 w-10 mx-auto text-muted-foreground/40" />
-      <p className="text-sm text-muted-foreground">
-        Preview not available for this file type ({mime}).
-      </p>
-      <button
-        onClick={() => downloadBlob(base64, mime, filename)}
-        className="inline-flex items-center gap-1.5 text-sm text-amber-500 hover:underline"
-      >
-        <Download className="h-4 w-4" /> Download {filename}
-      </button>
-    </div>
-  );
-}
 
 // ─── Smart attachment preview wrapper ──────────────────────────────────────
 // Detects actual file type from magic bytes, then renders the appropriate

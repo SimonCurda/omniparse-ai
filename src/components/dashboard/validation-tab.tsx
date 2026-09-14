@@ -462,7 +462,7 @@ export function ValidationTab() {
                         }}
                       />
                       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">
-                        {meta.unit || '$'}
+                        {meta.unit || ''}
                       </span>
                     </div>
                   </div>
