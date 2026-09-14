@@ -398,44 +398,64 @@ function findAttachment(structure: unknown): AttachmentInfo | null {
   if (!structure || typeof structure !== 'object') return null;
   const node = structure as Record<string, unknown>;
 
-  // If this is a leaf node with a content type, check it
+  // imapflow's MessageStructureObject has:
+  // - node.part: "1", "2", "1.1", etc. (used for download())
+  // - node.type: "application" or "text" or "image" (main type only, no subtype)
+  // - node.parameters: { charset: "utf-8", name: "file.pdf" } (Content-Type params)
+  // - node.disposition: "attachment" or "inline"
+  // - node.dispositionParameters: { filename: "file.pdf" }
+  // - node.childNodes: array of child parts (for multipart)
+  //
+  // IMPORTANT: node.type is just the MAIN type ("application", not "application/pdf")
+  // There is no separate "subtype" property. We need to check:
+  // 1. The filename extension (most reliable)
+  // 2. The parameters.name (often contains the filename)
+  // 3. The dispositionParameters.filename
+
   if (typeof node.type === 'string') {
-    // node.type from imapflow is usually just "application/pdf" (already clean)
-    // But some servers include parameters like "application/pdf; name=file.pdf"
     const rawType = node.type.toLowerCase().split(';')[0].trim();
-    const subtype = (node.subtype as string | undefined)?.toLowerCase()?.trim() ?? '';
     const disposition = (node.disposition as string | undefined)?.toLowerCase() ?? '';
     const params = node.parameters as Record<string, unknown> | undefined;
+    const dispParams = node.dispositionParameters as Record<string, unknown> | undefined;
+
+    // Try to find the filename in multiple places
     const filename =
-      (node.filename as string | undefined) ??
-      (params?.filename as string | undefined) ??
+      (dispParams?.filename as string | undefined) ??
       (params?.name as string | undefined) ??
+      (params?.filename as string | undefined) ??
+      (node.filename as string | undefined) ??
       'attachment';
 
-    // Check by MIME type (application/pdf, image/jpeg, etc.)
-    const isAllowedMime = ALLOWED_ATTACHMENT_TYPES.has(rawType);
-
-    // Also check by subtype (pdf, jpeg, png, webp) — some servers
-    // report type as "application" and subtype as "pdf" separately
-    const isAllowedSubtype = ALLOWED_ATTACHMENT_EXTENSIONS.includes(subtype);
-
-    // Also check by file extension as a last resort
+    // Check by file extension (most reliable for imapflow)
     const ext = filename.split('.').pop()?.toLowerCase() ?? '';
     const isAllowedExt = ALLOWED_ATTACHMENT_EXTENSIONS.includes(ext);
 
+    // Also check if the rawType is "image" (images always have image/* MIME type)
+    const isImage = rawType === 'image';
+
+    // Check if type contains the full MIME type (some servers do this)
+    const isAllowedMime = ALLOWED_ATTACHMENT_TYPES.has(rawType);
+
     // Determine the final MIME type
-    let mimeType = rawType;
-    if (!isAllowedMime && isAllowedExt) {
-      // Infer MIME type from extension
+    let mimeType = 'application/octet-stream';
+    if (isAllowedMime) {
+      mimeType = rawType;
+    } else if (isAllowedExt) {
       if (ext === 'pdf') mimeType = 'application/pdf';
       else if (ext === 'jpg' || ext === 'jpeg') mimeType = 'image/jpeg';
       else if (ext === 'png') mimeType = 'image/png';
       else if (ext === 'webp') mimeType = 'image/webp';
+    } else if (isImage) {
+      // It's an image but we don't know the exact format
+      // Default to JPEG (most common for email attachments)
+      mimeType = 'image/jpeg';
     }
 
-    if ((isAllowedMime || isAllowedSubtype || isAllowedExt) && disposition !== 'inline') {
+    // Accept if: has allowed extension, OR is an image type, OR has allowed MIME type
+    // AND disposition is NOT "inline" (skip inline images like email signatures)
+    if ((isAllowedExt || isImage || isAllowedMime) && disposition !== 'inline') {
       return {
-        part: String(node.partNumber ?? ''),
+        part: String(node.part ?? ''),
         filename,
         mimeType,
       };

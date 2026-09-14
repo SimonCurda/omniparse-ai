@@ -111,10 +111,12 @@ export function DashboardShell() {
   }, []);
 
   // Keyboard shortcuts (user-configurable)
+  // Reload from localStorage whenever the Settings tab is opened, so custom
+  // shortcuts take effect immediately without requiring a page reload.
   const shortcutsRef = useRef<Record<string, string>>(DEFAULT_SHORTCUTS);
   useEffect(() => {
     shortcutsRef.current = loadShortcuts();
-  }, []);
+  }, [activeDashTab]);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     const tag = (e.target as HTMLElement).tagName;
