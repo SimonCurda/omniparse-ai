@@ -5,6 +5,15 @@ import { scanInbox } from '@/lib/email-scanner';
 
 // POST /api/email-inboxes/[id]/scan — manually scan an inbox for new invoices
 //
+// Query params:
+//   ?reset=true  — clear lastSeenUID + scannedUIDs before scanning, so we
+//                  re-examine every email in the inbox from the beginning.
+//                  Useful when a filter bug previously caused emails to be
+//                  silently skipped (e.g., inline image attachments).
+//
+// Body:
+//   { direction: 'oldest' | 'newest' } — default 'oldest'
+//
 // Vercel Hobby tier caps function duration at 60s. We set maxDuration = 60
 // and the scanner internally stops at ~50s to leave buffer for response.
 export const maxDuration = 60;
@@ -22,7 +31,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Inbox is paused. Activate it in Settings first.' }, { status: 400 });
   }
 
-  // Parse direction from request body or query
+  // Check for ?reset=true — clears the scan cursor so we re-examine every email
+  const url = new URL(req.url);
+  const reset = url.searchParams.get('reset') === 'true';
+  if (reset) {
+    await db.emailInbox.update({
+      where: { id },
+      data: {
+        lastSeenUID: 0,
+        scannedUIDs: [],
+      },
+    });
+  }
+
+  // Parse direction from request body
   const body = await req.json().catch(() => ({}));
   const direction = body.direction === 'newest' ? 'newest' : 'oldest';
 

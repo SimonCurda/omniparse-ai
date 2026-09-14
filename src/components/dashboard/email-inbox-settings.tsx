@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/select';
 import {
   Mail, Plus, Trash2, Loader2, RefreshCw, Ban, CheckCircle2, Clock,
-  AlertCircle, ShieldCheck,
+  AlertCircle, ShieldCheck, RotateCcw,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -244,6 +244,40 @@ export function EmailInboxSettings() {
     }
   };
 
+  const handleForceRescan = async (id: string) => {
+    if (!confirm(
+      'Force Rescan will re-examine EVERY email in your inbox from the beginning.\n\n' +
+      'This is useful if a previous bug caused emails to be silently skipped (e.g., inline image attachments).\n\n' +
+      'It will clear the scan cursor and re-process up to 25 oldest emails. Click Scan Oldest again to continue through the rest.\n\n' +
+      'Continue?'
+    )) return;
+    setScanning(id);
+    const token = localStorage.getItem('op_token');
+    try {
+      const res = await fetch(`/api/email-inboxes/${id}/scan?reset=true`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ direction: 'oldest' }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        const r = data;
+        let msg = `Rescan from start: Scanned ${r.scanned} | Pending: ${r.pending} | Skipped: ${r.skipped}`;
+        if (r.remaining > 0) msg += ` | ${r.remaining} remaining — click Scan Oldest again to continue`;
+        if (r.paused === 'time_limit') msg = `Time limit reached — click Scan Oldest to continue`;
+        if (r.error) msg = `Error: ${r.error}`;
+        toast.success(msg);
+        loadInboxes();
+      } else {
+        toast.error(data.error || 'Rescan failed');
+      }
+    } catch {
+      toast.error('Network error');
+    } finally {
+      setScanning(null);
+    }
+  };
+
   const handleToggleActive = async (inbox: EmailInbox) => {
     const token = localStorage.getItem('op_token');
     try {
@@ -346,6 +380,16 @@ export function EmailInboxSettings() {
                         >
                           {scanning === inbox.id ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <RefreshCw className="h-3 w-3 mr-1" />}
                           Scan Newest
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleForceRescan(inbox.id)}
+                          disabled={scanning === inbox.id || !inbox.active}
+                          className="h-7 w-7 p-0"
+                          title="Force Rescan — re-examine every email from the beginning (clears scan cursor). Use this if a previous bug caused emails to be skipped."
+                        >
+                          <RotateCcw className="h-3.5 w-3.5 text-muted-foreground hover:text-amber-500" />
                         </Button>
                         <Button
                           size="sm"

@@ -30,6 +30,14 @@ const ALLOWED_ATTACHMENT_EXTENSIONS = ['pdf', 'jpg', 'jpeg', 'png', 'webp'];
 const MAX_EMAILS_PER_SCAN = 25;
 const MAX_PENDING_PER_INBOX = 100;
 
+// Min size to keep an attachment. Filters out tiny inline images like
+// email signature logos (typically 1-5KB) and tracking pixels (<1KB).
+// Real invoice photos/scans are almost always >50KB.
+const MIN_ATTACHMENT_BYTES = 10 * 1024; // 10KB
+
+// Max size — matches /api/parse limit
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024; // 10MB
+
 export interface ScanResult {
   scanned: number;
   imported: number;       // auto-imported (trusted sender)
@@ -221,7 +229,18 @@ export async function scanInbox(
         const attachmentBytes = Buffer.concat(chunks);
 
         // 10 MB limit (matches /api/parse)
-        if (attachmentBytes.length > 10 * 1024 * 1024) {
+        if (attachmentBytes.length > MAX_ATTACHMENT_BYTES) {
+          result.skipped++;
+          if (uid > lastProcessedUID) lastProcessedUID = uid;
+          continue;
+        }
+
+        // Min size: skip tiny inline images (signature logos, tracking pixels).
+        // Only applies to images — PDFs are pre-filtered by disposition above.
+        if (
+          attachment.mimeType.startsWith('image/') &&
+          attachmentBytes.length < MIN_ATTACHMENT_BYTES
+        ) {
           result.skipped++;
           if (uid > lastProcessedUID) lastProcessedUID = uid;
           continue;
@@ -451,9 +470,19 @@ function findAttachment(structure: unknown): AttachmentInfo | null {
       mimeType = 'image/jpeg';
     }
 
-    // Accept if: has allowed extension, OR is an image type, OR has allowed MIME type
-    // AND disposition is NOT "inline" (skip inline images like email signatures)
-    if ((isAllowedExt || isImage || isAllowedMime) && disposition !== 'inline') {
+    // Accept if: has allowed extension, OR is an image type, OR has allowed MIME type.
+    //
+    // For images (jpg/png/webp): accept regardless of disposition. Many email
+    // clients (Gmail web drag-drop, Apple Mail, Outlook) mark image attachments
+    // as "inline" rather than "attachment" — but they're still real attachments
+    // the user wants imported. We filter signature logos via a min-size check
+    // after download (see MIN_ATTACHMENT_BYTES below).
+    //
+    // For PDFs: keep the disposition filter. Inline PDFs are rare and usually
+    // small embedded assets, not invoices.
+    const isPdf = ext === 'pdf' || rawType === 'application/pdf' || mimeType === 'application/pdf';
+    const skipDueToDisposition = isPdf && disposition === 'inline';
+    if ((isAllowedExt || isImage || isAllowedMime) && !skipDueToDisposition) {
       return {
         part: String(node.part ?? ''),
         filename,
