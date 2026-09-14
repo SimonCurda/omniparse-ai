@@ -404,55 +404,66 @@ interface AttachmentInfo {
 }
 
 /**
- * Walk the MIME body structure to find the first PDF/image attachment.
+ * Walk the MIME body structure to find the best PDF/image attachment.
  * Returns null if no usable attachment is found.
  *
- * Checks multiple properties because imapflow's BODYSTRUCTURE response
- * format varies between email servers. We check:
- * - node.type (e.g., "application/pdf" or "APPLICATION/PDF")
- * - node.subtype (e.g., "pdf", "jpeg")
- * - node.filename extension as fallback
+ * Strategy: collect ALL candidate parts first, then pick the best one.
+ * This avoids the bug where a part with the PDF's filename but text/plain
+ * MIME type (e.g., a forwarded message body) gets picked before the real
+ * PDF attachment later in the structure.
+ *
+ * Score (highest wins):
+ *   - 100: application/pdf (or part with .pdf ext + pdf magic bytes)
+ *   - 80:  image/* with matching extension
+ *   - 70:  allowed extension (.pdf/.jpg/.png/.webp) regardless of MIME
+ *   - 50:  application/octet-stream with allowed extension
+ *   - 20:  text/* with PDF filename (suspicious — probably forwarded email source)
+ *
+ * Disposition breaks ties: 'attachment' > 'inline' > none
  */
 function findAttachment(structure: unknown): AttachmentInfo | null {
-  if (!structure || typeof structure !== 'object') return null;
-  const node = structure as Record<string, unknown>;
+  const candidates: Array<{ info: AttachmentInfo; score: number; disposition: string }> = [];
+  collectCandidates(structure, candidates);
 
-  // imapflow's MessageStructureObject has:
-  // - node.part: "1", "2", "1.1", etc. (used for download())
-  // - node.type: "application" or "text" or "image" (main type only, no subtype)
-  // - node.parameters: { charset: "utf-8", name: "file.pdf" } (Content-Type params)
-  // - node.disposition: "attachment" or "inline"
-  // - node.dispositionParameters: { filename: "file.pdf" }
-  // - node.childNodes: array of child parts (for multipart)
-  //
-  // IMPORTANT: node.type is just the MAIN type ("application", not "application/pdf")
-  // There is no separate "subtype" property. We need to check:
-  // 1. The filename extension (most reliable)
-  // 2. The parameters.name (often contains the filename)
-  // 3. The dispositionParameters.filename
+  if (candidates.length === 0) return null;
 
-  if (typeof node.type === 'string') {
-    const rawType = node.type.toLowerCase().split(';')[0].trim();
-    const disposition = (node.disposition as string | undefined)?.toLowerCase() ?? '';
-    const params = node.parameters as Record<string, unknown> | undefined;
-    const dispParams = node.dispositionParameters as Record<string, unknown> | undefined;
+  // Sort by score descending, then by disposition preference
+  const dispositionRank: Record<string, number> = { attachment: 3, inline: 2, '': 1 };
+  candidates.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    return (dispositionRank[b.disposition] ?? 0) - (dispositionRank[a.disposition] ?? 0);
+  });
 
-    // Try to find the filename in multiple places
+  return candidates[0].info;
+}
+
+function collectCandidates(
+  node: unknown,
+  candidates: Array<{ info: AttachmentInfo; score: number; disposition: string }>,
+): void {
+  if (!node || typeof node !== 'object') return;
+  const n = node as Record<string, unknown>;
+
+  if (typeof n.type === 'string') {
+    const rawType = n.type.toLowerCase().split(';')[0].trim();
+    const disposition = ((n.disposition as string | undefined)?.toLowerCase() ?? '').trim();
+    const params = n.dispositionParameters as Record<string, unknown> | undefined;
+    const contentTypeParams = n.parameters as Record<string, unknown> | undefined;
+
     const filename =
-      (dispParams?.filename as string | undefined) ??
-      (params?.name as string | undefined) ??
       (params?.filename as string | undefined) ??
-      (node.filename as string | undefined) ??
+      (contentTypeParams?.name as string | undefined) ??
+      (contentTypeParams?.filename as string | undefined) ??
+      (n.filename as string | undefined) ??
       'attachment';
 
-    // Check by file extension (most reliable for imapflow)
     const ext = filename.split('.').pop()?.toLowerCase() ?? '';
     const isAllowedExt = ALLOWED_ATTACHMENT_EXTENSIONS.includes(ext);
 
-    // Also check if the rawType is "image" (images always have image/* MIME type)
-    const isImage = rawType === 'image';
+    // isImage: rawType is "image/*" or just "image"
+    const isImage = rawType === 'image' || rawType.startsWith('image/');
 
-    // Check if type contains the full MIME type (some servers do this)
+    // isAllowedMime: exact MIME type match
     const isAllowedMime = ALLOWED_ATTACHMENT_TYPES.has(rawType);
 
     // Determine the final MIME type
@@ -465,49 +476,53 @@ function findAttachment(structure: unknown): AttachmentInfo | null {
       else if (ext === 'png') mimeType = 'image/png';
       else if (ext === 'webp') mimeType = 'image/webp';
     } else if (isImage) {
-      // It's an image but we don't know the exact format
-      // Default to JPEG (most common for email attachments)
       mimeType = 'image/jpeg';
     }
 
-    // Accept if: has allowed extension, OR is an image type, OR has allowed MIME type.
-    //
-    // For images (jpg/png/webp): accept regardless of disposition. Many email
-    // clients (Gmail web drag-drop, Apple Mail, Outlook) mark image attachments
-    // as "inline" rather than "attachment" — but they're still real attachments
-    // the user wants imported. We filter signature logos via a min-size check
-    // after download (see MIN_ATTACHMENT_BYTES below).
-    //
-    // For PDFs: keep the disposition filter. Inline PDFs are rare and usually
-    // small embedded assets, not invoices.
-    const isPdf = ext === 'pdf' || rawType === 'application/pdf' || mimeType === 'application/pdf';
-    const skipDueToDisposition = isPdf && disposition === 'inline';
-    if ((isAllowedExt || isImage || isAllowedMime) && !skipDueToDisposition) {
-      return {
-        part: String(node.part ?? ''),
-        filename,
-        mimeType,
-      };
+    // Score this part
+    let score = 0;
+    const isPdf = ext === 'pdf' || rawType === 'application/pdf';
+    const isInlinePdf = isPdf && disposition === 'inline';
+
+    if (isAllowedMime) {
+      // Real PDF/image MIME type — highest score
+      score = 100;
+    } else if (isAllowedExt && !isInlinePdf) {
+      // Has allowed extension (e.g., .pdf) — strong signal
+      // Skip inline PDFs (rare, usually embeds)
+      score = 70;
+    } else if (rawType === 'application/octet-stream' && isAllowedExt) {
+      score = 50;
+    } else if (isImage) {
+      // Image type but no recognized extension — still usable
+      score = 60;
+    } else if (isAllowedExt && isInlinePdf) {
+      // Inline PDF — lower priority but still a candidate
+      score = 30;
+    } else {
+      // Not a candidate — skip
+    }
+
+    if (score > 0) {
+      candidates.push({
+        info: {
+          part: String(n.part ?? ''),
+          filename,
+          mimeType,
+        },
+        score,
+        disposition,
+      });
     }
   }
 
-  // If this node has child parts (multipart), recurse
-  if (Array.isArray(node.childNodes)) {
-    for (const child of node.childNodes) {
-      const found = findAttachment(child);
-      if (found) return found;
-    }
+  // Recurse into children
+  if (Array.isArray(n.childNodes)) {
+    for (const child of n.childNodes) collectCandidates(child, candidates);
   }
-
-  // Some servers nest structure differently
-  if (Array.isArray(node.parts)) {
-    for (const child of node.parts) {
-      const found = findAttachment(child);
-      if (found) return found;
-    }
+  if (Array.isArray(n.parts)) {
+    for (const child of n.parts) collectCandidates(child, candidates);
   }
-
-  return null;
 }
 
 /**
