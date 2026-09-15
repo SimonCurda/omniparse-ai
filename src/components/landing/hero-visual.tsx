@@ -1,6 +1,6 @@
 'use client';
 
-import { FileText, ArrowRight, Sparkles, Table2, BarChart3, Shield } from 'lucide-react';
+import { FileText, ArrowRight, Sparkles, Table2, BarChart3, Shield, Braces } from 'lucide-react';
 
 /**
  * Animated hero visual showing the invoice processing flow.
@@ -86,7 +86,7 @@ export function HeroVisual() {
           <StepCard
             step={3}
             label="Extracted Data"
-            detail
+            icon={<Braces className="h-6 w-6 text-amber-500" />}
           />
 
           <Connector step={3} />
@@ -141,7 +141,7 @@ export function HeroVisual() {
           <StepCard
             step={3}
             label="Extracted Data"
-            detail
+            icon={<Braces className="h-6 w-6 text-amber-500" />}
           />
           <MobileConnector step={3} />
 
@@ -180,14 +180,12 @@ function StepCard({
   label,
   icon,
   glow,
-  detail,
   bar,
 }: {
   step: number;
   label: string;
   icon?: React.ReactNode;
   glow?: boolean;
-  detail?: boolean;
   bar?: boolean;
 }) {
   return (
@@ -199,17 +197,7 @@ function StepCard({
           transition-colors
         `}
       >
-        {detail ? (
-          /* Mini JSON-like extracted data card */
-          <div className="flex flex-col gap-0.5 text-[9px] leading-tight font-mono">
-            <span className="text-muted-foreground">{'{ '}</span>
-            <span className="text-amber-500">vendor</span>
-            <span className="text-foreground/80 ml-1">"Acme Ltd"</span>
-            <span className="text-amber-500">total</span>
-            <span className="text-foreground/80 ml-1">1,240.00</span>
-            <span className="text-muted-foreground">{ '}' }</span>
-          </div>
-        ) : bar ? (
+        {bar ? (
           /* Mini confidence bar */
           <div className="flex flex-col items-end gap-1">
             <div className="flex items-end gap-0.5 h-7">

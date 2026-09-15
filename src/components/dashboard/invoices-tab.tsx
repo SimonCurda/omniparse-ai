@@ -1648,7 +1648,9 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                 <th className="text-center px-4 py-3 font-medium hidden xl:table-cell">Proc. Time</th>
                 <th className="text-center px-4 py-3 font-medium hidden md:table-cell">Lifecycle</th>
                 <th className="text-center px-3 py-3 font-medium w-[88px]">Checked</th>
-                <th className="px-3 py-3"></th>
+                {/* Action buttons: View + Delete (two columns) */}
+                <th className="px-3 py-3 w-8"></th>
+                <th className="px-3 py-3 w-8"></th>
               </tr>
             </thead>
             <tbody>
