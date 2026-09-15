@@ -1027,6 +1027,57 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
             )}
           </div>
 
+          {/* Email Source Provenance — shown only for invoices imported via IMAP */}
+          {(inv.customFields as Record<string, unknown> | null)?.source === 'email' && (
+            <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+              <div className="flex items-center gap-2 mb-1.5">
+                <Mail className="h-3.5 w-3.5 text-amber-600" />
+                <span className="text-xs font-semibold text-amber-700 dark:text-amber-500">
+                  Imported via Email
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                {(() => {
+                  const cf = inv.customFields as Record<string, unknown> | null;
+                  const fromAddr = cf?.emailFromAddress as string | null;
+                  const fromName = cf?.emailFromName as string | null;
+                  const subject = cf?.emailSubject as string | null;
+                  const date = cf?.emailDate as string | null;
+                  return (
+                    <>
+                      <div className="text-muted-foreground">
+                        From:{' '}
+                        <span className="text-foreground font-medium">
+                          {fromName ? `${fromName} ` : ''}{fromAddr ? `<${fromAddr}>` : 'unknown'}
+                        </span>
+                      </div>
+                      {date && (
+                        <div className="text-muted-foreground">
+                          Received:{' '}
+                          <span className="text-foreground font-medium">
+                            {(() => {
+                              try {
+                                return new Date(date).toLocaleString();
+                              } catch {
+                                return date;
+                              }
+                            })()}
+                          </span>
+                        </div>
+                      )}
+                      {subject && (
+                        <div className="text-muted-foreground sm:col-span-2 truncate" title={subject}>
+                          Subject:{' '}
+                          <span className="text-foreground font-medium">{subject}</span>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+          )}
+
           {/* Original File Viewer */}
           <div className="mt-4">
             <h4 className="text-sm font-semibold mb-2">Original File</h4>
@@ -1624,7 +1675,14 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                       <div className="font-medium flex items-center gap-1.5">
                         {showNormalized && inv.normalizedVendor ? inv.normalizedVendor : inv.vendor}
                         {(inv.customFields as Record<string, unknown> | null)?.source === 'email' && (
-                          <Mail className="h-3 w-3 text-amber-500 shrink-0" aria-label="From email" />
+                          <Badge
+                            variant="secondary"
+                            className="bg-amber-500/10 text-amber-600 border-0 text-[10px] px-1.5 py-0 gap-0.5 shrink-0"
+                            title={`From email: ${(inv.customFields as Record<string, unknown> | null)?.emailFromAddress || 'unknown sender'}`}
+                          >
+                            <Mail className="h-2.5 w-2.5" />
+                            Email
+                          </Badge>
                         )}
                         {inv.isDuplicate && (
                           <Badge variant="secondary" className="bg-amber-500/10 text-amber-500 border-0 text-[10px] px-1.5 py-0">

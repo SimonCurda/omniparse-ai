@@ -51,6 +51,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const blob = new Blob([fileBuffer], { type: item.attachmentMime });
   formData.append('file', blob, item.attachmentFilename);
 
+  // ─── Pass email provenance metadata to /api/parse ──────────────────
+  // /api/parse stamps these onto the Invoice's customFields at creation
+  // time, so the "From Email" badge works regardless of whether this
+  // approval is manual or auto-approval rules fire inside parse.
+  formData.append('emailSource', 'true');
+  if (item.fromAddress) formData.append('emailFromAddress', item.fromAddress);
+  if (item.fromName) formData.append('emailFromName', item.fromName);
+  if (item.subject) formData.append('emailSubject', item.subject);
+  if (item.receivedAt) {
+    try {
+      formData.append('emailDate', new Date(item.receivedAt).toISOString());
+    } catch { /* skip invalid date */ }
+  }
+  formData.append('pendingReviewId', id);
+
   // Get the user's auth token from the request header
   const authHeader = req.headers.get('Authorization') || '';
   const token = authHeader.replace('Bearer ', '');
@@ -83,31 +98,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const parseResult = await parseResponse.json();
   const invoiceId = parseResult.id || parseResult.invoice?.id;
 
-  // Store email source info on the Invoice record so we can show a 📧 badge
-  // in the Invoices tab and display "from email" info in the detail dialog.
-  if (invoiceId) {
-    const invoice = await db.invoice.findFirst({
-      where: { id: invoiceId, userId: auth.userId },
-      select: { id: true, customFields: true },
-    });
-    if (invoice) {
-      const existing = (invoice.customFields as Record<string, unknown> | null) ?? {};
-      await db.invoice.update({
-        where: { id: invoiceId },
-        data: {
-          customFields: {
-            ...existing,
-            source: 'email',
-            emailFromAddress: item.fromAddress,
-            emailFromName: item.fromName,
-            emailSubject: item.subject,
-            emailDate: item.receivedAt,
-            pendingReviewId: id,
-          },
-        },
-      });
-    }
-  }
+  // Note: email provenance (customFields.source='email' + email metadata) is
+  // now set at invoice creation time inside /api/parse, NOT here. This means
+  // the "From Email" badge works for:
+  //   - Manual approvals (this path)
+  //   - Auto-approval rules that fire inside /api/parse
+  //   - Future auto-approve webhooks that call /api/parse directly
+  // No post-creation customFields update needed.
 
   // Mark the pending item as approved (keep attachmentData for potential un-approve)
   await db.pendingReview.update({

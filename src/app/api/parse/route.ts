@@ -453,6 +453,26 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData();
     const file = formData.get('file');
 
+    // ─── Email source provenance ────────────────────────────────────────
+    // When the request comes from the email approval flow (or future
+    // auto-approval webhook), the caller passes email metadata as FormData
+    // fields. We stamp these onto the Invoice at creation time so the
+    // "From Email" badge shows up regardless of which path triggered parse.
+    //
+    // Fields (all optional):
+    //   emailSource         — 'true' to mark this invoice as email-originated
+    //   emailFromAddress    — sender email address
+    //   emailFromName       — sender display name
+    //   emailSubject        — email subject line
+    //   emailDate           — ISO date string when email was received
+    //   pendingReviewId     — ID of the PendingReview record this came from
+    const emailSource = formData.get('emailSource') === 'true';
+    const emailFromAddress = (formData.get('emailFromAddress') as string | null) || null;
+    const emailFromName = (formData.get('emailFromName') as string | null) || null;
+    const emailSubject = (formData.get('emailSubject') as string | null) || null;
+    const emailDate = (formData.get('emailDate') as string | null) || null;
+    const pendingReviewId = (formData.get('pendingReviewId') as string | null) || null;
+
     if (!file || !(file instanceof File)) {
       return NextResponse.json({ error: 'No file provided. Send a file in the "file" field.' }, { status: 400 });
     }
@@ -816,6 +836,20 @@ IMPORTANT: For each field, estimate your extraction confidence (0.0 to 1.0). If 
           customFieldValues[cf.name] = parsed[cf.name];
         }
       }
+    }
+
+    // ─── Stamp email provenance onto customFields ──────────────────────
+    // We add this AFTER extracting customFieldValues so the source metadata
+    // is preserved even if the user's template doesn't include a "source"
+    // field. This way, /api/parse handles source tracking once at creation
+    // time — no post-creation update needed in the approve route.
+    if (emailSource) {
+      customFieldValues.source = 'email';
+      if (emailFromAddress) customFieldValues.emailFromAddress = emailFromAddress;
+      if (emailFromName) customFieldValues.emailFromName = emailFromName;
+      if (emailSubject) customFieldValues.emailSubject = emailSubject;
+      if (emailDate) customFieldValues.emailDate = emailDate;
+      if (pendingReviewId) customFieldValues.pendingReviewId = pendingReviewId;
     }
 
     // Combine validation + variance into full results
