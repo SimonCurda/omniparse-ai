@@ -62,6 +62,7 @@ import {
   Pencil,
   Lock,
   FileDown,
+  Copy,
   Save,
   Undo2,
   FileText,
@@ -898,6 +899,12 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                   From Email
                 </Badge>
               )}
+              {inv.isDuplicate && (
+                <Badge variant="secondary" className="bg-rose-500/10 text-rose-600 dark:text-rose-400 border-0 text-xs gap-1">
+                  <Copy className="h-3 w-3" />
+                  Duplicate
+                </Badge>
+              )}
               {isReviewed(inv) && (
                 <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 border-0 text-xs">
                   <CheckCircle2 className="h-3 w-3 mr-1" />
@@ -1672,8 +1679,8 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                     </td>
                     {/* Vendor */}
                     <td className="px-4 py-3">
-                      <div className="font-medium flex items-center gap-1.5">
-                        {showNormalized && inv.normalizedVendor ? inv.normalizedVendor : inv.vendor}
+                      <div className="font-medium flex flex-wrap items-center gap-1">
+                        <span className="truncate">{showNormalized && inv.normalizedVendor ? inv.normalizedVendor : inv.vendor}</span>
                         {(inv.customFields as Record<string, unknown> | null)?.source === 'email' && (
                           <Badge
                             variant="secondary"
@@ -1685,7 +1692,12 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                           </Badge>
                         )}
                         {inv.isDuplicate && (
-                          <Badge variant="secondary" className="bg-amber-500/10 text-amber-500 border-0 text-[10px] px-1.5 py-0">
+                          <Badge
+                            variant="secondary"
+                            className="bg-rose-500/10 text-rose-600 dark:text-rose-400 border-0 text-[10px] px-1.5 py-0 shrink-0"
+                            title="This invoice matches another invoice from the same vendor with the same total and date"
+                          >
+                            <Copy className="h-2.5 w-2.5" />
                             Duplicate
                           </Badge>
                         )}
