@@ -50,6 +50,59 @@ export interface ScanResult {
   error?: string;
 }
 
+// ─── Human-readable IMAP errors ────────────────────────────────────────────
+//
+// Raw IMAP error strings from Node + ImapFlow are cryptic (e.g.,
+// "getaddrinfo ENOTFOUND imap.gmial.com"). This helper pattern-matches
+// common error families and returns a clear English message that tells the
+// user what's wrong + what to do about it.
+
+export function humanizeImapError(err: unknown, host?: string): string {
+  const raw = err instanceof Error ? err.message : String(err);
+  const lower = raw.toLowerCase();
+  const displayHost = host ?? 'the mail server';
+
+  // Network / DNS errors
+  if (lower.includes('enotfound') || lower.includes('getaddrinfo')) {
+    return `Can't reach ${displayHost}. Check the IMAP host is spelled correctly (e.g., "imap.gmail.com" not "imap.gmial.com").`;
+  }
+  if (lower.includes('etimedout') || lower.includes('timeout') || lower.includes('esockettimedout')) {
+    return `Connection to ${displayHost} timed out. The server may be slow, blocking your connection, or your network is unstable.`;
+  }
+  if (lower.includes('econnrefused')) {
+    return `Connection refused by ${displayHost}. The IMAP port (probably 993) may be wrong or blocked by a firewall.`;
+  }
+  if (lower.includes('econnreset') || lower.includes('socket hang up')) {
+    return `Connection was dropped by ${displayHost} mid-handshake. This is usually transient — try again in a moment.`;
+  }
+
+  // TLS / SSL errors
+  if (lower.includes('certificate') || lower.includes('tls') || lower.includes('ssl')) {
+    return `TLS/SSL handshake failed with ${displayHost}. The server's certificate may be invalid, or you may need port 993 instead of 143.`;
+  }
+
+  // Auth errors
+  if (lower.includes('authenticationfailed') || lower.includes('invalid credentials') ||
+      lower.includes('login failed') || lower.includes('auth failed') ||
+      lower.includes('username and password not accepted')) {
+    return `Wrong username or password. If you're using Gmail, Outlook, or Yahoo, you must use an App Password (not your regular account password). See the "How to get an app password" link next to the provider selector.`;
+  }
+
+  // Mailbox errors
+  if (lower.includes('mailbox') && lower.includes('not found') || lower.includes('no mailbox')) {
+    return `The INBOX folder was not found on this server. Some providers use a different folder name (e.g., "All Mail").`;
+  }
+
+  // Rate limiting
+  if (lower.includes('rate') || lower.includes('too many') || lower.includes('throttl')) {
+    return `${displayHost} is rate-limiting your account. Wait a few minutes and try again.`;
+  }
+
+  // Generic fallback — show the raw error in parens so the user (and support)
+  // can still see what happened.
+  return `IMAP error: ${raw.slice(0, 200)}`;
+}
+
 /**
  * Scan a single inbox for new invoice emails.
  *
@@ -208,55 +261,29 @@ export async function scanInbox(
           continue;
         }
 
-        // ─── Stage 2: Find attachment ───────────────────────────────────────
-        // Walk the body structure to find PDF/image parts
-        const attachment = findAttachment(msg.bodyStructure);
-        if (!attachment) {
+        // ─── Stage 2: Find ALL attachments ────────────────────────────────
+        // Walk the body structure to find all PDF/image parts.
+        // Many vendors send invoice.pdf + receipt.pdf in one email — we save
+        // each as a separate PendingReview so the user can approve independently.
+        const attachments = findAttachments(msg.bodyStructure);
+        if (attachments.length === 0) {
           // No usable attachment — skip
           result.skipped++;
           if (uid > lastProcessedUID) lastProcessedUID = uid;
           continue;
         }
 
-        // Download the attachment
-        // imapflow's download() returns { meta, content } where content is a
-        // Node Readable stream. We collect it into a Buffer.
-        const downloadResult = await client.download(uid, attachment.part, { uid: true });
-        const chunks: Buffer[] = [];
-        for await (const chunk of downloadResult.content) {
-          chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
-        }
-        const attachmentBytes = Buffer.concat(chunks);
-
-        // 10 MB limit (matches /api/parse)
-        if (attachmentBytes.length > MAX_ATTACHMENT_BYTES) {
-          result.skipped++;
-          if (uid > lastProcessedUID) lastProcessedUID = uid;
-          continue;
-        }
-
-        // Min size: skip tiny inline images (signature logos, tracking pixels).
-        // Only applies to images — PDFs are pre-filtered by disposition above.
-        if (
-          attachment.mimeType.startsWith('image/') &&
-          attachmentBytes.length < MIN_ATTACHMENT_BYTES
-        ) {
-          result.skipped++;
-          if (uid > lastProcessedUID) lastProcessedUID = uid;
-          continue;
-        }
-
-        // ─── Stage 3: Keyword classification (free) ─────────────────────
+        // ─── Stage 3: Classify once per email (not per attachment) ───────
+        // The classifier looks at subject + sender + filename. We use the
+        // FIRST attachment's filename as the proxy for the email's intent.
+        const firstAttachment = attachments[0];
         const emailInfo = {
           fromAddress: fromAddr,
           fromName,
           subject,
-          attachmentFilename: attachment.filename || 'attachment',
+          attachmentFilename: firstAttachment.filename || 'attachment',
         };
 
-        // If sender is trusted AND scan mode is 'trusted', auto-import
-        // without running the classifier (saves AI cost — user already
-        // explicitly trusted this sender).
         const isTrustedSender = inbox.scanMode === 'trusted' && fromAddr && trustedSenders.has(fromAddr);
 
         let classification: EmailClassification = 'maybe';
@@ -277,15 +304,40 @@ export async function scanInbox(
           }
         }
 
-        // ─── Save to PendingReview (or auto-import if trusted) ─────────
-        if (isTrustedSender) {
-          // Auto-import: create a PendingReview with 'invoice' classification
-          // but status 'pending' with auto-approve flag (so the user can
-          // still review if they want, OR we auto-approve).
-          //
-          // For now, we still create a PendingReview entry — the user can
-          // bulk-approve trusted senders in one click. This is safer than
-          // auto-creating Invoice records directly.
+        // ─── Stage 4: Download + save each attachment as its own ─────────
+        // PendingReview entry. We iterate over ALL attachments (capped at 5).
+        for (const attachment of attachments) {
+          // Time budget check (inside inner loop — each download can be slow)
+          if (Date.now() - startTime > maxDurationMs) {
+            result.paused = 'time_limit';
+            break;
+          }
+
+          // Download this attachment
+          const downloadResult = await client.download(uid, attachment.part, { uid: true });
+          const chunks: Buffer[] = [];
+          for await (const chunk of downloadResult.content) {
+            chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+          }
+          const attachmentBytes = Buffer.concat(chunks);
+
+          // 10 MB limit (matches /api/parse)
+          if (attachmentBytes.length > MAX_ATTACHMENT_BYTES) {
+            // Skip this attachment but continue to the next one
+            result.skipped++;
+            continue;
+          }
+
+          // Min size: skip tiny inline images (signature logos, tracking pixels).
+          if (
+            attachment.mimeType.startsWith('image/') &&
+            attachmentBytes.length < MIN_ATTACHMENT_BYTES
+          ) {
+            result.skipped++;
+            continue;
+          }
+
+          // Save to PendingReview
           await db.pendingReview.create({
             data: {
               userId,
@@ -297,45 +349,29 @@ export async function scanInbox(
               attachmentFilename: attachment.filename || 'attachment',
               attachmentMime: attachment.mimeType,
               attachmentData: attachmentBytes.toString('base64'),
-              classification: 'invoice',
+              classification: isTrustedSender ? 'invoice' : classification,
               extractedData: Prisma.JsonNull,
               status: 'pending',
             },
           });
           result.pending++;
-          result.imported++; // Count as "imported" in the sense that it's trusted
-        } else {
-          // Always goes to Pending Review — user decides
-          await db.pendingReview.create({
-            data: {
-              userId,
-              inboxId,
-              fromAddress: fromAddr,
-              fromName,
-              subject,
-              receivedAt,
-              attachmentFilename: attachment.filename || 'attachment',
-              attachmentMime: attachment.mimeType,
-              attachmentData: attachmentBytes.toString('base64'),
-              classification,
-              extractedData: Prisma.JsonNull,
-              status: 'pending',
-            },
+          if (isTrustedSender) result.imported++;
+
+          // Re-check pending queue cap after each save
+          const currentPending = await db.pendingReview.count({
+            where: { userId, status: 'pending', inboxId },
           });
-          result.pending++;
+          if (currentPending >= MAX_PENDING_PER_INBOX) {
+            result.paused = 'pending_full';
+            break;
+          }
         }
 
-        // Don.t mark email as seen — we track via lastSeenUID
+        // Don't mark email as seen — we track via lastSeenUID
         if (uid > lastProcessedUID) lastProcessedUID = uid;
 
-        // Re-check pending queue cap
-        const currentPending = await db.pendingReview.count({
-          where: { userId, status: 'pending', inboxId },
-        });
-        if (currentPending >= MAX_PENDING_PER_INBOX) {
-          result.paused = 'pending_full';
-          break;
-        }
+        // If the pending queue filled up, stop scanning more emails
+        if (result.paused === 'pending_full') break;
       }
 
       result.nextUID = lastProcessedUID;
@@ -376,7 +412,7 @@ export async function scanInbox(
       lock.release();
     }
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown IMAP error';
+    const message = humanizeImapError(err, inbox.imapHost);
     result.error = message;
     // Save error to inbox for display in settings
     await db.emailInbox.update({
@@ -404,28 +440,18 @@ interface AttachmentInfo {
 }
 
 /**
- * Walk the MIME body structure to find the best PDF/image attachment.
- * Returns null if no usable attachment is found.
+ * Walk the MIME body structure and return ALL PDF/image attachments,
+ * sorted best-first. Returns an empty array if no usable attachment is found.
  *
- * Strategy: collect ALL candidate parts first, then pick the best one.
- * This avoids the bug where a part with the PDF's filename but text/plain
- * MIME type (e.g., a forwarded message body) gets picked before the real
- * PDF attachment later in the structure.
- *
- * Score (highest wins):
- *   - 100: application/pdf (or part with .pdf ext + pdf magic bytes)
- *   - 80:  image/* with matching extension
- *   - 70:  allowed extension (.pdf/.jpg/.png/.webp) regardless of MIME
- *   - 50:  application/octet-stream with allowed extension
- *   - 20:  text/* with PDF filename (suspicious — probably forwarded email source)
- *
- * Disposition breaks ties: 'attachment' > 'inline' > none
+ * Multi-attachment support: many vendors send invoice.pdf + receipt.pdf +
+ * contract.pdf in the same email. We save each as a separate PendingReview
+ * entry so the user can approve/skip them independently.
  */
-function findAttachment(structure: unknown): AttachmentInfo | null {
+function findAttachments(structure: unknown): AttachmentInfo[] {
   const candidates: Array<{ info: AttachmentInfo; score: number; disposition: string }> = [];
   collectCandidates(structure, candidates);
 
-  if (candidates.length === 0) return null;
+  if (candidates.length === 0) return [];
 
   // Sort by score descending, then by disposition preference
   const dispositionRank: Record<string, number> = { attachment: 3, inline: 2, '': 1 };
@@ -434,7 +460,9 @@ function findAttachment(structure: unknown): AttachmentInfo | null {
     return (dispositionRank[b.disposition] ?? 0) - (dispositionRank[a.disposition] ?? 0);
   });
 
-  return candidates[0].info;
+  // Cap to 5 attachments per email — protects against pathological emails
+  // with hundreds of inline images.
+  return candidates.slice(0, 5).map((c) => c.info);
 }
 
 function collectCandidates(
@@ -534,7 +562,7 @@ export async function testImapConnection(
   port: number,
   username: string,
   password: string,
-): Promise<{ ok: boolean; mailboxCount?: number; error?: string }> {
+): Promise<{ ok: boolean; mailboxCount?: number; unseenCount?: number; error?: string }> {
   let client: ImapFlow | null = null;
   try {
     client = new ImapFlow({
@@ -551,11 +579,12 @@ export async function testImapConnection(
     return {
       ok: true,
       mailboxCount: status.messages ?? 0,
+      unseenCount: status.unseen ?? 0,
     };
   } catch (err) {
     return {
       ok: false,
-      error: err instanceof Error ? err.message : 'Unknown connection error',
+      error: humanizeImapError(err, host),
     };
   } finally {
     if (client) {

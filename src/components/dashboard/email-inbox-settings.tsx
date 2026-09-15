@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/select';
 import {
   Mail, Plus, Trash2, Loader2, RefreshCw, Ban, CheckCircle2, Clock,
-  AlertCircle, ShieldCheck, RotateCcw,
+  AlertCircle, ShieldCheck, RotateCcw, Plug,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -76,6 +76,7 @@ export function EmailInboxSettings() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [testing, setTesting] = useState(false);
   const [scanning, setScanning] = useState<string | null>(null);
+  const [testingInbox, setTestingInbox] = useState<string | null>(null);
 
   // Add form state
   const [provider, setProvider] = useState('gmail');
@@ -278,6 +279,27 @@ export function EmailInboxSettings() {
     }
   };
 
+  const handleTestExisting = async (inbox: EmailInbox) => {
+    setTestingInbox(inbox.id);
+    const token = localStorage.getItem('op_token');
+    try {
+      const res = await fetch(`/api/email-inboxes/${inbox.id}/test`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token },
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        toast.success(data.message || `Connected. ${data.mailboxCount ?? 0} messages.`);
+      } else {
+        toast.error(data.error || 'Connection failed');
+      }
+    } catch {
+      toast.error('Network error');
+    } finally {
+      setTestingInbox(null);
+    }
+  };
+
   const handleToggleActive = async (inbox: EmailInbox) => {
     const token = localStorage.getItem('op_token');
     try {
@@ -390,6 +412,18 @@ export function EmailInboxSettings() {
                           title="Force Rescan — re-examine every email from the beginning (clears scan cursor). Use this if a previous bug caused emails to be skipped."
                         >
                           <RotateCcw className="h-3.5 w-3.5 text-muted-foreground hover:text-amber-500" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleTestExisting(inbox)}
+                          disabled={testingInbox === inbox.id || scanning === inbox.id}
+                          className="h-7 w-7 p-0"
+                          title="Test Connection — verify the IMAP credentials still work and see how many messages are in the inbox."
+                        >
+                          {testingInbox === inbox.id
+                            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            : <Plug className="h-3.5 w-3.5 text-muted-foreground hover:text-emerald-500" />}
                         </Button>
                         <Button
                           size="sm"
