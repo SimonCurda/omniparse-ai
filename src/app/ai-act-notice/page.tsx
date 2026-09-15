@@ -57,11 +57,12 @@ export default function AIActNoticePage() {
           <li><strong>Purpose:</strong> Extract structured data from business documents and provide conversational analysis</li>
           <li><strong>AI providers:</strong>
             <ul>
-              <li><strong>Groq Inc.</strong> (United States) — primary provider. Models used: Llama 3.1 8B Instant, Llama 4 Scout 17B, Qwen 3.6 27B.</li>
-              <li><strong>OpenRouter</strong> (United States) — fallback provider used when Groq is unavailable. Models used: Ling 3.0 Flash Fin, NVIDIA Nemotron 70B, and others as availability changes.</li>
+              <li><strong>OpenRouter</strong> (United States) — primary provider. Models used: Ling 3.0 Flash VL, Google Gemma 4 (31B/26B), NVIDIA Nemotron, and others as availability changes.</li>
+              <li><strong>Groq Inc.</strong> (United States) — secondary provider. Models used: Llama 3.1 8B Instant, Llama 4 Scout 17B, Qwen 3.6 27B.</li>
+              <li><strong>Google Gemini</strong> (United States) — final fallback provider. Models used: Gemini 2.0 Flash, Gemini 2.5 Flash, Gemini 1.5 Flash.</li>
             </ul>
           </li>
-          <li><strong>Model selection policy:</strong> We use a cascade approach — primary model is tried first, with automatic fallback through 2-3 alternative models on rate-limit or unavailability. Free-tier quotas on all providers.</li>
+          <li><strong>Model selection policy:</strong> We use a 3-tier cascade approach — OpenRouter is tried first (8 models with 5-key rotation), with automatic fallback to Groq (3 models), then Google Gemini (3 models with 3-key rotation) on rate-limit or unavailability. Free-tier quotas on all providers.</li>
         </ul>
       </section>
 
@@ -74,7 +75,7 @@ export default function AIActNoticePage() {
           <li><strong>Artifact errors:</strong> Generated tables, charts, and summaries inherit any extraction or reasoning errors.</li>
           <li><strong>Currency and formatting:</strong> May misinterpret currency symbols, date formats, or number formatting across regions.</li>
           <li><strong>Confidence score reliability:</strong> Confidence scores are model-generated estimates, not verified accuracy measurements.</li>
-          <li><strong>Provider availability:</strong> Free-tier AI providers (Groq, OpenRouter) impose rate limits. During periods of high demand, the chat may return &quot;temporarily busy&quot; messages.</li>
+          <li><strong>Provider availability:</strong> Free-tier AI providers (OpenRouter, Groq, Google Gemini) impose rate limits. During periods of high demand, the chat may return &quot;temporarily busy&quot; messages.</li>
         </ul>
         <p>
           <strong>Always verify AI-generated data against your original documents before using it for any
@@ -96,9 +97,9 @@ export default function AIActNoticePage() {
       <section>
         <h2>6. Data Handling and AI Training</h2>
         <ul>
-          <li><strong>Per-request processing:</strong> Documents and chat messages are sent to the AI provider only for the duration of the inference request. They are not permanently stored by Groq or OpenRouter.</li>
+          <li><strong>Per-request processing:</strong> Documents and chat messages are sent to the AI provider only for the duration of the inference request. They are not permanently stored by OpenRouter, Groq, or Google.</li>
           <li><strong>Stored on our side:</strong> The uploaded document file is stored in your account database for 30 days (for preview), then automatically purged. Chat messages are stored in your account until you delete them.</li>
-          <li><strong>No training on your data:</strong> Your documents and chat messages are not used to train or fine-tune AI models. Both Groq and OpenRouter have policies prohibiting the use of customer API inputs for model training.</li>
+          <li><strong>No training on your data:</strong> Your documents and chat messages are not used to train or fine-tune AI models. OpenRouter, Groq, and Google all have policies prohibiting the use of customer API inputs for model training.</li>
           <li><strong>No content logging by us:</strong> We do not log the content of your documents or chat conversations to server logs. We do log API request metadata (timestamps, success/failure, model used) for operational purposes.</li>
         </ul>
       </section>
@@ -118,7 +119,7 @@ export default function AIActNoticePage() {
       <section>
         <h2>8. International Transfers</h2>
         <p>
-          AI processing is performed by Groq Inc. and OpenRouter, both based in the United States. Under
+          AI processing is performed by OpenRouter, Groq Inc., and Google LLC, all based in the United States. Under
           GDPR Chapter V, transfers to the US require appropriate safeguards. We rely on Standard
           Contractual Clauses (SCCs) consistent with the Schrems II ruling. We are in the process of
           executing SCCs with each US-based AI provider. Until SCCs are signed, please do not upload

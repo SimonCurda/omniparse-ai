@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Bot, User, Send, RefreshCw, ChevronDown, ChevronUp, AlertCircle, AlertTriangle } from 'lucide-react';
+import { Bot, User, Send, RefreshCw, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
 import { useAppStore } from '@/stores/app-store';
 import type { Artifact, ChatMessage } from '@/stores/app-store';
 import {
@@ -265,14 +265,6 @@ export function ChatTab() {
         </div>
       )}
 
-      {/* Persistent AI disclaimer — visible at all times, compact */}
-      <div className="mb-3 flex items-center gap-1.5 text-[11px] text-muted-foreground bg-muted/40 border border-border/50 rounded-md px-2.5 py-1.5">
-        <AlertTriangle className="h-3 w-3 shrink-0 text-amber-500" />
-        <span>
-          AI responses may contain mistakes. Always verify critical numbers against your source invoices before acting on them.
-        </span>
-      </div>
-
       <Card className="flex-1 flex flex-col border-border/50 overflow-hidden">
         <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4">
           {chatHistory.length === 0 && (
@@ -286,14 +278,6 @@ export function ChatTab() {
                     {q}
                   </Button>
                 ))}
-              </div>
-              <div className="mt-6 max-w-md flex items-start gap-2 text-xs text-muted-foreground/80 bg-amber-500/5 border border-amber-500/20 rounded-lg px-3 py-2">
-                <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-500 mt-0.5" />
-                <span>
-                  <strong className="text-amber-700 dark:text-amber-500">AI can make mistakes.</strong> This assistant
-                  analyzes your invoice data using AI. While it's usually accurate, always verify important figures
-                  against your source documents before making financial decisions.
-                </span>
               </div>
             </div>
           )}
@@ -346,6 +330,9 @@ export function ChatTab() {
               <Send className="h-4 w-4" />
             </Button>
           </form>
+          <p className="text-[10px] text-muted-foreground/60 mt-1.5 text-center">
+            AI-generated responses may be inaccurate. Verify important figures against your source invoices.
+          </p>
         </div>
       </Card>
     </div>
