@@ -57,6 +57,10 @@ export function DashboardShell() {
   const [pendingReviewCount, setPendingReviewCount] = useState(0);
   const tabsScrollRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  // Mirror visibleTabs in a ref so the keydown handler (which is memoized
+  // via useCallback and would otherwise close over a stale copy) can check
+  // whether a tab is visible for the user's plan before switching to it.
+  const visibleTabsRef = useRef<typeof TAB_ITEMS>(TAB_ITEMS);
 
   // Load invoices from API on mount
   useEffect(() => {
@@ -147,16 +151,28 @@ export function DashboardShell() {
     }
 
     // Tab shortcuts
+    // We map every shortcut to its tab key, then check below whether the
+    // tab is actually visible for the user's plan. Pressing a shortcut for
+    // a tab the user can't access is a silent no-op (no error toast — that
+    // would be annoying).
     const tabMap: Record<string, string> = {
       [sc.tabUpload]: 'upload',
       [sc.tabInvoices]: 'invoices',
       [sc.tabPending]: 'pending',
+      [sc.tabValidation]: 'validation',
+      [sc.tabApprovals]: 'approvals',
       [sc.tabAnalytics]: 'analytics',
       [sc.tabChat]: 'chat',
       [sc.tabSettings]: 'settings',
     };
-    if (tabMap[e.key]) {
-      setActiveDashTab(tabMap[e.key]);
+    const targetTab = tabMap[e.key];
+    if (targetTab) {
+      // Only switch to the tab if it's visible for the user's plan.
+      // visibleTabs is computed later in render, so we re-filter here.
+      const visible = visibleTabsRef.current.some((t) => t.key === targetTab);
+      if (visible) {
+        setActiveDashTab(targetTab);
+      }
     }
   }, [setActiveDashTab]);
 
@@ -175,6 +191,12 @@ export function DashboardShell() {
     if (!tab.minPlan) return true;
     return PLAN_ORDER.indexOf(tab.minPlan) <= planIndex;
   });
+  // Keep the ref in sync — used by the keydown handler to skip shortcuts
+  // for tabs the user's plan doesn't include (e.g., pressing 'v' on Free
+  // tier where Validation isn't available).
+  useEffect(() => {
+    visibleTabsRef.current = visibleTabs;
+  }, [visibleTabs]);
 
   // Count validation issues for badge
   const failCount = invoices.filter((i) => i.validationStatus === 'fail').length;

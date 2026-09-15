@@ -167,13 +167,16 @@ export function ChatTab() {
     scrollRef.current?.scrollTo({ top: scrollRef.current?.scrollHeight, behavior: 'smooth' });
   }, [chatHistory]);
 
-  // Focus the input when the chat tab first mounts
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
+  // NOTE: We intentionally do NOT autofocus the chat input on mount.
+  // Autofocusing here stole keyboard focus from the global tab shortcuts
+  // (u / i / p / v / o / a / c / s), making it feel like shortcuts were
+  // broken right after switching to the Chat tab. The user can focus the
+  // input by clicking it or pressing Enter.
 
-  // Re-focus the input when the AI finishes loading its response — this catches
-  // cases where focus was lost during loading (e.g. user clicked elsewhere).
+  // Re-focus the input when the AI finishes loading its response. This is
+  // intentional: when the user has just sent a message, they're already
+  // engaged with the chat and likely want to type the next question without
+  // clicking the input again.
   useEffect(() => {
     if (!chatLoading) {
       const t = setTimeout(() => inputRef.current?.focus(), 0);
