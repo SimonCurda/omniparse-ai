@@ -242,7 +242,105 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
     console.warn('[gemini] Groq vision call failed:', err instanceof Error ? err.message : String(err));
   }
 
-  throw new Error('All vision models (OpenRouter + Groq) are temporarily unavailable. Please try again in a moment.');
+  // ─── Final fallback: Google Gemini direct API ────────────────────────
+  // Google's Gemini API has its OWN free tier (separate from OpenRouter
+  // and Groq) — 15 req/min on gemini-2.0-flash and gemini-2.5-flash.
+  // Adding it here directly multiplies our total capacity by ~2-3x
+  // because it has an independent quota pool.
+  //
+  // Supports multiple GEMINI_API_KEY / GEMINI_API_KEY_2 keys for rotation.
+  // Set them in Vercel env vars.
+  const geminiKeys = [
+    process.env.GEMINI_API_KEY,
+    process.env.GEMINI_API_KEY_2,
+    process.env.GEMINI_API_KEY_3,
+  ].filter(Boolean) as string[];
+
+  if (geminiKeys.length > 0) {
+    const geminiModels = [
+      'gemini-2.0-flash',           // fast, generous free tier (15 rpm)
+      'gemini-2.5-flash',           // newer, also free tier
+      'gemini-1.5-flash',           // legacy fallback
+    ];
+
+    for (const gm of geminiModels) {
+      for (let keyIdx = 0; keyIdx < geminiKeys.length; keyIdx++) {
+        const geminiKey = geminiKeys[keyIdx];
+        try {
+          console.warn(`[gemini] Trying Google Gemini vision: ${gm} (key ${keyIdx + 1}/${geminiKeys.length})...`);
+
+          // Gemini API uses a different request shape — convert OpenAI messages
+          // to Gemini's contents/parts format
+          const contents = openaiMessages.map((m) => ({
+            role: m.role === 'assistant' ? 'model' : 'user',
+            parts: m.content.map((c) => {
+              if (c.type === 'text' && c.text) {
+                return { text: c.text };
+              }
+              if (c.type === 'image_url' && c.image_url) {
+                // Gemini expects { inlineData: { mimeType, data } }
+                const url = c.image_url.url;
+                const match = url.match(/^data:([^;]+);base64,(.+)$/);
+                if (match) {
+                  return { inlineData: { mimeType: match[1], data: match[2] } };
+                }
+                return { text: '[image url not supported]' };
+              }
+              return { text: '' };
+            }),
+          }));
+
+          const res = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${gm}:generateContent?key=${geminiKey}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents,
+                generationConfig: {
+                  temperature: 0.1,
+                  maxOutputTokens: 4096,
+                  responseMimeType: 'application/json',
+                },
+              }),
+            },
+          );
+
+          if (res.ok) {
+            const data = await res.json();
+            // Response shape: { candidates: [{ content: { parts: [{ text }] } }] }
+            const content = data.candidates?.[0]?.content?.parts
+              ?.map((p: { text?: string }) => p.text || '')
+              .join('') || '';
+            if (content) {
+              console.warn(`[gemini] Google Gemini vision succeeded (model: ${gm}, key ${keyIdx + 1})!`);
+              return content;
+            }
+          }
+
+          // 429 — rate limited, try next key
+          if (res.status === 429) {
+            console.warn(`[gemini] Google Gemini ${gm} rate limited (key ${keyIdx + 1}). Trying next key...`);
+            continue;
+          }
+
+          // 400/404 — model not available, try next model
+          if (res.status === 400 || res.status === 404) {
+            console.warn(`[gemini] Google Gemini ${gm} not available (status ${res.status}). Trying next model...`);
+            break;
+          }
+
+          console.warn(`[gemini] Google Gemini ${gm} failed (key ${keyIdx + 1}, status ${res.status})`);
+          break;
+        } catch (err) {
+          console.warn(`[gemini] Google Gemini ${gm} error (key ${keyIdx + 1}):`, err instanceof Error ? err.message : String(err));
+          continue;
+        }
+      }
+    }
+  }
+
+  throw new Error('All vision models (OpenRouter + Groq + Gemini) are temporarily unavailable. Please try again in a moment.');
 }
 
 /**

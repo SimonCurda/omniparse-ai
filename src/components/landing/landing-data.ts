@@ -73,6 +73,14 @@ export const COMPARISON_DATA: CompetitorRow[] = [
     competitor3: true,
   },
   {
+    feature: 'IMAP email auto-import',
+    tooltip: 'Connect your Gmail, Outlook, or Yahoo inbox once. Every invoice that arrives via email is automatically captured, classified, and queued for your approval — no manual upload needed.',
+    omniparse: true,
+    competitor1: false,
+    competitor2: false,
+    competitor3: false,
+  },
+  {
     feature: 'Tampering detection',
     tooltip: 'Three-layer analysis (metadata, heuristics, VLM) that flags potentially altered or fraudulent invoices.',
     omniparse: true,
@@ -95,6 +103,14 @@ export const COMPARISON_DATA: CompetitorRow[] = [
     competitor1: true,
     competitor2: true,
     competitor3: true,
+  },
+  {
+    feature: 'Multi-currency analytics',
+    tooltip: 'Track invoices in CZK, EUR, USD, GBP and more. Analytics group by currency, monthly charts show one series per currency, and the AI chat is currency-aware.',
+    omniparse: true,
+    competitor1: 'Limited',
+    competitor2: 'Limited',
+    competitor3: 'Limited',
   },
   {
     feature: 'AI chat with context',
@@ -137,11 +153,27 @@ export const COMPARISON_DATA: CompetitorRow[] = [
     competitor3: false,
   },
   {
+    feature: 'Vendor scorecards',
+    tooltip: 'Per-vendor dashboard: total spend, invoice count, average value, anomaly history, and trend charts — all in one view.',
+    omniparse: true,
+    competitor1: 'Limited',
+    competitor2: false,
+    competitor3: false,
+  },
+  {
     feature: 'Price change alerts',
     tooltip: 'Automatically detects when a vendor increases prices between invoices and alerts you.',
     omniparse: true,
     competitor1: false,
     competitor2: false,
+    competitor3: false,
+  },
+  {
+    feature: 'Data retention control',
+    tooltip: 'Set your own retention window for stored invoice files (default 30 days). Extracted data is kept forever; raw file binaries are auto-purged to respect privacy.',
+    omniparse: true,
+    competitor1: false,
+    competitor2: 'Limited',
     competitor3: false,
   },
   {
