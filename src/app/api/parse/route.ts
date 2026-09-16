@@ -399,15 +399,26 @@ function buildVlmPrompt(customFieldsPart: string): string {
   return `You are an invoice parser. Extract ALL visible fields from the document image.
 
 IMPORTANT: The invoice may be in ANY language (English, Czech, German, French, Spanish, etc.). Extract the fields regardless of the document language. Map foreign-language labels to their English equivalents:
-- Czech: Dodavatel/Prodávající = vendor, Číslo dokladu/č. faktury = invoice number, Datum vystavení = invoice date, Datum splatnosti = due date, Celkem/Celkem uhradit = total, DPH = VAT, Kč = CZK, Sazba DPH = VAT rate, Základ = amount (net), Položka = line item
-- German: Lieferant/Verkäufer = vendor, Rechnungsnummer = invoice number, Rechnungsdatum = invoice date, Fälligkeitsdatum = due date, Gesamtbetrag = total, MwSt/USt = VAT, € = EUR
+- Czech: Dodavatel/Prodávající = vendor, Číslo dokladu/č. faktury = invoice number, Datum vystavení = invoice date, Datum splatnosti = due date, Celkem/Celkem uhradit/K úhradě = total, DPH = VAT, Kč = CZK, Sazba DPH = VAT rate, Základ = amount (net), Položka = line item
+- German: Lieferant/Verkäufer = vendor, Rechnungsnummer = invoice number, Rechnungsdatum = invoice date, Fälligkeitsdatum = due date, Gesamtbetrag/Gesamt = total, MwSt/USt = VAT, € = EUR
 - French: Fournisseur/Vendeur = vendor, Numéro de facture = invoice number, Date de facture = invoice date, Date d'échéance = due date, Total/Montant TTC = total, TVA = VAT
+
+CRITICAL: TOTAL FIELD
+- "total" is the FINAL AMOUNT TO PAY — the grand total including VAT/tax
+- Look for labels like: "Total", "Grand Total", "Amount Due", "Balance Due", "Total TTC", "Celkem", "K úhradě", "Gesamtbetrag", "Total a pagar", "Totale"
+- ALWAYS return "total" as a NUMBER (not a string). Example: 1234.56, NOT "1,234.56"
+- If the total is written as "1.234,56" (European), convert to 1234.56
+- If the total is written as "1,234.56" (US), convert to 1234.56
+- If you cannot find a total, look for "amount due", "balance", "to pay", "k úhradě", "zu zahlen"
+- If there is NO total visible, compute it: total = amount (net) + vatAmount (tax). Set total to this computed value.
 
 CRITICAL NUMBER PARSING RULES:
 - European number format: "12 705,00" or "12.705,00" means 12705.00 (space/dot = thousands separator, comma = decimal)
+- US number format: "12,705.00" means 12705.00 (comma = thousands separator, dot = decimal)
 - Always convert to standard float: "12 705,00 Kč" → 12705.00
 - "7 000,00" → 7000.00 (NOT 7.00 — the space means thousands, not decimal)
 - If a number has a space followed by 3 digits and then a comma, it's thousands: "15 300,50" → 15300.50
+- ALL numeric fields (amount, vatAmount, total) MUST be returned as numbers, not strings.
 
 CRITICAL: Output ONLY the JSON object. Do NOT explain, do NOT analyze, do NOT write any text before or after the JSON. Do NOT include confidence labels or field names as values — only actual data from the document.
 
@@ -819,15 +830,75 @@ IMPORTANT: For each field, estimate your extraction confidence (0.0 to 1.0). If 
     for (const field of numericFields) {
       if (typeof parsed[field] === 'string') {
         const strVal = parsed[field] as string;
-        // Remove currency symbols, spaces, and convert comma to dot
-        const cleaned = strVal
-          .replace(/[€$£¥Kč\sczk]/gi, '')
-          .replace(/(\d)\.(\d{3})/g, '$1$2')  // remove dot-separated thousands
-          .replace(/,/g, '.');                   // comma → dot
+        // Parse number from string — handle both European and US formats.
+        //
+        // European: "1.234,56" or "1 234,56" (dot/space = thousands, comma = decimal)
+        // US:       "1,234.56"              (comma = thousands, dot = decimal)
+        //
+        // Strategy: detect which format by checking if there's a comma AFTER
+        // the last dot (European) or a dot AFTER the last comma (US).
+        let cleaned = strVal;
+
+        // Step 1: Remove currency symbols and labels
+        cleaned = cleaned
+          .replace(/[€$£¥Kč\sczk]/gi, '')  // remove currency chars + spaces
+          .trim();
+
+        // Step 2: Detect format
+        const lastComma = cleaned.lastIndexOf(',');
+        const lastDot = cleaned.lastIndexOf('.');
+
+        if (lastComma > lastDot) {
+          // European format: comma is decimal separator
+          // Remove dots (thousands separator): "1.234,56" → "1234,56"
+          cleaned = cleaned.replace(/\./g, '');
+          // Replace comma with dot: "1234,56" → "1234.56"
+          cleaned = cleaned.replace(/,/g, '.');
+        } else if (lastDot > lastComma) {
+          // US format: dot is decimal separator
+          // Remove commas (thousands separator): "1,234.56" → "1234.56"
+          cleaned = cleaned.replace(/,/g, '');
+        }
+        // If neither comma nor dot, just parse as-is
+
         const num = parseFloat(cleaned);
         if (!isNaN(num)) {
           parsed[field] = num;
-          console.warn(`[parse] Converted field "${field}" from string "${strVal}" to number ${num}`);
+          console.warn(`[parse] Converted field "${field}" from string "${strVal}" to number ${num} (cleaned: ${cleaned})`);
+        } else {
+          console.warn(`[parse] Could not parse number from "${strVal}" (cleaned: ${cleaned})`);
+        }
+      }
+    }
+
+    // ─── Fallback: compute total from amount + VAT if total is missing ──
+    // If the AI couldn't extract total but did extract amount (net) and
+    // vatAmount, compute total = amount + vatAmount.
+    if (typeof parsed.total !== 'number' || parsed.total === null) {
+      const amt = typeof parsed.amount === 'number' ? parsed.amount : null;
+      const vat = typeof parsed.vatAmount === 'number' ? parsed.vatAmount : null;
+      if (amt !== null && vat !== null) {
+        const computedTotal = Math.round((amt + vat) * 100) / 100;
+        parsed.total = computedTotal;
+        console.warn(`[parse] Total was missing — computed from amount(${amt}) + vat(${vat}) = ${computedTotal}`);
+      } else if (amt !== null && vat === null) {
+        // If we have amount but no VAT, assume amount IS the total
+        parsed.total = amt;
+        console.warn(`[parse] Total was missing — using amount(${amt}) as total (no VAT extracted)`);
+      }
+    }
+
+    // ─── Fallback: compute total from line items if still missing ──────
+    if (typeof parsed.total !== 'number' || parsed.total === null) {
+      if (Array.isArray(parsed.lineItems) && parsed.lineItems.length > 0) {
+        const lineTotal = parsed.lineItems.reduce((sum: number, item: Record<string, unknown>) => {
+          const qty = typeof item.quantity === 'number' ? item.quantity : 1;
+          const price = typeof item.unitPrice === 'number' ? item.unitPrice : 0;
+          return sum + (qty * price);
+        }, 0);
+        if (lineTotal > 0) {
+          parsed.total = Math.round(lineTotal * 100) / 100;
+          console.warn(`[parse] Total was missing — computed from ${parsed.lineItems.length} line items = ${parsed.total}`);
         }
       }
     }

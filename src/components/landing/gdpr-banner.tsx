@@ -39,17 +39,17 @@ export function GdprBanner() {
   if (dismissed) return null;
 
   return (
-    <div className="bg-amber-500/10 border-b border-amber-500/30">
+    <div className="bg-amber-100 border-b-2 border-amber-400 dark:bg-amber-900/40 dark:border-amber-600">
       <div className="max-w-6xl mx-auto px-4 py-2.5 sm:py-3 flex items-start gap-2.5">
-        <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-amber-500" />
+        <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-amber-700 dark:text-amber-400" />
         <div className="flex-1 min-w-0">
-          <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-            <span className="text-amber-600 font-semibold">EU users — AI processing notice.</span>{' '}
+          <p className="text-xs sm:text-sm text-amber-900 dark:text-amber-100 leading-relaxed">
+            <span className="font-bold">EU users — AI processing notice.</span>{' '}
             Documents are processed by AI providers. Mistral (Paris, EU) is used first;
             OpenRouter, Groq, and Google (US) are fallbacks. Until SCCs are signed with
             US providers, do not upload personal data of EU residents unless Mistral is
             configured or you have a valid legal basis.{' '}
-            <a href="/ai-act-notice" className="text-amber-600 hover:underline font-medium">
+            <a href="/ai-act-notice" className="text-amber-800 dark:text-amber-300 hover:underline font-bold">
               Learn more →
             </a>
           </p>
@@ -58,9 +58,9 @@ export function GdprBanner() {
           type="button"
           onClick={dismiss}
           aria-label="Dismiss notice"
-          className="shrink-0 p-1 rounded hover:bg-amber-500/20 transition-colors"
+          className="shrink-0 p-1 rounded hover:bg-amber-300/50 dark:hover:bg-amber-700/50 transition-colors"
         >
-          <X className="h-3.5 w-3.5 text-amber-600" />
+          <X className="h-3.5 w-3.5 text-amber-800 dark:text-amber-300" />
         </button>
       </div>
     </div>
