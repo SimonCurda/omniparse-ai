@@ -70,7 +70,7 @@ export const PLAN_LABELS: Record<string, string> = {
 };
 
 export const PLAN_CHAT_LIMITS: Record<string, number> = {
-  free: 25,
+  free: 10,
   pro: Infinity,
   plus: Infinity,
   business: Infinity,

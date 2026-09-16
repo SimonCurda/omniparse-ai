@@ -125,7 +125,85 @@ export default function TermsOfServicePage() {
       </section>
 
       <section>
-        <h2>8. Disclaimer of Warranties</h2>
+        <h2>8. Service Availability and Limitations (Including IMAP Email Capture)</h2>
+        <p>
+          <strong>The Service is provided on a best-effort basis.</strong> OmniParse uses automated
+          processes (including IMAP email scanning, AI vision-language models, classification
+          heuristics, and external AI providers) to capture and extract invoice data. None of these
+          processes are guaranteed to be complete, accurate, or timely. We explicitly disclaim any
+          warranty that the Service will capture every invoice, classify it correctly, or extract
+          all data without error.
+        </p>
+        <p>
+          <strong>The IMAP email auto-capture feature is an auxiliary convenience, not a substitute
+          for proper invoice management.</strong> Specifically, the Service may fail to capture
+          invoices for reasons including but not limited to:
+        </p>
+        <ul className="list-disc pl-6 space-y-1 text-sm">
+          <li>AI provider rate limits, outages, model deprecations, or temporary unavailability</li>
+          <li>Classifier false negatives (the AI incorrectly determines an email is not an invoice)</li>
+          <li>Email attachment format issues (corrupted PDFs, unsupported image formats, encrypted archives)</li>
+          <li>IMAP server-side issues (mailbox sync delays, throttling by Gmail/Outlook/etc.)</li>
+          <li>Vercel function timeout (60-second limit per scan call)</li>
+          <li>Network connectivity issues between Vercel, the email provider, and AI providers</li>
+          <li>Pending Review queue cap (100 items per inbox — scan pauses when reached)</li>
+          <li>Sender blocklist (user or system blocks a legitimate invoice sender)</li>
+          <li>Emails older than the scan cursor (UID-based resume may skip emails if cursor is corrupted)</li>
+          <li>Bugs, configuration errors, or schema migrations that affect data integrity</li>
+        </ul>
+        <p>
+          <strong>You must not rely solely on the Service for time-critical or financially significant
+          invoice management.</strong> You remain responsible for:
+        </p>
+        <ul className="list-disc pl-6 space-y-1 text-sm">
+          <li>Periodically checking that all expected invoices have been captured</li>
+          <li>Manually uploading invoices that the Service failed to capture</li>
+          <li>Verifying due dates and payment deadlines against source documents</li>
+          <li>Maintaining backup processes for invoice tracking independent of OmniParse</li>
+          <li>Reviewing the Pending Review queue regularly (at minimum weekly, or before any payment run)</li>
+        </ul>
+        <p>
+          <strong>OmniParse is not liable for missed invoices, late payment fees, vendor relationship
+          damage, tax filing errors, late filing penalties, or any other damages arising from the
+          Service&apos;s failure to capture or correctly process an invoice.</strong> This includes
+          scenarios where the user has stopped checking their email inbox manually and relies
+          exclusively on the Service&apos;s auto-capture feature.
+        </p>
+        <p>
+          <strong>Czech law grounding:</strong> This limitation is consistent with:
+        </p>
+        <ul className="list-disc pl-6 space-y-1 text-sm">
+          <li><strong>Act No. 89/2012 Sb. (Civil Code) § 2896, 2936-2937:</strong> Service provider
+          liability for damages caused by defective service is limited for auxiliary services that
+          are not the provider&apos;s primary business activity. Invoice extraction is auxiliary to
+          the user&apos;s primary business of managing their finances.</li>
+          <li><strong>Act No. 89/2012 Sb. § 2913:</strong> Liability for damages is excluded where
+          the service is provided free of charge (Free tier) unless the damage was caused intentionally.</li>
+          <li><strong>Directive 93/13/EEC (Unfair Contract Terms) Art. 3 + 4:</strong> This clause
+          is not unfair because (a) the Service is clearly auxiliary, (b) the user has alternative
+          invoice management options, (c) the limitation is transparent and brought to the
+          user&apos;s attention before signup.</li>
+          <li><strong>Act No. 634/1992 Sb. (Consumer Protection) § 16:</strong> This clause does
+          not disproportionately shift risk to the consumer because the user retains control of
+          their email inbox and can always verify capture independently.</li>
+        </ul>
+        <p>
+          <strong>For paid users only:</strong> Where OmniParse is found directly at fault for
+          damages (e.g., a confirmed bug in our code, not a third-party AI provider issue),
+          liability is capped at the amount you paid to OmniParse in the 12 months preceding
+          the claim. For Free tier users, liability is capped at zero (Czech Civil Code § 2913).
+        </p>
+        <p>
+          <strong>Notification of issues:</strong> If you become aware that the Service has failed
+          to capture an invoice or has extracted incorrect data, you must notify us at
+          <strong> damr58h@gmail.com</strong> within 30 days. We will investigate and, where
+          possible, restore or correct the affected data. Failure to notify within 30 days
+          may limit our ability to provide remedies.
+        </p>
+      </section>
+
+      <section>
+        <h2>9. Disclaimer of Warranties</h2>
         <p>
           THE SERVICE IS PROVIDED &quot;AS IS&quot; AND &quot;AS AVAILABLE&quot; WITHOUT WARRANTIES OF
           ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO IMPLIED WARRANTIES OF
@@ -141,7 +219,7 @@ export default function TermsOfServicePage() {
       </section>
 
       <section>
-        <h2>9. Limitation of Liability</h2>
+        <h2>10. Limitation of Liability</h2>
         <p>
           To the maximum extent permitted by applicable law, Simon Curda shall not be liable for any
           indirect, incidental, special, consequential, or punitive damages, including but not limited
@@ -160,7 +238,7 @@ export default function TermsOfServicePage() {
       </section>
 
       <section>
-        <h2>10. Indemnification</h2>
+        <h2>11. Indemnification</h2>
         <p>
           You agree to indemnify and hold harmless Simon Curda from and against any claims, damages,
           losses, or expenses arising from your use of the Service, your violation of these Terms, or
@@ -170,7 +248,7 @@ export default function TermsOfServicePage() {
       </section>
 
       <section>
-        <h2>11. Subscription Plans and Billing</h2>
+        <h2>12. Subscription Plans and Billing</h2>
         <p>
           Paid plans (Pro, Plus, Business, Enterprise) are billed monthly or annually via Stripe. You
           can cancel your subscription at any time from your Stripe customer portal. Cancellation
@@ -187,7 +265,7 @@ export default function TermsOfServicePage() {
       </section>
 
       <section>
-        <h2>12. Modifications to Terms</h2>
+        <h2>13. Modifications to Terms</h2>
         <p>
           We may update these Terms from time to time. Material changes will be notified via the Service
           or by email. Continued use of the Service after changes constitutes acceptance of the updated
@@ -197,7 +275,7 @@ export default function TermsOfServicePage() {
       </section>
 
       <section>
-        <h2>13. Governing Law and Dispute Resolution</h2>
+        <h2>14. Governing Law and Dispute Resolution</h2>
         <p>
           These Terms are governed by the laws of the Czech Republic, without regard to conflict of law
           principles. EU consumer protection laws apply additionally for users classified as consumers
@@ -217,7 +295,7 @@ export default function TermsOfServicePage() {
       </section>
 
       <section>
-        <h2>14. Severability</h2>
+        <h2>15. Severability</h2>
         <p>
           If any provision of these Terms is found to be unenforceable or invalid, that provision shall
           be limited or eliminated to the minimum extent necessary, and the remaining provisions shall
@@ -226,7 +304,7 @@ export default function TermsOfServicePage() {
       </section>
 
       <section>
-        <h2>15. Non-Reliance on AI Output</h2>
+        <h2>16. Non-Reliance on AI Output</h2>
         <p>
           You acknowledge and agree that:
         </p>
@@ -246,7 +324,7 @@ export default function TermsOfServicePage() {
       </section>
 
       <section>
-        <h2>16. Acceptable Use Policy</h2>
+        <h2>17. Acceptable Use Policy</h2>
         <p>You agree not to:</p>
         <ul className="list-disc pl-6 space-y-1 text-sm">
           <li>Upload documents you do not have the right to process (copyright, privacy, or other legal restrictions);</li>
@@ -266,7 +344,7 @@ export default function TermsOfServicePage() {
       </section>
 
       <section>
-        <h2>17. Contact</h2>
+        <h2>18. Contact</h2>
         <p>For questions about these Terms: <strong>damr58h@gmail.com</strong></p>
       </section>
 
