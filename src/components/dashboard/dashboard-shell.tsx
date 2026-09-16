@@ -9,7 +9,6 @@ import { Progress } from '@/components/ui/progress';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { useAppStore } from '@/stores/app-store';
 import { loadShortcuts, DEFAULT_SHORTCUTS } from '@/lib/shortcuts';
-import { EmailVerificationBanner } from './email-verification-banner';
 
 const PLAN_LIMITS: Record<string, number> = { free: 15, pro: 500, plus: 2000, business: 10000, enterprise: Infinity };
 const PLAN_LABELS: Record<string, string> = { free: 'Free', pro: 'Pro', plus: 'Plus', business: 'Business', enterprise: 'Enterprise' };
@@ -210,11 +209,6 @@ export function DashboardShell() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Email Verification Banner — shown if user's email is not yet verified */}
-      {user?.emailVerifiedRequired && (
-        <EmailVerificationBanner userEmail={user.email} />
-      )}
-
       {/* Top Header Bar */}
       <header className="h-14 border-b border-border flex items-center justify-between px-4 bg-background/95 backdrop-blur-sm sticky top-0 z-40">
         <div className="flex items-center gap-2">

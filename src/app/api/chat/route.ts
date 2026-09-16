@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { getUserFromRequest, isEmailVerified, PLAN_CHAT_LIMITS } from '@/lib/auth';
+import { getUserFromRequest, PLAN_CHAT_LIMITS } from '@/lib/auth';
 import { chatSchema, getClientIp } from '@/lib/validation';
 import { rateLimit } from '@/lib/rate-limit';
 import type { Artifact } from '@/stores/app-store';
@@ -1104,21 +1104,6 @@ export async function POST(req: NextRequest) {
     const auth = await getUserFromRequest(req);
     if (!auth) {
       return NextResponse.json({ error: 'Unauthorized. Please sign in.' }, { status: 401 });
-    }
-
-    // Email verification check — block AI chat until email is verified
-    const chatUser = await db.user.findUnique({
-      where: { id: auth.userId },
-      select: { id: true, emailVerified: true, createdAt: true, plan: true },
-    });
-    if (!chatUser) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
-    if (!isEmailVerified(chatUser.emailVerified, chatUser.createdAt)) {
-      return NextResponse.json(
-        { error: 'Email verification required. Please check your inbox for the verification link, or click "Resend verification email" in Settings.', code: 'EMAIL_NOT_VERIFIED' },
-        { status: 403 },
-      );
     }
 
     // Validate request body with Zod

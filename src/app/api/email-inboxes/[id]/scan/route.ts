@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { getUserFromRequest, isEmailVerified } from '@/lib/auth';
+import { getUserFromRequest } from '@/lib/auth';
 import { scanInbox } from '@/lib/email-scanner';
 import { rateLimit } from '@/lib/rate-limit';
-import { getClientIp } from '@/lib/validation';
 
 // POST /api/email-inboxes/[id]/scan — manually scan an inbox for new invoices
 //
@@ -51,27 +50,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
   if (!inbox.active) {
     return NextResponse.json({ error: 'Inbox is paused. Activate it in Settings first.' }, { status: 400 });
-  }
-
-  // ─── Email verification check ───────────────────────────────────
-  // Block scanning until the user's email is verified. This prevents
-  // attackers from creating fake accounts and immediately scanning
-  // inboxes to burn AI quota.
-  const user = await db.user.findUnique({
-    where: { id: auth.userId },
-    select: { emailVerified: true, createdAt: true },
-  });
-  if (!user) {
-    return NextResponse.json({ error: 'User not found' }, { status: 404 });
-  }
-  if (!isEmailVerified(user.emailVerified, user.createdAt)) {
-    return NextResponse.json(
-      {
-        error: 'Email verification required. Please verify your email address before scanning inboxes.',
-        code: 'EMAIL_NOT_VERIFIED',
-      },
-      { status: 403 },
-    );
   }
 
   // Check for ?reset=true — clears the scan cursor so we re-examine every email

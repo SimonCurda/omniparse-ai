@@ -18,8 +18,6 @@ export function Navbar({ onAuth }: { onAuth: (v: 'login' | 'signup') => void }) 
 
   return (
     <div className="fixed top-0 inset-x-0 z-50">
-      {/* GDPR banner sits inside the fixed wrapper so it stacks above the navbar */}
-      <GdprBanner />
       <nav className="border-b border-border bg-background/80 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <button onClick={scrollToTop} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
@@ -60,6 +58,8 @@ export function Navbar({ onAuth }: { onAuth: (v: 'login' | 'signup') => void }) 
         </div>
       )}
       </nav>
+      {/* GDPR banner sits BELOW the navbar — inside the same fixed wrapper so both stay visible at top */}
+      <GdprBanner />
     </div>
   );
 }

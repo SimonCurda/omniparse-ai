@@ -249,7 +249,7 @@ export function runValidationRules(
   }
 
   // Rule: Ensure vendor name isn't blank
-  if (rules.blank_vendor && (!data.vendor || data.vendor.trim().length === 0)) {
+  if (rules.blank_vendor && (!data.vendor || typeof data.vendor !== 'string' || data.vendor.trim().length === 0)) {
     results.push({
       rule: 'blank_vendor',
       severity: 'warning',
@@ -456,10 +456,28 @@ export function normalizeInvoiceData(data: {
   };
 }
 
-function normalizeVendor(vendor?: string | null): string {
+function normalizeVendor(vendor?: unknown): string {
   if (!vendor) return '';
+
+  // Coerce to string — vision models sometimes return vendor as an array
+  // (e.g. ["Acme Ltd"]) or object (e.g. {name: "Acme Ltd"}). Handle all cases.
+  let vendorStr: string;
+  if (typeof vendor === 'string') {
+    vendorStr = vendor;
+  } else if (Array.isArray(vendor)) {
+    // Take first element if it's a string, else stringify
+    vendorStr = typeof vendor[0] === 'string' ? vendor[0] : String(vendor[0] ?? '');
+  } else if (typeof vendor === 'object' && vendor !== null) {
+    // Try common keys: name, vendor, company
+    const v = vendor as Record<string, unknown>;
+    const candidate = v.name ?? v.vendor ?? v.company ?? v.businessName ?? '';
+    vendorStr = typeof candidate === 'string' ? candidate : String(candidate ?? '');
+  } else {
+    vendorStr = String(vendor);
+  }
+
   // Trim whitespace, fix multiple spaces, title case
-  return vendor
+  return vendorStr
     .trim()
     .replace(/\s+/g, ' ')
     .replace(/\b([a-z])([a-z]+)\b/gi, (_, first, rest) => first.toUpperCase() + rest.toLowerCase())

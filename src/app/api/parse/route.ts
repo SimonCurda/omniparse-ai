@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
 import { db } from '@/lib/db';
-import { getUserFromRequest, getUserWithVerification, isEmailVerified, hasFeature, PLAN_LIMITS } from '@/lib/auth';
+import { getUserFromRequest, hasFeature, PLAN_LIMITS } from '@/lib/auth';
 import {
   runValidationRules,
   runVarianceChecks,
@@ -486,13 +486,6 @@ export async function POST(req: NextRequest) {
     const user = await db.user.findUnique({ where: { id: auth.userId } });
     if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
-    // Email verification check — block AI extraction until email is verified
-    if (!isEmailVerified(user.emailVerified, user.createdAt)) {
-      return NextResponse.json(
-        { error: 'Email verification required. Please check your inbox for the verification link, or click "Resend verification email" in Settings.', code: 'EMAIL_NOT_VERIFIED' },
-        { status: 403 },
-      );
-    }
 
     // Count invoices this month only (hard wall per month)
     const now = new Date();
@@ -792,6 +785,30 @@ IMPORTANT: For each field, estimate your extraction confidence (0.0 to 1.0). If 
         if (prefixMatch) {
           parsed[field] = prefixMatch[1].trim();
         }
+      }
+    }
+
+    // ─── Coerce non-string fields to strings (defensive) ──────────────
+    // Vision models sometimes return string fields as arrays or objects
+    // (e.g. vendor: ["Acme Ltd"] or vendor: {name: "Acme Ltd"}).
+    // Coerce them to strings so downstream code that calls .trim() doesn't crash.
+    for (const field of stringFields) {
+      const val = parsed[field];
+      if (val === null || val === undefined) continue;
+      if (typeof val === 'string') continue;
+      if (Array.isArray(val)) {
+        // Take first element if it's a string, else stringify
+        parsed[field] = typeof val[0] === 'string' ? val[0] : String(val[0] ?? '');
+        console.warn(`[parse] Coerced ${field} from array to string: ${JSON.stringify(val)} → ${parsed[field]}`);
+      } else if (typeof val === 'object') {
+        // Try common keys: name, vendor, company
+        const v = val as Record<string, unknown>;
+        const candidate = v.name ?? v.vendor ?? v.company ?? v.value ?? '';
+        parsed[field] = typeof candidate === 'string' ? candidate : String(candidate ?? '');
+        console.warn(`[parse] Coerced ${field} from object to string: ${JSON.stringify(val)} → ${parsed[field]}`);
+      } else {
+        parsed[field] = String(val);
+        console.warn(`[parse] Coerced ${field} from ${typeof val} to string: ${val} → ${parsed[field]}`);
       }
     }
 
