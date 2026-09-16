@@ -86,9 +86,9 @@ export async function getUserWithVerification(req: Request): Promise<{ userId: s
  * as verified (grandfathered). New signups will have emailVerified = null
  * AND a recent createdAt — these need to verify.
  *
- * Cutoff: September 17, 2026 (when this feature shipped).
+ * Cutoff: September 16, 2026 (when this feature shipped).
  */
-const GRANDFATHER_CUTOFF = new Date('2026-09-17T00:00:00Z');
+const GRANDFATHER_CUTOFF = new Date('2026-09-16T00:00:00Z');
 
 export function isEmailVerified(emailVerified: Date | null, userCreatedAt: Date): boolean {
   if (emailVerified) return true;
