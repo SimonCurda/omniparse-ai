@@ -55,15 +55,26 @@ export async function POST(req: NextRequest) {
 
     const sent = await sendVerificationEmail(user.email, verificationToken);
 
+    // In dev mode, or when email couldn't be sent, return the URL so the
+    // user can verify manually. Useful when Resend free tier can't send
+    // to the user's email (custom domain not verified).
+    const isDevMode = process.env.NODE_ENV === 'development' || process.env.EMAIL_DEV_MODE === 'true';
+    const verificationUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://omniparse-ai.vercel.app'}/?verify_token=${verificationToken}`;
+
     if (!sent) {
-      return NextResponse.json(
-        { error: 'Failed to send verification email. Please contact support.' },
-        { status: 500 },
-      );
+      return NextResponse.json({
+        success: false,
+        emailSent: false,
+        // Return the URL so the user can click it manually
+        ...(isDevMode ? { verificationUrl } : {}),
+        error: 'Failed to send verification email (Resend may not be configured with a custom domain yet). ' +
+               (isDevMode ? 'Click the verification link below to verify manually.' : 'Please contact support.'),
+      }, { status: 200 });  // 200 not 500 — user can still verify via the URL
     }
 
     return NextResponse.json({
       success: true,
+      emailSent: true,
       message: 'Verification email sent. Please check your inbox.',
     });
   } catch (err) {

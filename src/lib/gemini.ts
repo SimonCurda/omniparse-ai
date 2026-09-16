@@ -5,33 +5,47 @@
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
-// Model hierarchy: primary → fallback1 → fallback2
-// Order by reliability for artifact generation (charts/tables need lots of tokens):
-//   llama-3.1-8b-instant:    30k OTPM, very reliable, smaller model (no thinking leak)
-//   llama-4-scout:            6k OTPM, better quality, sometimes rate-limited (no thinking leak)
-//   qwen/qwen3.6-27b:         1k OTPM, REASONING MODEL (leaks thinking) — last resort
-//                            because it is the most accessible model on Groq free tier.
-//                            The chat route's stripThinkingLines + cleanReplyText handle
-//                            the thinking leak, so even when qwen is used the user sees
-//                            a clean response (just potentially truncated artifacts).
+// ─── Groq Model Configuration ─────────────────────────────────────────────
 //
-// NOTE: llama-3.3-70b-versatile and llama-3.1-70b-versatile were both REMOVED from the
-// cascade — Groq has decommissioned both. If Groq reintroduces a 70b llama variant
-// (check https://console.groq.com/docs/deprecations), it can be re-added here.
-const VISION_MODEL = 'qwen/qwen3.6-27b';
+// Groq periodically deprecates models. As of September 2026, the following
+// models are available on Groq's free tier:
+//
+//   Text models:
+//     llama-3.1-8b-instant:      ~30k OTPM, very reliable, small (no thinking leak)
+//     llama-3.3-70b-versatile:   ~6k OTPM, higher quality, sometimes rate-limited
+//
+//   Vision models (replacements for the decommissioned qwen/qwen3.6-27b):
+//     llama-3.2-11b-vision-preview:  Vision-capable, decent quality
+//     llama-3.2-90b-vision-preview:  Vision-capable, higher quality (sometimes rate-limited)
+//
+// NOTE: qwen/qwen3.6-27b was decommissioned by Groq in September 2026.
+// We switched to Llama 3.2 vision models, which do NOT have the thinking-leak
+// problem that qwen had. This is actually a quality improvement.
+//
+// NOTE: llama-3.3-70b-versatile and llama-3.1-70b-versatile were both REMOVED
+// from the cascade earlier (Groq decommissioned them). If Groq reintroduces
+// a 70b llama variant (check https://console.groq.com/docs/deprecations),
+// it can be re-added here.
 
+// Vision models (tried in order — first one that works is used)
+const GROQ_VISION_MODELS = [
+  'llama-3.2-90b-vision-preview',   // higher quality vision
+  'llama-3.2-11b-vision-preview',   // smaller, faster vision
+];
+
+// Chat models (tried in order)
 const CHAT_MODEL = 'llama-3.1-8b-instant';
-const CHAT_MODEL_FALLBACK_1 = 'llama-4-scout-17b-16e-instruct';
-const CHAT_MODEL_FALLBACK_2 = 'qwen/qwen3.6-27b'; // last resort — reasoning model, cleanup handles leak
+const CHAT_MODEL_FALLBACK_1 = 'llama-3.3-70b-versatile';
 
-// Groq free tier (on_demand) output token limits per minute:
+// Groq free tier output token limits per minute:
 //   llama-3.1-8b-instant:     ~30,000 OTPM  (highest, most reliable)
-//   llama-4-scout:             ~6,000 OTPM
-//   qwen/qwen3.6-27b:          ~1,000 OTPM  (lowest, but always available)
+//   llama-3.3-70b-versatile:  ~6,000 OTPM
+//   llama-3.2-11b-vision:     ~6,000 OTPM
+//   llama-3.2-90b-vision:     ~2,000 OTPM  (lowest, but highest quality)
 // Max tokens per request: stay well under the per-minute limit.
 // Responses with artifacts (tables/charts) need more tokens for the JSON.
-const MAX_TOKENS_HIGH = 4096;    // llama-3.1-8b-instant, llama-4-scout, llama-3.3-70b
-const MAX_TOKENS_LOW = 4096;     // qwen — was 900 (truncated JSON output), now 4096 so the reasoning + JSON fits
+const MAX_TOKENS_HIGH = 4096;
+const MAX_TOKENS_LOW = 4096;
 
 const RETRY_DELAY_MS = 2000;            // base delay before retrying a rate-limited model (doubles each retry)
 const MAX_RETRIES = 2;                  // retry each model up to 2 times on 429 (was 1)
@@ -314,39 +328,55 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
     }
   }
 
-  // ─── Last resort: Groq vision model (qwen3.6-27b) ────────────────────
-  // This is a reasoning model that may leak thinking into JSON values.
-  // Only used when ALL OpenRouter models are unavailable.
-  // The prose-to-JSON fallback in parse/route.ts will attempt to clean up.
-  try {
-    console.warn(`[gemini] Trying Groq vision model: ${VISION_MODEL} (last resort)...`);
-    const res = await fetch(GROQ_API_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: VISION_MODEL,
-        messages: openaiMessages,
-        max_tokens: MAX_TOKENS_LOW,
-        temperature: 0.1,
-      }),
-    });
+  // ─── Groq vision models (Llama 3.2 Vision family) ──────────────────
+  // These replaced the decommissioned qwen3.6-27b. Llama 3.2 vision models
+  // don't have the thinking-leak problem, so JSON output is cleaner.
+  // Try each model in order; break on success.
+  for (const groqVisionModel of GROQ_VISION_MODELS) {
+    try {
+      console.warn(`[gemini] Trying Groq vision model: ${groqVisionModel} (last resort)...`);
+      const res = await fetch(GROQ_API_URL, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: groqVisionModel,
+          messages: openaiMessages,
+          max_tokens: MAX_TOKENS_LOW,
+          temperature: 0.1,
+        }),
+      });
 
-    if (res.ok) {
-      const data = await res.json();
-      const content = data.choices?.[0]?.message?.content || '';
-      if (content) {
-        console.warn(`[gemini] Groq vision model ${VISION_MODEL} succeeded (last resort)!`);
-        return content;
+      if (res.ok) {
+        const data = await res.json();
+        const content = data.choices?.[0]?.message?.content || '';
+        if (content) {
+          console.warn(`[gemini] Groq vision model ${groqVisionModel} succeeded!`);
+          return content;
+        }
       }
-    }
 
-    const errText = await res.text().catch(() => '');
-    console.warn(`[gemini] Groq vision model ${VISION_MODEL} also failed (${res.status})`);
-  } catch (err) {
-    console.warn('[gemini] Groq vision call failed:', err instanceof Error ? err.message : String(err));
+      // 429 — rate limited, try next Groq vision model
+      if (res.status === 429) {
+        console.warn(`[gemini] Groq vision model ${groqVisionModel} rate limited. Trying next model...`);
+        continue;
+      }
+
+      // 400/404 — model not available (deprecated), try next
+      if (res.status === 400 || res.status === 404) {
+        const errText = await res.text().catch(() => '');
+        console.warn(`[gemini] Groq vision model ${groqVisionModel} not available (${res.status}). ${errText.slice(0, 200)}`);
+        continue;
+      }
+
+      // Other error — try next model
+      console.warn(`[gemini] Groq vision model ${groqVisionModel} failed (${res.status}). Trying next...`);
+    } catch (err) {
+      console.warn(`[gemini] Groq vision ${groqVisionModel} error:`, err instanceof Error ? err.message : String(err));
+      continue;
+    }
   }
 
   // ─── Final fallback: Google Gemini direct API ────────────────────────
@@ -453,7 +483,7 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
 /**
  * Call Groq with text-only chat.
  * Tries models in order with retry on 429 rate limits.
- * Model cascade: llama-3.1-8b-instant → llama-4-scout → llama-3.3-70b → qwen/qwen3.6-27b
+ * Model cascade: llama-3.1-8b-instant → llama-3.3-70b-versatile → (OpenRouter fallbacks)
  */
 export async function geminiChatCall(
   systemPrompt: string,

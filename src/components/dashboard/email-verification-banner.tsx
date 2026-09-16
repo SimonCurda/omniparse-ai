@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { MailCheck, RefreshCw, X } from 'lucide-react';
+import { MailCheck, RefreshCw, X, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface EmailVerificationBannerProps {
@@ -20,14 +20,16 @@ interface EmailVerificationBannerProps {
  * Includes a "Resend verification email" button that calls
  * POST /api/auth/resend-verification. Rate limited server-side to 3/hour.
  *
- * Dismissable per-session — user can hide it for the current session but
- * it returns next time they log in if email is still not verified.
+ * Dev mode: if EMAIL_DEV_MODE=true (or email couldn't be sent), the resend
+ * endpoint returns a verificationUrl that we display here as a clickable
+ * link. This is a fallback for when Resend can't send (e.g., free tier
+ * without custom domain verification).
  */
 export function EmailVerificationBanner({ userEmail }: EmailVerificationBannerProps) {
   const [dismissed, setDismissed] = useState(false);
   const [resending, setResending] = useState(false);
+  const [manualVerifyUrl, setManualVerifyUrl] = useState<string | null>(null);
 
-  // Don't render if dismissed this session
   if (dismissed) return null;
 
   const handleResend = async () => {
@@ -39,10 +41,13 @@ export function EmailVerificationBanner({ userEmail }: EmailVerificationBannerPr
         headers: { Authorization: 'Bearer ' + token },
       });
       const data = await res.json();
-      if (res.ok && data.success) {
+      if (data.emailSent) {
         toast.success(data.message || 'Verification email sent.');
-      } else if (data.alreadyVerified) {
-        toast.info('Your email is already verified.');
+        setManualVerifyUrl(null);
+      } else if (data.verificationUrl) {
+        // Dev mode — show the manual link
+        setManualVerifyUrl(data.verificationUrl);
+        toast.info('Could not send email. Use the manual verification link below.');
       } else {
         toast.error(data.error || 'Failed to resend verification email.');
       }
@@ -54,12 +59,12 @@ export function EmailVerificationBanner({ userEmail }: EmailVerificationBannerPr
   };
 
   return (
-    <div className="border-b border-amber-500/40 bg-amber-500/10">
+    <div className="bg-amber-500/10 border-b border-amber-500/30">
       <div className="max-w-7xl mx-auto px-4 py-2.5 flex items-start gap-2.5">
-        <MailCheck className="h-4 w-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-500" />
+        <MailCheck className="h-4 w-4 shrink-0 mt-0.5 text-amber-500" />
         <div className="flex-1 min-w-0">
-          <p className="text-xs sm:text-sm text-foreground leading-relaxed">
-            <strong className="text-amber-700 dark:text-amber-500">Email verification required.</strong>{' '}
+          <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+            <span className="text-amber-600 font-semibold">Email verification required.</span>{' '}
             AI features (upload, scan, chat) are blocked until you verify{' '}
             <span className="font-medium">{userEmail}</span>. Check your inbox for the verification link.
           </p>
@@ -67,7 +72,7 @@ export function EmailVerificationBanner({ userEmail }: EmailVerificationBannerPr
             type="button"
             onClick={handleResend}
             disabled={resending}
-            className="inline-flex items-center gap-1 mt-1.5 text-xs font-medium text-amber-700 dark:text-amber-500 hover:text-amber-800 dark:hover:text-amber-400 underline underline-offset-2 disabled:opacity-50"
+            className="inline-flex items-center gap-1 mt-1.5 text-xs font-medium text-amber-600 hover:text-amber-700 underline underline-offset-2 disabled:opacity-50"
           >
             {resending ? (
               <>
@@ -81,6 +86,22 @@ export function EmailVerificationBanner({ userEmail }: EmailVerificationBannerPr
               </>
             )}
           </button>
+
+          {manualVerifyUrl && (
+            <div className="mt-2 p-2 bg-amber-500/10 rounded border border-amber-500/20">
+              <p className="text-[11px] text-muted-foreground mb-1">
+                Email delivery failed (Resend free tier can only send to your own Resend account email).
+                Use this link to verify manually:
+              </p>
+              <a
+                href={manualVerifyUrl}
+                className="inline-flex items-center gap-1 text-xs font-medium text-amber-600 hover:text-amber-700 underline underline-offset-2 break-all"
+              >
+                <ExternalLink className="h-3 w-3 shrink-0" />
+                {manualVerifyUrl.length > 60 ? manualVerifyUrl.substring(0, 60) + '...' : manualVerifyUrl}
+              </a>
+            </div>
+          )}
         </div>
         <button
           type="button"
@@ -88,7 +109,7 @@ export function EmailVerificationBanner({ userEmail }: EmailVerificationBannerPr
           aria-label="Dismiss notice"
           className="shrink-0 p-1 rounded hover:bg-amber-500/20 transition-colors"
         >
-          <X className="h-3.5 w-3.5 text-amber-700 dark:text-amber-500" />
+          <X className="h-3.5 w-3.5 text-amber-600" />
         </button>
       </div>
     </div>

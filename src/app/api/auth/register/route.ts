@@ -63,7 +63,20 @@ export async function POST(req: NextRequest) {
 
     // Send verification email (non-blocking — if Resend is not configured,
     // user can still log in but AI features will be blocked until verified)
-    await sendVerificationEmail(user.email, verificationToken);
+    const emailSent = await sendVerificationEmail(user.email, verificationToken);
+
+    // In dev mode (or when EMAIL_DEV_MODE is set), return the verification URL
+    // in the response so the developer can click it directly without needing
+    // Resend to be configured with a custom domain.
+    //
+    // This is useful because Resend's free tier (onboarding@resend.dev) can
+    // only send to the email you signed up to Resend with — so testing with
+    // other email addresses fails silently.
+    //
+    // In production, this is OFF by default. Set EMAIL_DEV_MODE=true in env
+    // to enable it (e.g., for testing before your custom domain is verified).
+    const isDevMode = process.env.NODE_ENV === 'development' || process.env.EMAIL_DEV_MODE === 'true';
+    const verificationUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://omniparse-ai.vercel.app'}/?verify_token=${verificationToken}`;
 
     const token = signToken({ userId: user.id, email: user.email });
 
@@ -71,7 +84,13 @@ export async function POST(req: NextRequest) {
       user,
       token,
       emailVerificationRequired: true,
-      message: 'Account created. Please check your email for a verification link to activate AI features.',
+      emailSent,
+      // Only include the URL in dev mode OR if email couldn't be sent
+      // (so the user isn't stuck without a way to verify)
+      ...(isDevMode || !emailSent ? { verificationUrl } : {}),
+      message: emailSent
+        ? 'Account created. Please check your email for a verification link to activate AI features.'
+        : 'Account created. We could not send the verification email (Resend may not be configured). Click the verification link shown in the response or contact support.',
     }, { status: 201 });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Registration failed';
