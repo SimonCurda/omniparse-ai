@@ -5,12 +5,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
-import { Upload, FileText, Sparkles, Loader2, AlertCircle, ShieldCheck, ShieldAlert, ShieldX, Timer, CheckCircle } from 'lucide-react';
+import { Upload, FileText, Sparkles, Loader2, AlertCircle, ShieldCheck, ShieldAlert, ShieldX, Timer, CheckCircle, TriangleAlert } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAppStore } from '@/stores/app-store';
 import type { InvoiceRow } from '@/stores/app-store';
 import { ConfidenceMeter } from './confidence-meter';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 
 function getToken(): string | null {
   return localStorage.getItem('op_token');
@@ -41,8 +42,29 @@ export function UploadTab() {
   const [results, setResults] = useState<InvoiceRow[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
   const [showWelcome, setShowWelcome] = useState(false);
+  // GDPR data transfer consent — required before user can upload documents
+  // that will be processed by US-based AI providers (OpenRouter, Groq, Google Gemini).
+  // Persisted in localStorage so user only has to confirm once per device.
+  // Reset on logout (see auth-view.tsx where op_token is removed).
+  const [legalConsent, setLegalConsent] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { setInvoices, invoices, user } = useAppStore();
+
+  // Load consent from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('op_legal_consent');
+      if (saved === 'true') setLegalConsent(true);
+    } catch { /* localStorage unavailable */ }
+  }, []);
+
+  const handleLegalConsentChange = (checked: boolean | 'indeterminate') => {
+    const value = checked === true;
+    setLegalConsent(value);
+    try {
+      localStorage.setItem('op_legal_consent', value ? 'true' : 'false');
+    } catch { /* localStorage unavailable */ }
+  };
 
   // Delay showing the Welcome card so it doesn't flicker while invoices are
   // being fetched from the API on initial mount.
@@ -84,6 +106,10 @@ export function UploadTab() {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
+    if (!legalConsent) {
+      toast.error('Please confirm the data transfer notice below before uploading.');
+      return;
+    }
     const validTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
     const dropped = Array.from(e.dataTransfer.files).filter((f) => validTypes.includes(f.type));
     if (dropped.length > 0) {
@@ -92,9 +118,15 @@ export function UploadTab() {
     } else {
       toast.error('Unsupported file type. Use PDF, JPEG, PNG, or WebP.');
     }
-  }, [files.length, plan, batchLimit]);
+  }, [files.length, plan, batchLimit, legalConsent]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!legalConsent) {
+      toast.error('Please confirm the data transfer notice below before uploading.');
+      // Reset the input value so the same file can be re-selected after consent
+      e.target.value = '';
+      return;
+    }
     if (e.target.files) {
       const newFiles = Array.from(e.target.files);
       const allowed = enforceBatchLimit(newFiles);
@@ -223,13 +255,54 @@ export function UploadTab() {
         </Card>
       )}
 
+      {/* GDPR data transfer notice + consent checkbox
+          Required before user can upload documents containing personal data
+          (e.g. vendor names, email addresses) that will be processed by
+          US-based AI providers (OpenRouter, Groq, Google Gemini). */ }
+      <Card className={'border-l-4 ' + (legalConsent ? 'border-l-emerald-500 bg-emerald-500/5' : 'border-l-amber-500 bg-amber-500/5')}>
+        <CardContent className="p-4">
+          <div className="flex items-start gap-3">
+            <TriangleAlert className={'h-5 w-5 shrink-0 mt-0.5 ' + (legalConsent ? 'text-emerald-500' : 'text-amber-500')} />
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm font-semibold mb-1">
+                {legalConsent ? 'Data transfer consent confirmed' : 'Data transfer notice — please read before uploading'}
+              </h3>
+              <p className="text-xs text-muted-foreground leading-relaxed mb-2">
+                Uploaded documents are processed by AI providers located in the United States
+                (OpenRouter, Groq, Google Gemini). Under GDPR Chapter V, transfers to the US require
+                a legal basis. <strong>Do not upload documents containing personal data of EU residents</strong>{' '}
+                (names, email addresses, phone numbers, ID numbers) unless you have a legal basis to
+                transfer that data to the US.
+              </p>
+              <p className="text-xs text-muted-foreground leading-relaxed mb-3">
+                We are in the process of executing Standard Contractual Clauses (SCCs) with each AI
+                provider to provide a compliant transfer mechanism. Until SCCs are in place, EU users
+                should not upload documents containing personal data subject to GDPR.
+              </p>
+              <label className="flex items-start gap-2 cursor-pointer">
+                <Checkbox
+                  checked={legalConsent}
+                  onCheckedChange={handleLegalConsentChange}
+                  className="mt-0.5"
+                />
+                <span className="text-xs text-foreground leading-relaxed">
+                  I confirm that I have a legal basis to transfer any personal data contained in my
+                  uploaded documents to US-based AI providers for processing, or that my documents do
+                  not contain personal data of EU data subjects.
+                </span>
+              </label>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <div
         onDragEnter={handleDrag}
         onDragLeave={handleDrag}
         onDragOver={handleDrag}
         onDrop={handleDrop}
-        className={'border-2 border-dashed rounded-xl p-12 text-center transition-all cursor-pointer ' + (dragActive ? 'border-amber-500 bg-amber-500/5' : 'border-border hover:border-amber-500/50 hover:bg-muted/30')}
-        onClick={() => fileInputRef.current?.click()}
+        className={'border-2 border-dashed rounded-xl p-12 text-center transition-all cursor-pointer ' + (dragActive ? 'border-amber-500 bg-amber-500/5' : 'border-border hover:border-amber-500/50 hover:bg-muted/30') + (legalConsent ? '' : ' opacity-50 pointer-events-none')}
+        onClick={() => legalConsent && fileInputRef.current?.click()}
       >
         <input ref={fileInputRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp" className="hidden" onChange={handleFileSelect} />
         <Upload className={'h-10 w-10 mx-auto mb-4 ' + (dragActive ? 'text-amber-500' : 'text-muted-foreground')} />

@@ -121,10 +121,24 @@ export default function AIActNoticePage() {
         <p>
           AI processing is performed by OpenRouter, Groq Inc., and Google LLC, all based in the United States. Under
           GDPR Chapter V, transfers to the US require appropriate safeguards. We rely on Standard
-          Contractual Clauses (SCCs) consistent with the Schrems II ruling. We are in the process of
-          executing SCCs with each US-based AI provider. Until SCCs are signed, please do not upload
-          documents containing personal data of EU data subjects to the AI processing features.
+          Contractual Clauses (SCCs) consistent with the Schrems II ruling.
         </p>
+        <div className="border-l-4 border-amber-500 bg-amber-500/5 p-3 my-3 rounded-r">
+          <p className="text-sm">
+            <strong className="text-amber-700 dark:text-amber-500">SCC Status: In progress (as of September 2026).</strong>{' '}
+            We are currently executing Standard Contractual Clauses with each US-based AI provider. Until SCCs are in place:
+          </p>
+          <ul className="list-disc pl-5 mt-2 text-sm space-y-1">
+            <li>EU users should not upload documents containing personal data of EU data subjects (names, email addresses, phone numbers, ID numbers) to AI processing features.</li>
+            <li>Non-EU users are not affected by this restriction (their data falls under their own jurisdiction&apos;s data laws, not GDPR).</li>
+            <li>EU users who upload documents containing no personal data (e.g. anonymized test data, generic financial data) are not affected by this restriction.</li>
+            <li>EU users uploading their own personal invoices (where they themselves are the data subject) may do so under consent (Art. 6(1)(a)), at their own discretion.</li>
+          </ul>
+          <p className="text-sm mt-2">
+            Once SCCs are executed with all three providers, this notice will be updated and the
+            restriction on EU personal data uploads will be lifted. Estimated timeline: 4-6 weeks.
+          </p>
+        </div>
         <p>
           Your primary database (Supabase) is hosted in Ireland (EU) — no transfer outside the EU for
           the primary data store.

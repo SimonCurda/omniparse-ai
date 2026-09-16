@@ -42,10 +42,15 @@ export default function TermsOfServicePage() {
       <section>
         <h2>3. Eligibility</h2>
         <p>
-          You must be at least 15 years old to use this Service (the age of digital consent under Czech
-          law implementing GDPR Art. 8). By registering an account, you confirm that you are at least 15
-          years old. If you are under 18, you confirm that you have obtained parental or guardian consent
-          to use this Service and to enter into these Terms.
+          You must be at least 13 years old to use this Service. The Service is not directed to children
+          under 13, and we do not knowingly collect personal data from children under 13. In jurisdictions
+          where the age of digital consent is higher (e.g., 15 in Czech Republic, 16 in Germany), parental
+          consent may be required — by registering an account, you confirm you have obtained such consent
+          if applicable.
+        </p>
+        <p>
+          If you are under 18, you confirm that you have obtained parental or guardian consent to use this
+          Service and to enter into these Terms.
         </p>
         <p>
           If you are registering on behalf of a business entity, you confirm that you have the authority
@@ -224,8 +229,48 @@ export default function TermsOfServicePage() {
       </section>
 
       <section>
-        <h2>15. Contact</h2>
-        <p>For questions about these Terms: <strong>damr58h@gmail.com</strong></p>
+        <h2>15. Non-Reliance on AI Output</h2>
+        <p>
+          You acknowledge and agree that:
+        </p>
+        <ul className="list-disc pl-6 space-y-1 text-sm">
+          <li>(a) AI-extracted data and chat responses are provided for informational purposes only;</li>
+          <li>(b) OmniParse does not warrant accuracy, completeness, timeliness, or fitness for any specific purpose;</li>
+          <li>(c) You are solely responsible for verifying all extracted data and chat responses against source documents before any use;</li>
+          <li>(d) If you rely on inaccurate AI output for financial decisions, tax filings, legal actions, vendor payments, or any other purpose, OmniParse is not liable for resulting damages, losses, or penalties;</li>
+          <li>(e) The confidence scores provided are model-generated estimates only and do not guarantee accuracy;</li>
+          <li>(f) Chat responses may contain errors, hallucinations, or be out of context — always cross-reference against the underlying invoice records before acting on them;</li>
+          <li>(g) OmniParse may modify, suspend, or discontinue AI features or change AI providers at any time without notice.</li>
+        </ul>
+        <p>
+          By accepting these Terms, you agree that you will not hold OmniParse, its operator, or its
+          AI providers liable for losses arising from reliance on AI output.
+        </p>
+      </section>
+
+      <section>
+        <h2>16. Acceptable Use Policy</h2>
+        <p>You agree not to:</p>
+        <ul className="list-disc pl-6 space-y-1 text-sm">
+          <li>Upload documents you do not have the right to process (copyright, privacy, or other legal restrictions);</li>
+          <li>Upload documents containing personal data of EU data subjects without a valid legal basis for transfer to US-based AI providers;</li>
+          <li>Use automated scraping, bots, or rate-limit bypass tools to overwhelm the Service;</li>
+          <li>Attempt IDOR (insecure direct object reference), prompt injection, SQL injection, XSS, or other exploits against the Service;</li>
+          <li>Upload child sexual abuse material (CSAM), hate speech, content promoting violence or terrorism, or content that is illegal in your jurisdiction or the operator&apos;s jurisdiction (Czech Republic);</li>
+          <li>Use the Service for fraud, money laundering, tax evasion, or any other illegal activity;</li>
+          <li>Reverse-engineer, decompile, or attempt to extract AI model weights, training data, or proprietary algorithms;</li>
+          <li>Resell or sublicense access to the Service without written permission;</li>
+          <li>Interfere with the proper functioning of the Service, including by introducing viruses, malware, or other malicious code.</li>
+        </ul>
+        <p>
+          We reserve the right to suspend or terminate your account immediately upon any violation of this
+          Acceptable Use Policy. Suspected illegal activity will be reported to the relevant authorities.
+        </p>
+      </section>
+
+      <section>
+        <h2>17. Contact</h2>
+        <p>For questions about these Terms: <strong>support@omniparse-ai.vercel.app</strong></p>
       </section>
 
       <p className="text-xs mt-8">

@@ -14,6 +14,7 @@ import { AuthView } from '@/components/landing/auth-view';
 import { DashboardShell } from '@/components/dashboard/dashboard-shell';
 import { LegalDrawer } from '@/components/landing/legal-drawer';
 import { CookieBanner } from '@/components/landing/cookie-banner';
+import { GdprBanner } from '@/components/landing/gdpr-banner';
 import { toast } from 'sonner';
 
 export default function Home() {
@@ -172,6 +173,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
+      <GdprBanner />
       <Navbar onAuth={handleAuth} />
       <main id="main-content" className="flex-1">
         <Hero onAuth={handleAuth} />

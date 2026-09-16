@@ -55,7 +55,7 @@ export default function PrivacyPolicyPage() {
           <li><strong>Account creation and authentication:</strong> Contractual necessity (Art. 6(1)(b)) — necessary to provide the Service you requested.</li>
           <li><strong>Document parsing:</strong> Consent (Art. 6(1)(a)) — you actively upload documents for processing. You can withdraw this consent by deleting your invoices.</li>
           <li><strong>Chat interactions:</strong> Consent (Art. 6(1)(a)) — you actively send messages to the AI chat.</li>
-          <li><strong>Terms acceptance and age confirmation:</strong> Consent (Art. 6(1)(a)) — recorded at signup with timestamps.</li>
+          <li><strong>Terms acceptance:</strong> Consent (Art. 6(1)(a)) — recorded at signup with timestamps. We do not collect or verify age at signup.</li>
           <li><strong>Security and service stability:</strong> Legitimate interest (Art. 6(1)(f)) — server logs for abuse prevention, rate limiting, and fraud detection.</li>
           <li><strong>Local storage preferences:</strong> Consent via cookie banner (Art. 6(1)(a) + ePrivacy Directive).</li>
         </ul>
@@ -140,10 +140,16 @@ export default function PrivacyPolicyPage() {
       <section>
         <h2>8. Children&apos;s Data (GDPR Art. 8)</h2>
         <p>
-          The Service is not directed at children under 15. At signup, we require users to confirm they
-          are at least 15 years old. If we learn that we have collected personal data from a child under
-          15 without parental consent, we will delete that data promptly. Contact us at
-          <strong> damr58h@gmail.com</strong> if you believe a child has provided us with personal data.
+          The Service is not directed at children under 13. We do not perform age verification at signup.
+          If you are under 18, you confirm that you have obtained parental or guardian consent to use this
+          Service. Parental consent requirements vary by jurisdiction — in the EU, the age of digital
+          consent is between 13 and 16 depending on the Member State (in Czech Republic, it is 15).
+        </p>
+        <p>
+          If we learn that we have collected personal data from a child under the applicable age of
+          digital consent without verifiable parental consent, we will delete that data promptly.
+          Contact us at <strong>support@omniparse-ai.vercel.app</strong> if you believe a child has
+          provided us with personal data.
         </p>
       </section>
 
@@ -172,7 +178,72 @@ export default function PrivacyPolicyPage() {
       </section>
 
       <section>
-        <h2>11. Changes to This Policy</h2>
+        <h2>11. Data Processing Addendum (DPA)</h2>
+        <p>
+          This Data Processing Addendum (&quot;DPA&quot;) applies when you (the &quot;Customer&quot;) act as a data
+          controller and use the Service to process personal data on behalf of data subjects. This DPA
+          reflects the parties&apos; agreement with respect to the processing of personal data under
+          GDPR Art. 28.
+        </p>
+        <h3 className="text-base font-semibold mt-4 mb-2">11.1 Roles and Scope</h3>
+        <ul className="list-disc pl-6 space-y-1 text-sm">
+          <li><strong>Customer</strong> is the data controller. Customer determines the purposes and means of processing.</li>
+          <li><strong>OmniParse</strong> (operated by Simon Curda) is the data processor. We process personal data only on documented instructions from Customer.</li>
+          <li>We process documents and extracted data per your instructions (via the Service&apos;s UI and API). We do not use your data for any purpose other than providing the Service.</li>
+        </ul>
+        <h3 className="text-base font-semibold mt-4 mb-2">11.2 Subprocessors</h3>
+        <p className="text-sm">OmniParse engages the following subprocessors. Customer grants general written authorization for OmniParse to engage these subprocessors; the current list is maintained in this Privacy Policy and material changes will be notified 30 days in advance:</p>
+        <ul className="list-disc pl-6 space-y-1 text-sm mt-2">
+          <li><strong>Vercel Inc.</strong> (United States) — Web hosting and serverless function execution</li>
+          <li><strong>Supabase Inc.</strong> (Ireland, EU) — Primary database hosting (PostgreSQL)</li>
+          <li><strong>OpenRouter</strong> (United States) — AI inference (primary vision + text)</li>
+          <li><strong>Groq Inc.</strong> (United States) — AI inference (fallback vision + text)</li>
+          <li><strong>Google LLC</strong> (United States) — AI inference (final fallback vision)</li>
+          <li><strong>Stripe Inc.</strong> (United States) — Payment processing (paid plans only)</li>
+        </ul>
+        <h3 className="text-base font-semibold mt-4 mb-2">11.3 Data Subject Rights</h3>
+        <p className="text-sm">
+          Customer is responsible for responding to data subject rights requests (access, rectification,
+          erasure, portability, objection). OmniParse will assist Customer with such requests, including
+          by exporting or deleting personal data upon Customer&apos;s written request. Contact
+          <strong> support@omniparse-ai.vercel.app</strong> with the subject &quot;DPA — Data Subject Request&quot;.
+        </p>
+        <h3 className="text-base font-semibold mt-4 mb-2">11.4 Security Measures (GDPR Art. 32)</h3>
+        <p className="text-sm">OmniParse implements the following technical and organizational measures:</p>
+        <ul className="list-disc pl-6 space-y-1 text-sm mt-2">
+          <li>AES-256-GCM encryption for IMAP credentials at rest</li>
+          <li>bcrypt password hashing (10 rounds)</li>
+          <li>TLS 1.2+ for all data in transit</li>
+          <li>JWT-based authentication with 7-day expiry</li>
+          <li>Per-request user scoping — no query returns cross-user data</li>
+          <li>File data auto-purge after 30 days (configurable)</li>
+          <li>Account deletion with cascade (full erasure)</li>
+          <li>Audit log of significant actions (invoice create/approve/delete)</li>
+        </ul>
+        <h3 className="text-base font-semibold mt-4 mb-2">11.5 International Transfers (GDPR Chapter V)</h3>
+        <p className="text-sm">
+          Personal data may be transferred to the United States for AI processing by OpenRouter, Groq, and
+          Google. The US does not have an adequacy decision. We rely on Standard Contractual Clauses
+          (SCCs) consistent with the Schrems II ruling. <strong>We are currently in the process of executing
+          SCCs with each US-based AI provider.</strong> Until SCCs are in place, EU-based Customers should not
+          upload documents containing personal data of EU data subjects to AI processing features.
+        </p>
+        <h3 className="text-base font-semibold mt-4 mb-2">11.6 Duration and Deletion</h3>
+        <p className="text-sm">
+          This DPA continues for the duration of your subscription. Upon account termination, all personal
+          data is deleted within 30 days (file binaries) and 90 days (extracted data, audit logs), except
+          where longer retention is required by law.
+        </p>
+        <h3 className="text-base font-semibold mt-4 mb-2">11.7 Acceptance</h3>
+        <p className="text-sm">
+          By uploading documents to the Service and checking the data transfer consent box in the Upload
+          tab, Customer accepts this DPA on behalf of themselves and any data subjects whose personal data
+          they upload.
+        </p>
+      </section>
+
+      <section>
+        <h2>12. Changes to This Policy</h2>
         <p>
           We may update this Privacy Policy from time to time. Material changes will be notified via
           the Service or by email. The &quot;Last updated&quot; date at the top of this page indicates
@@ -182,7 +253,7 @@ export default function PrivacyPolicyPage() {
       </section>
 
       <section>
-        <h2>12. Contact</h2>
+        <h2>13. Contact</h2>
         <ul>
           <li><strong>Data controller:</strong> Simon Curda, Czech Republic</li>
           <li><strong>General contact &amp; all GDPR requests:</strong> damr58h@gmail.com</li>
