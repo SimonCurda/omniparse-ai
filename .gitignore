@@ -48,3 +48,9 @@ logs
 .cache
 .turbo
 package-lock.json
+
+# Database backups (created by scripts/backup-db.sh — never commit these,
+# they contain user data)
+backups/
+*.sql.gz
+*.sql.bak

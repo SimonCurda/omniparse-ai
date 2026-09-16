@@ -22,6 +22,57 @@ const ALLOWED_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png', 'im
 const MAX_SIZE = 10 * 1024 * 1024;
 
 /**
+ * Detect the actual file type by inspecting magic bytes (file signature).
+ *
+ * The Content-Type header set by the browser can be spoofed — a malicious
+ * user could upload an executable or a polyglot file with a .pdf extension
+ * and Content-Type: application/pdf. This function inspects the actual bytes
+ * to verify the file is what it claims to be.
+ *
+ * Returns one of the ALLOWED_TYPES, or 'unknown' if the signature doesn't
+ * match any known type.
+ *
+ * Signature reference: https://en.wikipedia.org/wiki/List_of_file_signatures
+ */
+function detectFileTypeFromMagicBytes(buf: Buffer): string {
+  if (buf.length < 12) return 'unknown';
+
+  // PDF: starts with %PDF- (hex: 25 50 44 46 2D)
+  if (
+    buf[0] === 0x25 && buf[1] === 0x50 && buf[2] === 0x44 &&
+    buf[3] === 0x46 && buf[4] === 0x2D
+  ) {
+    return 'application/pdf';
+  }
+
+  // JPEG: starts with \xFF\xD8\xFF
+  if (buf[0] === 0xFF && buf[1] === 0xD8 && buf[2] === 0xFF) {
+    return 'image/jpeg';
+  }
+
+  // PNG: starts with \x89PNG\r\n\x1A\n (8 bytes)
+  if (
+    buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47 &&
+    buf[4] === 0x0D && buf[5] === 0x0A && buf[6] === 0x1A && buf[7] === 0x0A
+  ) {
+    return 'image/png';
+  }
+
+  // WebP: RIFF....WEBP
+  // Bytes 0-3: "RIFF" (52 49 46 46)
+  // Bytes 4-7: file size (any)
+  // Bytes 8-11: "WEBP" (57 45 42 50)
+  if (
+    buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46 &&
+    buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50
+  ) {
+    return 'image/webp';
+  }
+
+  return 'unknown';
+}
+
+/**
  * Extract invoice fields from prose text (last resort when the AI model
  * doesn't output JSON but writes its analysis as text).
  *
@@ -495,6 +546,28 @@ export async function POST(req: NextRequest) {
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const base64 = buffer.toString('base64');
+
+    // ─── Magic byte validation ────────────────────────────────────────
+    // The Content-Type header is set by the browser and can be spoofed.
+    // Verify the actual file content matches the claimed MIME type by
+    // inspecting the first few bytes (file signature).
+    //
+    // Signatures:
+    //   PDF:   %PDF- (25 50 44 46 2D)
+    //   JPEG:  \xFF\xD8\xFF
+    //   PNG:   \x89PNG\r\n\x1A\n (89 50 4E 47 0D 0A 1A 0A)
+    //   WebP:  RIFF....WEBP (52 49 46 46 ?? ?? ?? ?? 57 45 42 50)
+    //
+    // Rejects polyglot files, MIME-type spoofing, and corrupted uploads
+    // that could crash pdfjs-dist or the image parser.
+    const detectedType = detectFileTypeFromMagicBytes(buffer);
+    if (detectedType !== file.type) {
+      console.warn(`[parse] Magic byte mismatch: claimed=${file.type} detected=${detectedType}`);
+      return NextResponse.json(
+        { error: `File content does not match its claimed type. Claimed ${file.type}, but file signature indicates ${detectedType}. Upload rejected for security.` },
+        { status: 400 },
+      );
+    }
     const dataUri = `data:${file.type};base64,${base64}`;
 
     // ── Metadata extraction for tampering detection ──
