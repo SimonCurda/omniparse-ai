@@ -126,18 +126,18 @@ export default function AIActNoticePage() {
         </p>
         <div className="border-l-4 border-amber-500 bg-amber-500/5 p-3 my-3 rounded-r">
           <p className="text-sm">
-            <strong className="text-amber-700 dark:text-amber-500">SCC Status: In progress (as of September 2026).</strong>{' '}
-            We are currently executing Standard Contractual Clauses with each US-based AI provider. Until SCCs are in place:
+            <strong className="text-amber-700 dark:text-amber-500">SCC Status by provider:</strong>
           </p>
           <ul className="list-disc pl-5 mt-2 text-sm space-y-1">
-            <li>EU users should not upload documents containing personal data of EU data subjects (names, email addresses, phone numbers, ID numbers) to AI processing features.</li>
-            <li>Non-EU users are not affected by this restriction (their data falls under their own jurisdiction&apos;s data laws, not GDPR).</li>
-            <li>EU users who upload documents containing no personal data (e.g. anonymized test data, generic financial data) are not affected by this restriction.</li>
-            <li>EU users uploading their own personal invoices (where they themselves are the data subject) may do so under consent (Art. 6(1)(a)), at their own discretion.</li>
+            <li><strong>Groq Inc.</strong> — SCCs in effect (October 15, 2025). DPA with EU SCC Module 2 is self-executing upon acceptance of Groq Services Agreement. Governing law: Ireland. Competent authority: Irish DPC.</li>
+            <li><strong>Mistral AI</strong> — No SCC needed (EU-based, Paris, France). Transfers stay within the EU.</li>
+            <li><strong>OpenRouter</strong> — SCC status: pending verification.</li>
+            <li><strong>Google LLC (Gemini)</strong> — SCC status: pending verification. Google Cloud DPA available at cloud.google.com/terms/data-processing-addendum.</li>
           </ul>
           <p className="text-sm mt-2">
-            Once SCCs are executed with all three providers, this notice will be updated and the
-            restriction on EU personal data uploads will be lifted. Estimated timeline: 4-6 weeks.
+            With Groq SCCs in effect and Mistral being EU-based, OmniParse has two GDPR-compliant AI
+            providers (Mistral for EU-only processing, Groq for US processing with SCCs). OpenRouter
+            and Google remain as fallbacks pending SCC verification.
           </p>
         </div>
         <p>

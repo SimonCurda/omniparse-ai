@@ -119,9 +119,18 @@ export default function PrivacyPolicyPage() {
           For EU users concerned about US transfers, ensuring Mistral is configured means vision extraction stays within the EU.
         </p>
         <p>
+          <strong>SCC Status:</strong>
+          <ul className="list-disc pl-6 space-y-1 mt-2 text-sm">
+            <li><strong>Groq Inc.</strong> — SCCs in effect (Groq DPA effective October 15, 2025; EU SCCs Module 2 deemed signed upon acceptance of Groq Services Agreement). <a href="https://groq.com/legal/dpa" target="_blank" rel="noopener">Groq DPA</a>.</li>
+            <li><strong>Mistral AI</strong> — No SCC needed (EU-based, Paris, France — transfers stay within the EU).</li>
+            <li><strong>OpenRouter</strong> — SCC status: pending verification.</li>
+            <li><strong>Google LLC (Gemini)</strong> — SCC status: pending verification. Google Cloud DPA available at <a href="https://cloud.google.com/terms/data-processing-addendum" target="_blank" rel="noopener">cloud.google.com/terms/data-processing-addendum</a>.</li>
+          </ul>
+        </p>
+        <p>
           <strong>Important:</strong> When Mistral is unavailable (rate-limited, model unavailable, or no MISTRAL_API_KEY configured), documents fall through to US-based providers (OpenRouter, Groq, Google).
           Under GDPR Chapter V, transfers to the US require Standard Contractual Clauses (SCCs) consistent with the Schrems II ruling.
-          We are in the process of executing SCCs with each US provider. Until those are signed, transfers to US AI providers are at your own risk — EU users should not upload documents containing personal data of EU data subjects unless Mistral is the only provider used (which is not guaranteed by the cascade).
+          Groq SCCs are in effect. OpenRouter and Google SCCs are pending verification — EU users should exercise caution when uploading personal data of EU data subjects until all SCCs are confirmed.
         </p>
         <p>
           <strong>Your documents are NOT used to train AI models.</strong> All four AI providers (Mistral, OpenRouter, Groq, Google) have policies against using customer API inputs for model training. Documents are processed
@@ -230,11 +239,21 @@ export default function PrivacyPolicyPage() {
         </ul>
         <h3 className="text-base font-semibold mt-4 mb-2">11.5 International Transfers (GDPR Chapter V)</h3>
         <p className="text-sm">
-          Personal data may be transferred to the United States for AI processing by OpenRouter, Groq, and
+          Personal data may be transferred to the United States for AI processing by Groq, OpenRouter, and
           Google. The US does not have an adequacy decision. We rely on Standard Contractual Clauses
-          (SCCs) consistent with the Schrems II ruling. <strong>We are currently in the process of executing
-          SCCs with each US-based AI provider.</strong> Until SCCs are in place, EU-based Customers should not
-          upload documents containing personal data of EU data subjects to AI processing features.
+          (SCCs) consistent with the Schrems II ruling. <strong>SCC status by provider:</strong>
+        </p>
+        <ul className="list-disc pl-6 space-y-1 text-sm mt-2">
+          <li><strong>Groq Inc.</strong> — SCCs in effect (October 15, 2025). DPA with EU SCC Module 2 is self-executing upon acceptance of Groq Services Agreement.</li>
+          <li><strong>Mistral AI</strong> — No SCC needed (EU-based, Paris, France).</li>
+          <li><strong>OpenRouter</strong> — SCC status: pending verification.</li>
+          <li><strong>Google LLC</strong> — SCC status: pending verification. Google Cloud DPA available.</li>
+        </ul>
+        <p className="text-sm mt-2">
+          Until SCCs are confirmed for OpenRouter and Google, EU-based Customers should primarily rely on
+          Mistral (EU-based) and Groq (SCCs in effect) for AI processing. The platform's cascade
+          prioritizes Mistral first, then OpenRouter, then Groq, then Google — so EU users may want to
+          ensure Mistral is configured to keep processing within the EU.
         </p>
         <h3 className="text-base font-semibold mt-4 mb-2">11.6 Duration and Deletion</h3>
         <p className="text-sm">
