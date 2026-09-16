@@ -116,11 +116,7 @@ export default function TermsOfServicePage() {
           communications, or tax filings based on them.
         </p>
         <p>
-          <strong>AI providers:</strong> OmniParse uses third-party AI providers (currently OpenRouter,
-          Groq, and Google Gemini) for vision extraction and text generation. These providers may
-          experience rate limits, outages, or model deprecations that affect the availability and
-          quality of AI features. We do not control and are not responsible for the behavior of these
-          upstream models beyond our integration layer.
+          <strong>AI providers:</strong> OmniParse uses third-party AI providers for vision extraction and text generation. The primary provider is <strong>Mistral AI</strong> (Paris, France — EU-based, no SCC required for transfers). Fallback providers (used when Mistral is unavailable) are OpenRouter, Groq, and Google Gemini (all US-based). These providers may experience rate limits, outages, or model deprecations that affect the availability and quality of AI features. We do not control and are not responsible for the behavior of these upstream models beyond our integration layer.
         </p>
         <p>
           See our <a href="/ai-act-notice" className="underline">AI Transparency Notice</a> for full
@@ -138,8 +134,9 @@ export default function TermsOfServicePage() {
         <p>
           We do not warrant that the Service will be uninterrupted, error-free, or free of harmful
           components. We do not warrant that AI extraction results will be accurate or complete.
-          AI providers (OpenRouter, Groq, Google Gemini) may experience rate limits, model deprecations,
-          or outages that affect availability of AI features.
+          AI providers (Mistral, OpenRouter, Groq, Google Gemini) may experience rate limits, model
+          deprecations, or outages that affect availability of AI features. Mistral is EU-based (Paris);
+          OpenRouter, Groq, and Google are US-based.
         </p>
       </section>
 
@@ -270,7 +267,7 @@ export default function TermsOfServicePage() {
 
       <section>
         <h2>17. Contact</h2>
-        <p>For questions about these Terms: <strong>support@omniparse-ai.vercel.app</strong></p>
+        <p>For questions about these Terms: <strong>damr58h@gmail.com</strong></p>
       </section>
 
       <p className="text-xs mt-8">

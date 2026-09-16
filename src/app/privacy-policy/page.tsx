@@ -99,24 +99,32 @@ export default function PrivacyPolicyPage() {
           on our behalf as a subprocessor under GDPR Art. 28. We have signed or are in the process of
           signing Data Processing Agreements (DPAs) with each provider.
         </p>
+        <p className="mt-3 p-3 bg-emerald-500/5 border-l-4 border-emerald-500 rounded-r">
+          <strong className="text-emerald-700 dark:text-emerald-500">EU-based AI provider available.</strong>{' '}
+          Mistral AI (Paris, France) processes documents entirely within the EU. Transfers to Mistral
+          are not subject to GDPR Chapter V restrictions (no SCC needed). We prioritize Mistral for
+          vision extraction when available.
+        </p>
         <ul>
           <li><strong>Vercel Inc.</strong> (United States) — Web hosting and serverless function execution. Processes: IP addresses, request metadata. <a href="https://vercel.com/legal/dpa" target="_blank" rel="noopener">Vercel DPA</a>.</li>
           <li><strong>Supabase Inc.</strong> (Ireland, EU) — Primary database hosting (PostgreSQL). Processes: all stored account data, invoices, chat messages. <a href="https://supabase.com/legal/dpa" target="_blank" rel="noopener">Supabase DPA</a>.</li>
-          <li><strong>Groq Inc.</strong> (United States) — AI inference provider. Processes: uploaded document content (PDF/images, transiently), chat messages (transiently) for AI extraction and chat responses. <a href="https://groq.com/legal/dpa" target="_blank" rel="noopener">Groq DPA</a> (paid tier).</li>
-          <li><strong>OpenRouter</strong> (United States) — AI inference aggregator. Used as a fallback when Groq is unavailable. Processes: same as Groq (transient document content and chat messages). <a href="https://openrouter.ai/legal/privacy" target="_blank" rel="noopener">OpenRouter Privacy</a>.</li>
+          <li><strong>Mistral AI</strong> (Paris, France — EU) — Primary AI inference provider. Processes: uploaded document content (transiently) for vision extraction. <strong>EU-based — no SCC required.</strong> <a href="https://mistral.ai/legal/privacy-policy" target="_blank" rel="noopener">Mistral Privacy Policy</a>.</li>
+          <li><strong>OpenRouter</strong> (United States) — AI inference aggregator. Fallback when Mistral is unavailable. Processes: transient document content and chat messages. <a href="https://openrouter.ai/legal/privacy" target="_blank" rel="noopener">OpenRouter Privacy</a>.</li>
+          <li><strong>Groq Inc.</strong> (United States) — AI inference provider. Secondary fallback. Processes: uploaded document content (transiently), chat messages (transiently) for AI extraction and chat responses. <a href="https://groq.com/legal/dpa" target="_blank" rel="noopener">Groq DPA</a> (paid tier).</li>
+          <li><strong>Google LLC</strong> (United States) — Final fallback AI inference provider. Models used: Gemini 2.0 Flash, Gemini 2.5 Flash, Gemini 1.5 Flash.</li>
           <li><strong>Stripe Inc.</strong> (United States) — Payment processing for paid plans. Processes: email, billing details. <a href="https://stripe.com/legal/dpa" target="_blank" rel="noopener">Stripe DPA</a>.</li>
         </ul>
         <p>
-          <strong>Important:</strong> Your documents are sent to Groq and/or OpenRouter for AI processing.
-          Both are US-based providers. Under GDPR Chapter V (transfers to third countries), since the US
-          lacks an adequacy decision, we rely on Standard Contractual Clauses (SCCs) for these transfers,
-          consistent with the Schrems II ruling. We are in the process of executing SCCs with each US
-          provider. Until those are signed, transfers to US AI providers are at your own risk — please
-          do not upload documents containing personal data of EU data subjects until SCCs are in place.
+          <strong>AI vision cascade:</strong> Mistral (EU, primary) → OpenRouter (US, fallback) → Groq (US, secondary fallback) → Google Gemini (US, final fallback).
+          For EU users concerned about US transfers, ensuring Mistral is configured means vision extraction stays within the EU.
         </p>
         <p>
-          <strong>Your documents are NOT used to train AI models.</strong> Groq and OpenRouter both
-          have policies against using customer API inputs for model training. Documents are processed
+          <strong>Important:</strong> When Mistral is unavailable (rate-limited, model unavailable, or no MISTRAL_API_KEY configured), documents fall through to US-based providers (OpenRouter, Groq, Google).
+          Under GDPR Chapter V, transfers to the US require Standard Contractual Clauses (SCCs) consistent with the Schrems II ruling.
+          We are in the process of executing SCCs with each US provider. Until those are signed, transfers to US AI providers are at your own risk — EU users should not upload documents containing personal data of EU data subjects unless Mistral is the only provider used (which is not guaranteed by the cascade).
+        </p>
+        <p>
+          <strong>Your documents are NOT used to train AI models.</strong> All four AI providers (Mistral, OpenRouter, Groq, Google) have policies against using customer API inputs for model training. Documents are processed
           in memory only and discarded after the response is generated.
         </p>
       </section>
@@ -148,7 +156,7 @@ export default function PrivacyPolicyPage() {
         <p>
           If we learn that we have collected personal data from a child under the applicable age of
           digital consent without verifiable parental consent, we will delete that data promptly.
-          Contact us at <strong>support@omniparse-ai.vercel.app</strong> if you believe a child has
+          Contact us at <strong>damr58h@gmail.com</strong> if you believe a child has
           provided us with personal data.
         </p>
       </section>
@@ -206,7 +214,7 @@ export default function PrivacyPolicyPage() {
           Customer is responsible for responding to data subject rights requests (access, rectification,
           erasure, portability, objection). OmniParse will assist Customer with such requests, including
           by exporting or deleting personal data upon Customer&apos;s written request. Contact
-          <strong> support@omniparse-ai.vercel.app</strong> with the subject &quot;DPA — Data Subject Request&quot;.
+          <strong> damr58h@gmail.com</strong> with the subject &quot;DPA — Data Subject Request&quot;.
         </p>
         <h3 className="text-base font-semibold mt-4 mb-2">11.4 Security Measures (GDPR Art. 32)</h3>
         <p className="text-sm">OmniParse implements the following technical and organizational measures:</p>

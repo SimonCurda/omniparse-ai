@@ -57,12 +57,13 @@ export default function AIActNoticePage() {
           <li><strong>Purpose:</strong> Extract structured data from business documents and provide conversational analysis</li>
           <li><strong>AI providers:</strong>
             <ul>
-              <li><strong>OpenRouter</strong> (United States) — primary provider. Models used: Ling 3.0 Flash VL, Google Gemma 4 (31B/26B), NVIDIA Nemotron, and others as availability changes.</li>
-              <li><strong>Groq Inc.</strong> (United States) — secondary provider. Models used: Llama 3.1 8B Instant, Llama 4 Scout 17B, Qwen 3.6 27B.</li>
+              <li><strong>Mistral AI</strong> (Paris, France — EU) — primary provider. EU-based — transfers stay within EU, no SCC required. Models used: Pixtral Large (124B vision), Pixtral 12B (vision).</li>
+              <li><strong>OpenRouter</strong> (United States) — secondary provider. Used when Mistral is unavailable. Models used: Ling 3.0 Flash VL, Google Gemma 4 (31B/26B), NVIDIA Nemotron, and others as availability changes.</li>
+              <li><strong>Groq Inc.</strong> (United States) — tertiary provider. Models used: Llama 3.1 8B Instant, Llama 4 Scout 17B, Qwen 3.6 27B.</li>
               <li><strong>Google Gemini</strong> (United States) — final fallback provider. Models used: Gemini 2.0 Flash, Gemini 2.5 Flash, Gemini 1.5 Flash.</li>
             </ul>
           </li>
-          <li><strong>Model selection policy:</strong> We use a 3-tier cascade approach — OpenRouter is tried first (8 models with 5-key rotation), with automatic fallback to Groq (3 models), then Google Gemini (3 models with 3-key rotation) on rate-limit or unavailability. Free-tier quotas on all providers.</li>
+          <li><strong>Model selection policy:</strong> We use a 4-tier cascade approach — Mistral (EU, primary) is tried first, with automatic fallback to OpenRouter (8 models with 5-key rotation), then Groq (3 models), then Google Gemini (3 models with 3-key rotation) on rate-limit or unavailability. For EU users concerned about US transfers, configuring MISTRAL_API_KEY keeps vision extraction within the EU when Mistral is available.</li>
         </ul>
       </section>
 

@@ -87,7 +87,114 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
     openaiMessages.push({ role: msg.role === 'model' ? 'assistant' : 'user', content: parts });
   }
 
-  // ─── Try OpenRouter vision models FIRST ──────────────────────────────
+  // ─── Try Mistral FIRST (EU-based, GDPR-friendly) ────────────────────
+  // STRATEGIC: Mistral AI is based in Paris, France (EU). Transfers to them
+  // stay within the EU — NO SCC NEEDED, NO Schrems II issue.
+  //
+  // This means: even before SCCs with US providers (OpenRouter, Groq, Google)
+  // are signed, EU users CAN legally use OmniParse if we route through Mistral.
+  //
+  // So we try Mistral FIRST for vision extraction. Falls through to OpenRouter/
+  // Groq/Google if Mistral is rate-limited or unavailable.
+  //
+  // Models tried (in order):
+  //   1. pixtral-large-2411 — best quality vision model (124B params)
+  //   2. pixtral-12b-2409   — smaller, faster, often free-tier eligible
+  //
+  // Supports up to 3 MISTRAL_API_KEY entries for rotation.
+  const mistralKeys = [
+    process.env.MISTRAL_API_KEY,
+    process.env.MISTRAL_API_KEY_2,
+    process.env.MISTRAL_API_KEY_3,
+  ].filter(Boolean) as string[];
+
+  if (mistralKeys.length > 0) {
+    const mistralModels = [
+      'pixtral-large-latest',   // best quality vision model
+      'pixtral-12b-latest',     // smaller, faster, often free-tier eligible
+    ];
+
+    for (const mistralModel of mistralModels) {
+      for (let keyIdx = 0; keyIdx < mistralKeys.length; keyIdx++) {
+        const mistralKey = mistralKeys[keyIdx];
+        try {
+          console.warn(`[gemini] Trying Mistral vision: ${mistralModel} (key ${keyIdx + 1}/${mistralKeys.length})...`);
+
+          // Mistral API is OpenAI-compatible — uses the same message format
+          // we already built. No conversion needed.
+          const res = await fetch('https://api.mistral.ai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${mistralKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: mistralModel,
+              messages: openaiMessages,
+              max_tokens: 4096,
+              temperature: 0.1,
+              // Mistral supports response_format for JSON mode on some models
+              response_format: { type: 'json_object' },
+            }),
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            const content = data.choices?.[0]?.message?.content || '';
+            if (content) {
+              const usedModel = data.model || mistralModel;
+              console.warn(`[gemini] Mistral vision succeeded (model: ${usedModel}, key ${keyIdx + 1})!`);
+              return content;
+            }
+          }
+
+          // If JSON mode failed (400/422), try WITHOUT response_format
+          if (res.status === 400 || res.status === 422) {
+            console.warn(`[gemini] Mistral ${mistralModel} doesn't support JSON mode. Retrying without (key ${keyIdx + 1})...`);
+            const fbRes = await fetch('https://api.mistral.ai/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${mistralKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                model: mistralModel,
+                messages: openaiMessages,
+                max_tokens: 4096,
+                temperature: 0.1,
+                // No response_format — free-text mode
+              }),
+            });
+            if (fbRes.ok) {
+              const fbData = await fbRes.json();
+              const fbContent = fbData.choices?.[0]?.message?.content || '';
+              if (fbContent) {
+                console.warn(`[gemini] Mistral vision succeeded (free-text, model: ${mistralModel}, key ${keyIdx + 1})!`);
+                return fbContent;
+              }
+            }
+            // This model doesn't work — try next model
+            break;
+          }
+
+          // 429 — rate limited, try next key
+          if (res.status === 429) {
+            console.warn(`[gemini] Mistral ${mistralModel} rate limited (key ${keyIdx + 1}). Trying next key...`);
+            continue;
+          }
+
+          // Other error — try next model
+          console.warn(`[gemini] Mistral ${mistralModel} failed (key ${keyIdx + 1}, status ${res.status})`);
+          break;
+        } catch (err) {
+          console.warn(`[gemini] Mistral ${mistralModel} error (key ${keyIdx + 1}):`, err instanceof Error ? err.message : String(err));
+          continue;
+        }
+      }
+    }
+  }
+
+  // ─── Try OpenRouter vision models NEXT ──────────────────────────────
   // OpenRouter's Gemma 4 models produce clean JSON without thinking leaks.
   // Groq's qwen3.6-27b is a reasoning model that leaks its thinking into
   // JSON values (e.g. vendor="High confidence", invoiceNumber="High"),
@@ -340,7 +447,7 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
     }
   }
 
-  throw new Error('All vision models (OpenRouter + Groq + Gemini) are temporarily unavailable. Please try again in a moment.');
+  throw new Error('All vision models (Mistral + OpenRouter + Groq + Gemini) are temporarily unavailable. Please try again in a moment.');
 }
 
 /**
