@@ -506,6 +506,8 @@ export async function geminiChatCall(
     process.env.MISTRAL_API_KEY_3,
   ].filter(Boolean) as string[];
 
+  const triedMistralModels: string[] = [];
+
   if (mistralKeys.length > 0) {
     const mistralChatModels = [
       'mistral-small-latest',    // fast, good quality for text extraction
@@ -566,6 +568,7 @@ export async function geminiChatCall(
                 return fbContent;
               }
             }
+            triedMistralModels.push(mistralModel);
             break; // model doesn't work, try next model
           }
 
@@ -575,12 +578,17 @@ export async function geminiChatCall(
           }
 
           console.warn(`[gemini-chat] Mistral ${mistralModel} failed (key ${keyIdx + 1}, status ${res.status})`);
+          triedMistralModels.push(mistralModel);
           break;
         } catch (err) {
           console.warn(`[gemini-chat] Mistral ${mistralModel} error:`, err instanceof Error ? err.message : String(err));
+          triedMistralModels.push(mistralModel);
           continue;
         }
       }
+    }
+    if (triedMistralModels.length > 0) {
+      console.warn(`[gemini-chat] All Mistral models failed: ${triedMistralModels.join(', ')}. Falling through to Groq...`);
     }
   }
 
@@ -833,5 +841,6 @@ export async function geminiChatCall(
     }
   }
 
-  throw new Error(`AI is temporarily busy. Please wait 30 seconds and try again. (Tried: ${triedModels.join(', ') || 'all models'})`);
+  const allTriedModels = [...triedMistralModels, ...triedModels];
+  throw new Error(`AI is temporarily busy. Please wait 30 seconds and try again. (Tried: ${allTriedModels.join(', ') || 'all models'})`);
 }
