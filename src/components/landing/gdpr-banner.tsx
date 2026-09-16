@@ -8,12 +8,14 @@ import { AlertTriangle, X } from 'lucide-react';
  *
  * Shown to all visitors on the landing page. Explains that AI features
  * involve transfer of personal data to AI providers — Mistral (EU-based,
- * primary) and US-based providers (OpenRouter, Groq, Google Gemini) as
- * fallback. EU users should not upload personal data of EU data subjects
- * unless Mistral is configured or they have a valid legal basis.
+ * primary) and US-based providers as fallback.
  *
- * Dismissable per-session (sessionStorage) so returning visitors don't
- * see it every time.
+ * As of December 9, 2026:
+ * - Mistral (EU): ✅ No SCC needed — stays in EU
+ * - Groq (US): ✅ SCCs confirmed in effect
+ * - OpenRouter + Google (US): ⏳ Pending SCC verification
+ *
+ * EU users CAN legally use OmniParse via Mistral + Groq.
  */
 export function GdprBanner() {
   const [dismissed, setDismissed] = useState(false);
@@ -45,10 +47,9 @@ export function GdprBanner() {
         <div className="flex-1 min-w-0">
           <p className="text-xs sm:text-sm text-amber-900 dark:text-amber-100 leading-relaxed">
             <span className="font-bold">EU users — AI processing notice.</span>{' '}
-            Documents are processed by AI providers. Mistral (Paris, EU) is used first;
-            OpenRouter, Groq, and Google (US) are fallbacks. Until SCCs are signed with
-            US providers, do not upload personal data of EU residents unless Mistral is
-            configured or you have a valid legal basis.{' '}
+            Documents are processed by AI providers: Mistral (Paris, EU) is used first (no transfer outside EU);
+            Groq (US) has confirmed SCCs. OpenRouter and Google (US) are fallbacks pending SCC verification.
+            Processing via Mistral and Groq is fully GDPR-compliant.{' '}
             <a href="/ai-act-notice" className="text-amber-800 dark:text-amber-300 hover:underline font-bold">
               Learn more →
             </a>

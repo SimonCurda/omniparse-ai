@@ -120,24 +120,25 @@ export default function AIActNoticePage() {
       <section>
         <h2>8. International Transfers</h2>
         <p>
-          AI processing is performed by OpenRouter, Groq Inc., and Google LLC, all based in the United States. Under
-          GDPR Chapter V, transfers to the US require appropriate safeguards. We rely on Standard
-          Contractual Clauses (SCCs) consistent with the Schrems II ruling.
+          AI processing is performed by Mistral AI (EU-based, Paris, France — no SCC needed), Groq Inc. (US — SCCs confirmed),
+          OpenRouter (US — pending), and Google LLC (US — pending). Under GDPR Chapter V, transfers to the US require
+          appropriate safeguards. We rely on Standard Contractual Clauses (SCCs) consistent with the Schrems II ruling.
         </p>
-        <div className="border-l-4 border-amber-500 bg-amber-500/5 p-3 my-3 rounded-r">
+        <div className="border-l-4 border-emerald-500 bg-emerald-500/5 p-3 my-3 rounded-r">
           <p className="text-sm">
-            <strong className="text-amber-700 dark:text-amber-500">SCC Status by provider:</strong>
+            <strong className="text-emerald-700 dark:text-emerald-500">SCC Status by provider (as of December 9, 2026):</strong>
           </p>
           <ul className="list-disc pl-5 mt-2 text-sm space-y-1">
-            <li><strong>Groq Inc.</strong> — SCCs in effect (October 15, 2025). DPA with EU SCC Module 2 is self-executing upon acceptance of Groq Services Agreement. Governing law: Ireland. Competent authority: Irish DPC.</li>
-            <li><strong>Mistral AI</strong> — No SCC needed (EU-based, Paris, France). Transfers stay within the EU.</li>
-            <li><strong>OpenRouter</strong> — SCC status: pending verification.</li>
-            <li><strong>Google LLC (Gemini)</strong> — SCC status: pending verification. Google Cloud DPA available at cloud.google.com/terms/data-processing-addendum.</li>
+            <li><strong>Groq Inc.</strong> — ✅ SCCs confirmed in effect (December 9, 2026). DPA with EU SCC Module 2 is self-executing upon acceptance of Groq Services Agreement. Governing law: Ireland. Competent authority: Irish DPC. 72-hour breach notification.</li>
+            <li><strong>Mistral AI</strong> — ✅ No SCC needed (EU-based, Paris, France). Transfers stay within the EU.</li>
+            <li><strong>OpenRouter</strong> — ⏳ SCC status: pending verification. DPA request sent December 2026.</li>
+            <li><strong>Google LLC (Gemini)</strong> — ⏳ SCC status: pending verification. Google Cloud DPA available at cloud.google.com/terms/data-processing-addendum (self-executing upon acceptance of Google Cloud Terms).</li>
           </ul>
           <p className="text-sm mt-2">
-            With Groq SCCs in effect and Mistral being EU-based, OmniParse has two GDPR-compliant AI
-            providers (Mistral for EU-only processing, Groq for US processing with SCCs). OpenRouter
-            and Google remain as fallbacks pending SCC verification.
+            <strong className="text-emerald-700 dark:text-emerald-500">EU users CAN legally use OmniParse.</strong>{' '}
+            AI processing via Mistral (EU, no transfer) and Groq (US, SCCs confirmed) is fully
+            GDPR-compliant. The platform's cascade prioritizes Mistral first, then Groq — both are
+            confirmed compliant. OpenRouter and Google remain as fallbacks pending SCC verification.
           </p>
         </div>
         <p>

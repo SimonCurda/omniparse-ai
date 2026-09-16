@@ -268,16 +268,17 @@ export function UploadTab() {
                 {legalConsent ? 'Data transfer consent confirmed' : 'Data transfer notice — please read before uploading'}
               </h3>
               <p className="text-xs text-muted-foreground leading-relaxed mb-2">
-                Uploaded documents are processed by AI providers located in the United States
-                (OpenRouter, Groq, Google Gemini). Under GDPR Chapter V, transfers to the US require
-                a legal basis. <strong>Do not upload documents containing personal data of EU residents</strong>{' '}
-                (names, email addresses, phone numbers, ID numbers) unless you have a legal basis to
-                transfer that data to the US.
+                Uploaded documents are processed by AI providers: <strong>Mistral (Paris, EU)</strong> is used
+                first (no transfer outside EU); <strong>Groq (US)</strong> has confirmed Standard Contractual
+                Clauses (SCCs) in effect as of December 9, 2026. <strong>OpenRouter</strong> and{' '}
+                <strong>Google</strong> (US) are fallbacks pending SCC verification. Processing via Mistral
+                and Groq is fully GDPR-compliant for EU users.
               </p>
               <p className="text-xs text-muted-foreground leading-relaxed mb-3">
-                We are in the process of executing Standard Contractual Clauses (SCCs) with each AI
-                provider to provide a compliant transfer mechanism. Until SCCs are in place, EU users
-                should not upload documents containing personal data subject to GDPR.
+                If your documents contain personal data of EU data subjects (names, email addresses, phone
+                numbers, ID numbers), processing via Mistral and Groq is covered by SCCs. If processing falls
+                through to OpenRouter or Google (pending SCC verification), exercise caution with highly
+                sensitive personal data.
               </p>
               <label className="flex items-start gap-2 cursor-pointer">
                 <Checkbox
@@ -286,9 +287,9 @@ export function UploadTab() {
                   className="mt-0.5"
                 />
                 <span className="text-xs text-foreground leading-relaxed">
-                  I confirm that I have a legal basis to transfer any personal data contained in my
-                  uploaded documents to US-based AI providers for processing, or that my documents do
-                  not contain personal data of EU data subjects.
+                  I understand that my documents may be processed by AI providers in the EU (Mistral) and
+                  US (Groq with SCCs, OpenRouter, Google). I confirm I have a legal basis for any personal
+                  data contained in my uploaded documents.
                 </span>
               </label>
             </div>

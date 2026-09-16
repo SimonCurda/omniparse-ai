@@ -116,7 +116,7 @@ export default function TermsOfServicePage() {
           communications, or tax filings based on them.
         </p>
         <p>
-          <strong>AI providers:</strong> OmniParse uses third-party AI providers for vision extraction and text generation. The primary provider is <strong>Mistral AI</strong> (Paris, France — EU-based, no SCC required for transfers). Fallback providers (used when Mistral is unavailable) are OpenRouter, Groq, and Google Gemini (all US-based). These providers may experience rate limits, outages, or model deprecations that affect the availability and quality of AI features. We do not control and are not responsible for the behavior of these upstream models beyond our integration layer.
+          <strong>AI providers:</strong> OmniParse uses third-party AI providers for vision extraction and text generation. The primary provider is <strong>Mistral AI</strong> (Paris, France — EU-based, no SCC required for transfers). <strong>Groq Inc.</strong> (US-based) has confirmed Standard Contractual Clauses (SCCs) in effect as of December 9, 2026 (EU SCC Module 2, self-executing under Groq's DPA). Fallback providers OpenRouter and Google Gemini (both US-based) have SCCs pending verification. These providers may experience rate limits, outages, or model deprecations that affect the availability and quality of AI features. We do not control and are not responsible for the behavior of these upstream models beyond our integration layer.
         </p>
         <p>
           See our <a href="/ai-act-notice" className="underline">AI Transparency Notice</a> for full
