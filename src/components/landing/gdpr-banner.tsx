@@ -47,9 +47,10 @@ export function GdprBanner() {
         <div className="flex-1 min-w-0">
           <p className="text-xs sm:text-sm text-amber-900 dark:text-amber-100 leading-relaxed">
             <span className="font-bold">EU users — AI processing notice.</span>{' '}
-            Documents are processed by AI providers: Mistral (Paris, EU) is used first (no transfer outside EU);
-            Groq (US) has confirmed SCCs. OpenRouter and Google (US) are fallbacks pending SCC verification.
-            Processing via Mistral and Groq is fully GDPR-compliant.{' '}
+            Documents are processed by AI providers: Mistral (Paris, EU) is used first; Groq (US) has
+            confirmed SCCs. OpenRouter and Google (US) are fallbacks pending SCC verification. Documents
+            may contain personal data of multiple data subjects — users are responsible for ensuring a
+            valid legal basis.{' '}
             <a href="/ai-act-notice" className="text-amber-800 dark:text-amber-300 hover:underline font-bold">
               Learn more →
             </a>

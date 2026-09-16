@@ -4,7 +4,7 @@ export const dynamic = 'force-static';
 
 export default function TermsOfServicePage() {
   return (
-    <LegalLayout title="Terms of Service" lastUpdated="September 9, 2026">
+    <LegalLayout title="Terms of Service" lastUpdated="December 9, 2026">
       <section>
         <h2>1. Acceptance of Terms</h2>
         <p>

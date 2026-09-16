@@ -4,7 +4,7 @@ export const dynamic = 'force-static';
 
 export default function PrivacyPolicyPage() {
   return (
-    <LegalLayout title="Privacy Policy" lastUpdated="September 9, 2026">
+    <LegalLayout title="Privacy Policy" lastUpdated="December 9, 2026">
       <section>
         <h2>1. Data Controller</h2>
         <p>
@@ -123,21 +123,22 @@ export default function PrivacyPolicyPage() {
           <strong>SCC Status (as of December 9, 2026):</strong>
           <ul className="list-disc pl-6 space-y-1 mt-2 text-sm">
             <li><strong>Groq Inc.</strong> — ✅ SCCs confirmed in effect (DPA effective October 15, 2025; EU SCC Module 2 self-executing upon acceptance of Groq Services Agreement). Confirmed December 9, 2026. Governing law: Ireland. <a href="https://groq.com/legal/dpa" target="_blank" rel="noopener">Groq DPA</a>.</li>
-            <li><strong>Mistral AI</strong> — ✅ No SCC needed (EU-based, Paris, France — transfers stay within the EU). GDPR Art. 28 compliant as an EU processor.</li>
+            <li><strong>Mistral AI</strong> — EU-based (Paris, France). As an EU-established provider, transfers to Mistral are expected to remain within the EEA, subject to Mistral&apos;s applicable terms and data-processing agreements.</li>
             <li><strong>OpenRouter</strong> — ⏳ SCC status: pending verification. DPA request sent December 2026.</li>
             <li><strong>Google LLC (Gemini)</strong> — ⏳ SCC status: pending verification. Google Cloud DPA available at <a href="https://cloud.google.com/terms/data-processing-addendum" target="_blank" rel="noopener">cloud.google.com/terms/data-processing-addendum</a> (self-executing upon acceptance of Google Cloud Terms).</li>
           </ul>
         </p>
         <p>
-          <strong>EU users:</strong> AI processing via Mistral (EU-based, no transfer) and Groq (US-based, SCCs confirmed)
-          is fully GDPR-compliant. EU users can legally upload documents containing personal data of EU data subjects
-          when processing is routed through Mistral or Groq. OpenRouter and Google remain as fallback providers pending
-          SCC verification — if your documents contain personal data of EU data subjects, exercise caution when those
-          providers are used (the cascade tries Mistral first, then Groq, then OpenRouter, then Google).
+          <strong>EU users:</strong> AI processing via Mistral (EU-based) and Groq (US-based, SCCs confirmed)
+          has appropriate safeguards in place under GDPR. However, users should note that documents uploaded
+          to the Service may contain personal data of multiple data subjects (e.g. vendor names, employee
+          names, email addresses, bank details). The user uploading such documents is responsible for
+          ensuring they have a valid legal basis under GDPR Art. 6 for processing that data, and that the
+          transfer to AI providers is lawful under Chapter V. OpenRouter and Google remain as fallback
+          providers pending SCC verification.
         </p>
         <p>
-          <strong>Your documents are NOT used to train AI models.</strong> All four AI providers (Mistral, OpenRouter, Groq, Google) have policies against using customer API inputs for model training. Documents are processed
-          in memory only and discarded after the response is generated.
+          <strong>Model training:</strong> We do not intentionally use customer documents or conversations to train or fine-tune AI models. Processing by third-party AI providers is governed by the applicable provider terms and data-processing agreements. The specific terms vary by provider, service tier (paid vs. unpaid), and product configuration. Data may be temporarily processed, cached, or retained by AI providers for security, abuse prevention, monitoring, billing, debugging, or other purposes specified in their applicable terms.
         </p>
       </section>
 
@@ -248,15 +249,17 @@ export default function PrivacyPolicyPage() {
         </p>
         <ul className="list-disc pl-6 space-y-1 text-sm mt-2">
           <li><strong>Groq Inc.</strong> — ✅ SCCs confirmed in effect (December 9, 2026). DPA with EU SCC Module 2 is self-executing upon acceptance of Groq Services Agreement. Governing law: Ireland. Competent authority: Irish Data Protection Commission. 72-hour breach notification.</li>
-          <li><strong>Mistral AI</strong> — ✅ No SCC needed (EU-based, Paris, France). Transfers stay within the EU.</li>
+          <li><strong>Mistral AI</strong> — EU-based (Paris, France). As an EU-established provider, transfers are expected to remain within the EEA, subject to Mistral&apos;s applicable terms.</li>
           <li><strong>OpenRouter</strong> — ⏳ SCC status: pending verification. DPA request sent December 2026.</li>
           <li><strong>Google LLC</strong> — ⏳ SCC status: pending verification. Google Cloud DPA available at cloud.google.com/terms/data-processing-addendum (self-executing upon acceptance of Google Cloud Terms).</li>
         </ul>
         <p className="text-sm mt-2">
-          OmniParse has two fully GDPR-compliant AI providers: Mistral (EU-based, no transfer needed) and
-          Groq (US-based, SCCs confirmed). EU users can legally use OmniParse for AI processing through
-          these two providers. The platform's cascade prioritizes Mistral first, then Groq — both are
-          compliant. OpenRouter and Google are additional fallbacks pending SCC verification.
+          OmniParse has confirmed SCCs with Groq (US-based) and uses Mistral (EU-based). However,
+          users should be aware that documents may contain personal data of multiple data subjects.
+          The user is responsible for ensuring they have a valid legal basis for processing and
+          transferring such data. The platform's cascade prioritizes Mistral first, then Groq —
+          both have appropriate safeguards. OpenRouter and Google are additional fallbacks pending
+          SCC verification.
         </p>
         <h3 className="text-base font-semibold mt-4 mb-2">11.6 Duration and Deletion</h3>
         <p className="text-sm">

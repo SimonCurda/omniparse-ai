@@ -269,16 +269,17 @@ export function UploadTab() {
               </h3>
               <p className="text-xs text-muted-foreground leading-relaxed mb-2">
                 Uploaded documents are processed by AI providers: <strong>Mistral (Paris, EU)</strong> is used
-                first (no transfer outside EU); <strong>Groq (US)</strong> has confirmed Standard Contractual
-                Clauses (SCCs) in effect as of December 9, 2026. <strong>OpenRouter</strong> and{' '}
-                <strong>Google</strong> (US) are fallbacks pending SCC verification. Processing via Mistral
-                and Groq is fully GDPR-compliant for EU users.
+                first; <strong>Groq (US)</strong> has confirmed Standard Contractual Clauses (SCCs) in effect
+                as of December 9, 2026. <strong>OpenRouter</strong> and <strong>Google</strong> (US) are
+                fallbacks pending SCC verification. Processing by AI providers is governed by their applicable
+                terms and data-processing agreements.
               </p>
               <p className="text-xs text-muted-foreground leading-relaxed mb-3">
-                If your documents contain personal data of EU data subjects (names, email addresses, phone
-                numbers, ID numbers), processing via Mistral and Groq is covered by SCCs. If processing falls
-                through to OpenRouter or Google (pending SCC verification), exercise caution with highly
-                sensitive personal data.
+                Documents may contain personal data of multiple data subjects (vendor names, employee names,
+                email addresses, bank details). You are responsible for ensuring you have a valid legal basis
+                under GDPR Art. 6 for processing and transferring such data. If processing falls through to
+                OpenRouter or Google (pending SCC verification), exercise caution with highly sensitive
+                personal data.
               </p>
               <label className="flex items-start gap-2 cursor-pointer">
                 <Checkbox

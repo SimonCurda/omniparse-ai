@@ -4,11 +4,11 @@ export const dynamic = 'force-static';
 
 export default function AIActNoticePage() {
   return (
-    <LegalLayout title="AI Transparency Notice" lastUpdated="September 9, 2026">
+    <LegalLayout title="AI Transparency Notice" lastUpdated="December 9, 2026">
       <section>
         <h2>EU AI Act Compliance (Regulation EU 2024/1689)</h2>
         <p>
-          Per Article 52 of the EU AI Act, deployers of AI systems must inform natural persons
+          Per Article 50 of the EU AI Act (effective August 2, 2026), deployers of AI systems must inform natural persons
           that they are interacting with an artificial intelligence system. This notice fulfills that
           obligation.
         </p>
@@ -33,19 +33,16 @@ export default function AIActNoticePage() {
       <section>
         <h2>2. System Classification</h2>
         <p>
-          Under the EU AI Act risk classification (Annex III), OmniParse is currently assessed as a
-          <strong> minimal-risk AI system</strong> for the following reasons:
+          Based on the intended purposes and functionality of the Service, we currently do not intend
+          the Service to perform any of the high-risk functions listed in Annex III of the EU AI Act.
+          The Service is nevertheless subject to applicable transparency requirements under Article 50,
+          including those applicable to AI systems that directly interact with users.
         </p>
-        <ul>
-          <li>It does not make autonomous decisions about individuals.</li>
-          <li>It does not evaluate creditworthiness, eligibility for public assistance, or employment.</li>
-          <li>It does not perform biometric identification or emotion recognition.</li>
-          <li>It processes business documents (invoices), not personal data at scale.</li>
-        </ul>
         <p>
-          This assessment may change if the Service is used in high-risk contexts. We will update this
-          notice accordingly and implement the required obligations under Articles 9-15 if
-          reclassification occurs.
+          As the provider of the Service under our own name and brand, we acknowledge our
+          responsibilities under the EU AI Act. This assessment may change if the Service is used in
+          high-risk contexts. We will update this notice accordingly and implement the required
+          obligations if reclassification occurs.
         </p>
       </section>
 
@@ -54,16 +51,17 @@ export default function AIActNoticePage() {
         <ul>
           <li><strong>Type:</strong> Document understanding and natural language processing</li>
           <li><strong>Components:</strong> Vision-language model (VLM) for document parsing, Language model (LLM) for chat</li>
-          <li><strong>Purpose:</strong> Extract structured data from business documents and provide conversational analysis</li>
+          <li><strong>Purpose:</strong> Extract structured data from documents and provide conversational analysis</li>
+          <li><strong>Data processed:</strong> Invoices and related documents may contain personal data (e.g. names, email addresses, phone numbers, bank account details, signatures). Depending on how the Service is used, we may process personal data on behalf of users or their organizations.</li>
           <li><strong>AI providers:</strong>
             <ul>
-              <li><strong>Mistral AI</strong> (Paris, France — EU) — primary provider. EU-based — transfers stay within EU, no SCC required. Models used: Pixtral Large (124B vision), Pixtral 12B (vision).</li>
-              <li><strong>OpenRouter</strong> (United States) — secondary provider. Used when Mistral is unavailable. Models used: Ling 3.0 Flash VL, Google Gemma 4 (31B/26B), NVIDIA Nemotron, and others as availability changes.</li>
-              <li><strong>Groq Inc.</strong> (United States) — tertiary provider. Models used: Llama 3.1 8B Instant, Llama 4 Scout 17B, Qwen 3.6 27B.</li>
-              <li><strong>Google Gemini</strong> (United States) — final fallback provider. Models used: Gemini 2.0 Flash, Gemini 2.5 Flash, Gemini 1.5 Flash.</li>
+              <li><strong>Mistral AI</strong> (Paris, France — EU). As an EU-based provider, transfers to Mistral are expected to remain within the EEA, though this depends on Mistral&apos;s applicable terms and data-processing agreements.</li>
+              <li><strong>OpenRouter</strong> (United States) — used when Mistral is unavailable.</li>
+              <li><strong>Groq Inc.</strong> (United States) — SCCs confirmed in effect (see §8 below).</li>
+              <li><strong>Google LLC</strong> (United States) — final fallback provider.</li>
             </ul>
           </li>
-          <li><strong>Model selection policy:</strong> We use a 4-tier cascade approach — Mistral (EU, primary) is tried first, with automatic fallback to OpenRouter (8 models with 5-key rotation), then Groq (3 models), then Google Gemini (3 models with 3-key rotation) on rate-limit or unavailability. For EU users concerned about US transfers, configuring MISTRAL_API_KEY keeps vision extraction within the EU when Mistral is available.</li>
+          <li><strong>Model selection policy:</strong> We may use multiple third-party AI providers to process uploaded content. The provider used for a particular request may depend on availability, capacity, configuration, and other operational factors. A current list of subprocessors and applicable processing locations is available in our Privacy Policy.</li>
         </ul>
       </section>
 
@@ -98,10 +96,11 @@ export default function AIActNoticePage() {
       <section>
         <h2>6. Data Handling and AI Training</h2>
         <ul>
-          <li><strong>Per-request processing:</strong> Documents and chat messages are sent to the AI provider only for the duration of the inference request. They are not permanently stored by OpenRouter, Groq, or Google.</li>
+          <li><strong>Processing by AI providers:</strong> Documents and chat messages are sent to AI providers for inference. Data may be temporarily processed, cached, or retained by AI providers for security, abuse prevention, monitoring, billing, debugging, or other purposes specified in their applicable terms and data-processing agreements. Retention periods and processing locations vary by provider and service configuration.</li>
           <li><strong>Stored on our side:</strong> The uploaded document file is stored in your account database for 30 days (for preview), then automatically purged. Chat messages are stored in your account until you delete them.</li>
-          <li><strong>No training on your data:</strong> Your documents and chat messages are not used to train or fine-tune AI models. OpenRouter, Groq, and Google all have policies prohibiting the use of customer API inputs for model training.</li>
-          <li><strong>No content logging by us:</strong> We do not log the content of your documents or chat conversations to server logs. We do log API request metadata (timestamps, success/failure, model used) for operational purposes.</li>
+          <li><strong>Model training:</strong> We do not intentionally use customer documents or conversations to train or fine-tune AI models. Processing by third-party AI providers is governed by the applicable provider terms and data-processing agreements. The specific terms vary by provider, service tier (paid vs. unpaid), and product configuration.</li>
+          <li><strong>Important note on free-tier AI APIs:</strong> Some AI providers may have different data handling terms for free/unpaid API tiers compared to paid tiers. We recommend reviewing the applicable provider terms for details. For production use involving personal data, paid API tiers may provide stronger data protection guarantees.</li>
+          <li><strong>Metadata logging:</strong> We log API request metadata (timestamps, success/failure, provider used) for operational purposes. We do not log the content of your documents to server logs.</li>
         </ul>
       </section>
 
@@ -130,15 +129,17 @@ export default function AIActNoticePage() {
           </p>
           <ul className="list-disc pl-5 mt-2 text-sm space-y-1">
             <li><strong>Groq Inc.</strong> — ✅ SCCs confirmed in effect (December 9, 2026). DPA with EU SCC Module 2 is self-executing upon acceptance of Groq Services Agreement. Governing law: Ireland. Competent authority: Irish DPC. 72-hour breach notification.</li>
-            <li><strong>Mistral AI</strong> — ✅ No SCC needed (EU-based, Paris, France). Transfers stay within the EU.</li>
+            <li><strong>Mistral AI</strong> — EU-based (Paris, France). As an EU-established provider, transfers are expected to remain within the EEA, subject to Mistral&apos;s applicable terms and data-processing agreements.</li>
             <li><strong>OpenRouter</strong> — ⏳ SCC status: pending verification. DPA request sent December 2026.</li>
             <li><strong>Google LLC (Gemini)</strong> — ⏳ SCC status: pending verification. Google Cloud DPA available at cloud.google.com/terms/data-processing-addendum (self-executing upon acceptance of Google Cloud Terms).</li>
           </ul>
           <p className="text-sm mt-2">
-            <strong className="text-emerald-700 dark:text-emerald-500">EU users CAN legally use OmniParse.</strong>{' '}
-            AI processing via Mistral (EU, no transfer) and Groq (US, SCCs confirmed) is fully
-            GDPR-compliant. The platform's cascade prioritizes Mistral first, then Groq — both are
-            confirmed compliant. OpenRouter and Google remain as fallbacks pending SCC verification.
+            <strong className="text-emerald-700 dark:text-emerald-500">SCCs confirmed with Groq; Mistral is EU-based.</strong>{' '}
+            AI processing via Mistral (EU) and Groq (US, SCCs confirmed) has appropriate safeguards
+            in place. However, users should note that documents may contain personal data of multiple
+            data subjects — the user is responsible for ensuring a valid legal basis for processing
+            and transferring such data. OpenRouter and Google remain as fallbacks pending SCC
+            verification.
           </p>
         </div>
         <p>
@@ -179,7 +180,7 @@ export default function AIActNoticePage() {
       </section>
 
       <p className="text-xs mt-8">
-        Complies with EU AI Act Regulation 2024/1689 (Art. 52), Czech Act No. 110/2019 Coll.,
+        Complies with EU AI Act Regulation 2024/1689 (Art. 50, effective August 2, 2026), Czech Act No. 110/2019 Coll.,
         Czech Act No. 181/2014 Sb., and Canadian AIDA (Bill C-27).
       </p>
     </LegalLayout>
