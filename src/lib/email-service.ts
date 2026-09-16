@@ -49,18 +49,18 @@ export async function sendVerificationEmail(
 ): Promise<boolean> {
   const client = getResendClient();
   if (!client) {
-    console.warn('[email] RESEND_API_KEY not set — skipping verification email send. User will need to be manually verified or RESEND_API_KEY must be configured.');
-    // Don't throw — let the signup succeed so the user can still log in
-    // (in case Resend is not yet configured). Email verification is a
-    // security enhancement, not a hard block on signup.
+    console.error('[email] RESEND_API_KEY not set — cannot send verification email');
     return false;
   }
 
   const verificationUrl = `${getAppUrl()}/?verify_token=${verificationToken}`;
+  const fromEmail = getFromEmail();
+
+  console.warn(`[email] Sending verification email to ${email} from ${fromEmail} (URL: ${verificationUrl.substring(0, 60)}...)`);
 
   try {
-    const { error } = await client.emails.send({
-      from: getFromEmail(),
+    const { data, error } = await client.emails.send({
+      from: fromEmail,
       to: email,
       subject: 'Verify your email — OmniParse AI',
       html: `
@@ -110,14 +110,17 @@ This link expires in 24 hours. If you didn't create an account with OmniParse AI
     });
 
     if (error) {
-      console.error('[email] Resend API error:', error);
+      console.error('[email] Resend API error:', JSON.stringify(error));
       return false;
     }
 
-    console.warn(`[email] Verification email sent to ${email}`);
+    console.warn(`[email] Verification email sent to ${email} (id: ${data?.id || 'unknown'})`);
     return true;
   } catch (err) {
     console.error('[email] Failed to send verification email:', err instanceof Error ? err.message : String(err));
+    if (err instanceof Error && err.stack) {
+      console.error('[email] Stack:', err.stack);
+    }
     return false;
   }
 }
