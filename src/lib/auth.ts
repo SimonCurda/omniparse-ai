@@ -53,6 +53,51 @@ export async function getUserFromRequest(req: Request): Promise<{ userId: string
   return { userId: payload.userId, email: payload.email };
 }
 
+/**
+ * Returns the user record including emailVerified timestamp.
+ * Use this on AI feature endpoints to block access until email is verified.
+ *
+ * Returns null if user not found.
+ */
+export async function getUserWithVerification(req: Request): Promise<{ userId: string; email: string; emailVerified: Date | null } | null> {
+  const auth = await getUserFromRequest(req);
+  if (!auth) return null;
+  // Lazy import to avoid circular dependency
+  const { db } = await import('@/lib/db');
+  const user = await db.user.findUnique({
+    where: { id: auth.userId },
+    select: { id: true, email: true, emailVerified: true },
+  });
+  if (!user) return null;
+  return {
+    userId: user.id,
+    email: user.email,
+    emailVerified: user.emailVerified,
+  };
+}
+
+/**
+ * Check if the user's email is verified. Returns true if verified.
+ * Existing users (registered before this feature was added) are
+ * considered verified (emailVerified is null but they had to confirm
+ * a signup before the change).
+ *
+ * Implementation note: we treat emailVerified === null AND createdAt < cutoff
+ * as verified (grandfathered). New signups will have emailVerified = null
+ * AND a recent createdAt — these need to verify.
+ *
+ * Cutoff: September 17, 2026 (when this feature shipped).
+ */
+const GRANDFATHER_CUTOFF = new Date('2026-09-17T00:00:00Z');
+
+export function isEmailVerified(emailVerified: Date | null, userCreatedAt: Date): boolean {
+  if (emailVerified) return true;
+  // Grandfathered: users who registered before the verification feature
+  // shipped are considered verified.
+  if (userCreatedAt < GRANDFATHER_CUTOFF) return true;
+  return false;
+}
+
 export const PLAN_LIMITS: Record<string, number> = {
   free: 15,
   pro: 500,

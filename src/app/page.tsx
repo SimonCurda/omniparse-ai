@@ -60,6 +60,8 @@ export default function Home() {
               name: data.user.name,
               plan: data.user.plan,
               createdAt: data.user.createdAt,
+              emailVerified: data.user.emailVerified,
+              emailVerifiedRequired: data.user.emailVerifiedRequired,
             });
             setInvoices([]);
             setView('dashboard');
@@ -88,6 +90,62 @@ export default function Home() {
       const newSearch = remaining ? `?${remaining}` : '';
       window.history.replaceState(null, '', `${window.location.pathname}${newSearch}${window.location.hash}`);
     }
+
+    // ─── Email verification callback ────────────────────────────────
+    // The verification email contains a link like:
+    //   /?verify_token=<jwt>
+    // When user clicks it, we POST to /api/auth/verify-email to confirm.
+    const verifyToken = params.get('verify_token');
+    if (verifyToken) {
+      // Strip the param from URL first so user doesn't see the token
+      params.delete('verify_token');
+      const remaining = params.toString();
+      const newSearch = remaining ? `?${remaining}` : '';
+      window.history.replaceState(null, '', `${window.location.pathname}${newSearch}${window.location.hash}`);
+
+      // Show loading state
+      toast.info('Verifying your email...');
+
+      // Call the verify endpoint
+      fetch('/api/auth/verify-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: verifyToken }),
+      })
+        .then(async (r) => {
+          const data = await r.json();
+          if (r.ok && data.success) {
+            toast.success(data.message || 'Email verified successfully. You can now use all features.');
+            // If user is logged in, refresh their profile so emailVerified is updated
+            const existingToken = localStorage.getItem('op_token');
+            if (existingToken) {
+              fetch('/api/auth/me', { headers: { Authorization: 'Bearer ' + existingToken } })
+                .then((rr) => rr.json())
+                .then((meData) => {
+                  if (meData.user) {
+                    setUser({
+                      id: meData.user.id,
+                      email: meData.user.email,
+                      name: meData.user.name,
+                      plan: meData.user.plan,
+                      createdAt: meData.user.createdAt,
+                      emailVerified: meData.user.emailVerified,
+                      emailVerifiedRequired: meData.user.emailVerifiedRequired,
+                    });
+                  }
+                })
+                .catch(() => {});
+            }
+          } else if (data.alreadyVerified) {
+            toast.info('Your email is already verified.');
+          } else {
+            toast.error(data.error || 'Verification failed. Please request a new verification email.');
+          }
+        })
+        .catch(() => {
+          toast.error('Network error during verification. Please try again.');
+        });
+    }
   }, []);
 
   useEffect(() => {
@@ -104,6 +162,8 @@ export default function Home() {
               name: data.user.name,
               plan: data.user.plan,
               createdAt: data.user.createdAt,
+              emailVerified: data.user.emailVerified,
+              emailVerifiedRequired: data.user.emailVerifiedRequired,
             });
           }
         })

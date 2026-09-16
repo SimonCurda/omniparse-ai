@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { getUserFromRequest } from '@/lib/auth';
+import { getUserFromRequest, isEmailVerified } from '@/lib/auth';
 
 export async function GET(req: Request) {
   const auth = await getUserFromRequest(req);
@@ -10,7 +10,7 @@ export async function GET(req: Request) {
 
   const user = await db.user.findUnique({
     where: { id: auth.userId },
-    select: { id: true, email: true, name: true, plan: true, createdAt: true, googleId: true, githubId: true, password: true },
+    select: { id: true, email: true, name: true, plan: true, createdAt: true, googleId: true, githubId: true, password: true, emailVerified: true },
   });
 
   if (!user) {
@@ -29,6 +29,8 @@ export async function GET(req: Request) {
       hasPassword,
       googleId: !!user.googleId,
       githubId: !!user.githubId,
+      emailVerified: user.emailVerified,
+      emailVerifiedRequired: !isEmailVerified(user.emailVerified, user.createdAt),
     },
   });
 }

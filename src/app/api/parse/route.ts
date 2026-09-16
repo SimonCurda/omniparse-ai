@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
 import { db } from '@/lib/db';
-import { getUserFromRequest, hasFeature, PLAN_LIMITS } from '@/lib/auth';
+import { getUserFromRequest, getUserWithVerification, isEmailVerified, hasFeature, PLAN_LIMITS } from '@/lib/auth';
 import {
   runValidationRules,
   runVarianceChecks,
@@ -434,6 +434,14 @@ export async function POST(req: NextRequest) {
     // Check plan limits
     const user = await db.user.findUnique({ where: { id: auth.userId } });
     if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+
+    // Email verification check — block AI extraction until email is verified
+    if (!isEmailVerified(user.emailVerified, user.createdAt)) {
+      return NextResponse.json(
+        { error: 'Email verification required. Please check your inbox for the verification link, or click "Resend verification email" in Settings.', code: 'EMAIL_NOT_VERIFIED' },
+        { status: 403 },
+      );
+    }
 
     // Count invoices this month only (hard wall per month)
     const now = new Date();

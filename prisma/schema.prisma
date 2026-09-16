@@ -30,6 +30,11 @@ model User {
   // GDPR Art. 7 (consent) + Art. 8 (children) — when user accepted terms / confirmed age
   termsAcceptedAt   DateTime?
   ageConfirmedAt    DateTime?
+  // Email verification — null until user clicks the verification link
+  // sent to their email after signup. Required before AI features
+  // (upload, scan, chat) can be used. Prevents account spam creation
+  // with fake email addresses.
+  emailVerified     DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   invoices         Invoice[]
