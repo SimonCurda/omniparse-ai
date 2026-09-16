@@ -481,9 +481,9 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
 }
 
 /**
- * Call Groq with text-only chat.
- * Tries models in order with retry on 429 rate limits.
- * Model cascade: llama-3.1-8b-instant → llama-3.3-70b-versatile → (OpenRouter fallbacks)
+ * Call text-only chat (used for PDF text extraction + AI Chat tab).
+ * Tries providers in order: Mistral (EU) → Groq (US) → OpenRouter (US).
+ * Mistral is tried first because it's EU-based (no SCC needed).
  */
 export async function geminiChatCall(
   systemPrompt: string,
@@ -496,7 +496,95 @@ export async function geminiChatCall(
     ...messages.map((m) => ({ role: m.role, content: m.content })),
   ];
 
-  // ─── Try Groq first (better at Czech/European invoice text extraction) ──
+  // ─── Try Mistral FIRST (EU-based, GDPR-friendly) ────────────────────
+  // Same strategy as geminiVisionCall: Mistral (Paris, EU) is tried first
+  // because it stays within the EU — no SCC needed. Falls through to Groq
+  // (US) if Mistral is rate-limited or unavailable.
+  const mistralKeys = [
+    process.env.MISTRAL_API_KEY,
+    process.env.MISTRAL_API_KEY_2,
+    process.env.MISTRAL_API_KEY_3,
+  ].filter(Boolean) as string[];
+
+  if (mistralKeys.length > 0) {
+    const mistralChatModels = [
+      'mistral-small-latest',    // fast, good quality for text extraction
+      'mistral-large-latest',    // higher quality fallback
+    ];
+
+    for (const mistralModel of mistralChatModels) {
+      for (let keyIdx = 0; keyIdx < mistralKeys.length; keyIdx++) {
+        const mistralKey = mistralKeys[keyIdx];
+        try {
+          console.warn(`[gemini-chat] Trying Mistral text: ${mistralModel} (key ${keyIdx + 1}/${mistralKeys.length})...`);
+
+          const res = await fetch('https://api.mistral.ai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${mistralKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: mistralModel,
+              messages: openaiMessages,
+              max_tokens: MAX_TOKENS_HIGH,
+              temperature: 0.1,
+              response_format: { type: 'json_object' },
+            }),
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            const content = data.choices?.[0]?.message?.content || '';
+            if (content) {
+              console.warn(`[gemini-chat] Mistral text succeeded (model: ${mistralModel}, key ${keyIdx + 1})!`);
+              return content;
+            }
+          }
+
+          // If JSON mode failed (400/422), try WITHOUT response_format
+          if (res.status === 400 || res.status === 422) {
+            console.warn(`[gemini-chat] Mistral ${mistralModel} doesn't support JSON mode. Retrying without...`);
+            const fbRes = await fetch('https://api.mistral.ai/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${mistralKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                model: mistralModel,
+                messages: openaiMessages,
+                max_tokens: MAX_TOKENS_HIGH,
+                temperature: 0.1,
+              }),
+            });
+            if (fbRes.ok) {
+              const fbData = await fbRes.json();
+              const fbContent = fbData.choices?.[0]?.message?.content || '';
+              if (fbContent) {
+                console.warn(`[gemini-chat] Mistral text succeeded (free-text, model: ${mistralModel})!`);
+                return fbContent;
+              }
+            }
+            break; // model doesn't work, try next model
+          }
+
+          if (res.status === 429) {
+            console.warn(`[gemini-chat] Mistral ${mistralModel} rate limited (key ${keyIdx + 1}). Trying next key...`);
+            continue;
+          }
+
+          console.warn(`[gemini-chat] Mistral ${mistralModel} failed (key ${keyIdx + 1}, status ${res.status})`);
+          break;
+        } catch (err) {
+          console.warn(`[gemini-chat] Mistral ${mistralModel} error:`, err instanceof Error ? err.message : String(err));
+          continue;
+        }
+      }
+    }
+  }
+
+  // ─── Try Groq next (better at Czech/European invoice text extraction) ──
   // Groq's models are more reliable for non-English documents.
   // OpenRouter text models produce lower-quality extraction.
   // We try Groq first; if ALL Groq models are rate-limited, we catch
