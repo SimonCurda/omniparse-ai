@@ -217,7 +217,7 @@ export function ChatTab() {
       if (!res.ok) {
         if (data.code === 'ACCOUNT_FROZEN') {
           setError(data.error);
-          addChatMessage({ role: 'assistant', content: `🔒 **Your account has been frozen.**\n\nReason: ${data.error}\n\nTo appeal, contact: damr58h@gmail.com` });
+          addChatMessage({ role: 'assistant', content: `**ACCOUNT FROZEN**\n\nYour account has been frozen by an administrator.\n\nReason: ${data.error}\n\nTo appeal, contact: damr58h@gmail.com` });
         } else {
           setError(data.error || 'AI request failed');
           addChatMessage({ role: 'assistant', content: 'Sorry, something went wrong: ' + (data.error || 'Unknown error') });

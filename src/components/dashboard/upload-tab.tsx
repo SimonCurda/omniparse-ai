@@ -177,7 +177,7 @@ export function UploadTab() {
           if (data.code === 'ACCOUNT_FROZEN') {
             // Show proper frozen message instead of generic error
             setErrors([]);
-            toast.error(`🔒 Your account has been frozen.\n\nReason: ${data.error}\n\nTo appeal, contact: damr58h@gmail.com`, { duration: 10000 });
+            toast.error(`ACCOUNT FROZEN — Your account has been frozen by an administrator.\n\nReason: ${data.error}\n\nTo appeal, contact: damr58h@gmail.com`, { duration: 10000 });
             return;
           }
           if (data.code === 'MONTHLY_LIMIT_REACHED') {

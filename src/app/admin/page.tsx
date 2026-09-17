@@ -334,13 +334,17 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* Risk summary */}
+        {/* Risk summary — clickable to filter */}
         {summary && (
           <div className="grid grid-cols-4 gap-3">
-            <RiskCard label="High Risk" value={summary.highRisk} color="text-red-500" bg="bg-red-500/10" icon={ShieldAlert} />
-            <RiskCard label="Medium Risk" value={summary.mediumRisk} color="text-amber-500" bg="bg-amber-500/10" icon={AlertTriangle} />
-            <RiskCard label="Low Risk" value={summary.lowRisk} color="text-emerald-500" bg="bg-emerald-500/10" icon={ShieldCheck} />
-            <RiskCard label="Frozen" value={summary.frozenAccounts} color="text-blue-500" bg="bg-blue-500/10" icon={Snowflake} />
+            <RiskCard label="High Risk" value={summary.highRisk} color="text-red-500" bg="bg-red-500/10" icon={ShieldAlert}
+              active={filter === 'high'} onClick={() => { setTab('accounts'); setFilter(filter === 'high' ? 'all' : 'high'); }} />
+            <RiskCard label="Medium Risk" value={summary.mediumRisk} color="text-amber-500" bg="bg-amber-500/10" icon={AlertTriangle}
+              active={filter === 'medium'} onClick={() => { setTab('accounts'); setFilter(filter === 'medium' ? 'all' : 'medium'); }} />
+            <RiskCard label="Low Risk" value={summary.lowRisk} color="text-emerald-500" bg="bg-emerald-500/10" icon={ShieldCheck}
+              active={filter === 'low'} onClick={() => { setTab('accounts'); setFilter(filter === 'low' ? 'all' : 'low'); }} />
+            <RiskCard label="Frozen" value={summary.frozenAccounts} color="text-blue-500" bg="bg-blue-500/10" icon={Snowflake}
+              active={filter === 'frozen'} onClick={() => { setTab('accounts'); setFilter(filter === 'frozen' ? 'all' : 'frozen'); }} />
           </div>
         )}
 
@@ -582,11 +586,14 @@ function StatCard({ icon: Icon, label, value }: { icon: any; label: string; valu
   );
 }
 
-function RiskCard({ label, value, color, bg, icon: Icon }: { label: string; value: number; color: string; bg: string; icon: any }) {
+function RiskCard({ label, value, color, bg, icon: Icon, active, onClick }: { label: string; value: number; color: string; bg: string; icon: any; active?: boolean; onClick?: () => void }) {
   return (
-    <div className={`rounded-xl border border-border p-3 ${bg}`}>
+    <button
+      onClick={onClick}
+      className={`rounded-xl border p-3 text-left transition-all ${bg} ${active ? 'border-amber-500 ring-2 ring-amber-500/30' : 'border-border hover:border-muted-foreground/30'}`}
+    >
       <div className="flex items-center gap-1.5 mb-1"><Icon className={`h-3.5 w-3.5 ${color}`} /><span className="text-xs text-muted-foreground">{label}</span></div>
       <p className={`text-xl font-bold ${color}`}>{value}</p>
-    </div>
+    </button>
   );
 }
