@@ -50,6 +50,7 @@ export async function GET(req: NextRequest) {
         createdAt: true,
         active: true,
         hidden: true,
+        starred: true,
         _count: {
           select: {
             invoices: true,
@@ -127,6 +128,7 @@ export async function GET(req: NextRequest) {
           ageDays,
           active: user.active,
           hidden: user.hidden,
+          starred: user.starred,
           stats: {
             invoices: user._count.invoices,
             chatSessions: user._count.chatSessions,

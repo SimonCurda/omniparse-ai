@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
       SELECT column_name
       FROM information_schema.columns
       WHERE table_name = 'User'
-        AND column_name IN ('emailVerified', 'active', 'frozenReason', 'frozenAt', 'monthlyParseCount', 'parseCountResetAt', 'hidden')
+        AND column_name IN ('emailVerified', 'active', 'frozenReason', 'frozenAt', 'monthlyParseCount', 'parseCountResetAt', 'hidden', 'starred')
     `;
 
     const existingSet = new Set(existingColumns.map((c) => c.column_name));
@@ -86,6 +86,12 @@ export async function POST(req: NextRequest) {
     if (!existingSet.has('hidden')) {
       await db.$executeRaw`ALTER TABLE "User" ADD COLUMN "hidden" BOOLEAN NOT NULL DEFAULT false`;
       added.push('hidden');
+    }
+
+    // Add starred if missing (admin can star accounts for easy spotting)
+    if (!existingSet.has('starred')) {
+      await db.$executeRaw`ALTER TABLE "User" ADD COLUMN "starred" BOOLEAN NOT NULL DEFAULT false`;
+      added.push('starred');
     }
 
     // Create AdminDeletionLog table if it doesn't exist

@@ -48,6 +48,8 @@ model User {
   // not frozen — just hidden from the "Active" tab). Useful for test
   // accounts or accounts you don't want cluttering the dashboard.
   hidden           Boolean  @default(false)
+  // Admin can star/mark accounts for easy spotting between many users
+  starred           Boolean  @default(false)
   // Hard monthly parse counter — tracks total invoices PARSED per month,
   // NOT just existing ones. If a Free user parses 15 invoices, deletes
   // them all, they STILL can't parse more this month. Counter resets

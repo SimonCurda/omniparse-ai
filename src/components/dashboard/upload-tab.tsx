@@ -174,6 +174,16 @@ export function UploadTab() {
         const data = await res.json();
 
         if (!res.ok) {
+          if (data.code === 'ACCOUNT_FROZEN') {
+            // Show proper frozen message instead of generic error
+            setErrors([]);
+            toast.error(`🔒 Your account has been frozen.\n\nReason: ${data.error}\n\nTo appeal, contact: damr58h@gmail.com`, { duration: 10000 });
+            return;
+          }
+          if (data.code === 'MONTHLY_LIMIT_REACHED') {
+            fileErrors.push(`${file.name}: ${data.error}`);
+            continue;
+          }
           fileErrors.push(`${file.name}: ${data.error || 'Error ' + res.status}`);
           continue;
         }

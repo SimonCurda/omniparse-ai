@@ -215,8 +215,13 @@ export function ChatTab() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || 'AI request failed');
-        addChatMessage({ role: 'assistant', content: 'Sorry, something went wrong: ' + (data.error || 'Unknown error') });
+        if (data.code === 'ACCOUNT_FROZEN') {
+          setError(data.error);
+          addChatMessage({ role: 'assistant', content: `🔒 **Your account has been frozen.**\n\nReason: ${data.error}\n\nTo appeal, contact: damr58h@gmail.com` });
+        } else {
+          setError(data.error || 'AI request failed');
+          addChatMessage({ role: 'assistant', content: 'Sorry, something went wrong: ' + (data.error || 'Unknown error') });
+        }
       } else {
         const assistantMsg: ChatMessage = {
           role: 'assistant',

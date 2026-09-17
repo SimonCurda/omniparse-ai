@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Shield, ShieldAlert, ShieldCheck, Snowflake, Trash2, RefreshCw,
   Search, AlertTriangle, Users, FileText, MessageSquare, Mail, Loader2,
-  ArrowUpDown, ArrowUp, ArrowDown, History, EyeOff, Eye,
+  ArrowUpDown, ArrowUp, ArrowDown, History, EyeOff, Eye, Star,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -31,6 +31,7 @@ interface Account {
   ageDays: number;
   active: boolean;
   hidden: boolean;
+  starred: boolean;
   stats: AccountStats;
   abuseRisk: AbuseRisk;
 }
@@ -145,6 +146,9 @@ export default function AdminPage() {
     });
 
     const sorted = [...filtered].sort((a, b) => {
+      // Starred accounts always at top, regardless of sort field
+      if (a.starred && !b.starred) return -1;
+      if (!a.starred && b.starred) return 1;
       let cmp = 0;
       switch (sortField) {
         case 'risk': cmp = a.abuseRisk.score - b.abuseRisk.score; break;
@@ -254,6 +258,28 @@ export default function AdminPage() {
       const data = await res.json();
       if (res.ok) { toast.success(data.message || 'Account restored'); fetchAccounts(); }
       else toast.error(data.error || 'Failed to unhide');
+    } catch { toast.error('Network error'); }
+    finally { setActionLoading(null); }
+  };
+
+  const handleStar = async (id: string) => {
+    setActionLoading(id);
+    try {
+      const res = await fetch(`/api/admin/accounts/${id}/star?key=${encodeURIComponent(secret)}`, { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) { toast.success(data.message || 'Starred'); fetchAccounts(); }
+      else toast.error(data.error || 'Failed');
+    } catch { toast.error('Network error'); }
+    finally { setActionLoading(null); }
+  };
+
+  const handleUnstar = async (id: string) => {
+    setActionLoading(id);
+    try {
+      const res = await fetch(`/api/admin/accounts/${id}/unstar?key=${encodeURIComponent(secret)}`, { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) { toast.success(data.message || 'Unstarred'); fetchAccounts(); }
+      else toast.error(data.error || 'Failed');
     } catch { toast.error('Network error'); }
     finally { setActionLoading(null); }
   };
@@ -392,6 +418,7 @@ export default function AdminPage() {
                         <td className="px-4 py-3">
                           <div className="font-medium truncate flex items-center gap-1.5">
                             {acc.email}
+                            {acc.starred && (<span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded"><Star className="h-2.5 w-2.5 fill-current" />STARRED</span>)}
                             {!acc.active && (<span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-blue-600 bg-blue-500/10 px-1.5 py-0.5 rounded"><Snowflake className="h-2.5 w-2.5" />FROZEN</span>)}
                           </div>
                           <div className="text-xs text-muted-foreground">{acc.name} · ...{acc.id.slice(-8)}</div>
@@ -427,6 +454,7 @@ export default function AdminPage() {
                           <div className="flex items-center justify-center gap-1">
                             {actionLoading === acc.id ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : (
                               <>
+                                <button onClick={() => acc.starred ? handleUnstar(acc.id) : handleStar(acc.id)} title={acc.starred ? 'Unstar' : 'Star for easy spotting'} className={`p-1.5 rounded hover:bg-amber-500/20 ${acc.starred ? 'text-amber-500' : 'text-muted-foreground'}`}><Star className={`h-4 w-4 ${acc.starred ? 'fill-current' : ''}`} /></button>
                                 {acc.active ? (
                                   <button onClick={() => handleFreeze(acc.id, acc.email)} title="Freeze" className="p-1.5 rounded hover:bg-blue-500/20 text-blue-500"><Snowflake className="h-4 w-4" /></button>
                                 ) : (
