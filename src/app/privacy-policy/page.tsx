@@ -9,7 +9,7 @@ export default function PrivacyPolicyPage() {
         <h2>1. Data Controller</h2>
         <p>
           The data controller for personal data processed through this Service is
-          <strong> Simon Curda</strong> (natural person, sole trader registration pending), based in the
+          <strong> Simon Curda</strong> (natural person), based in the
           Czech Republic. For GDPR purposes (EU Regulation 2016/679), the Controller is responsible for
           ensuring compliance with data protection law.
         </p>
@@ -30,12 +30,12 @@ export default function PrivacyPolicyPage() {
           <strong>Documents you upload:</strong> When you use the document parsing feature, your files
           (PDF, JPEG, PNG, WebP) are sent to AI processing providers (see Section 6 for the full list).
           The original file is stored in your account database (base64-encoded) for 30 days so you can
-          preview it in the dashboard, then automatically deleted. The extracted data is stored
-          indefinitely in your account until you delete it.
+          preview it in the dashboard, then deleted from the active environment after 30 days. The extracted data is stored
+          in your account until you delete it or terminate your account.
         </p>
         <p>
           <strong>Chat history:</strong> Messages you send to the AI chat assistant and the responses
-          returned are stored in your account database indefinitely until you delete them via the
+          returned are stored in your account database until you delete them via the
           dashboard&apos;s Clear button or by deleting your account.
         </p>
         <p>
@@ -65,7 +65,7 @@ export default function PrivacyPolicyPage() {
         <h2>4. Data Retention</h2>
         <ul>
           <li><strong>Uploaded document files:</strong> We retain uploaded documents for up to 30 days in the active application environment. Backup copies, security logs and data processed by third-party providers may be retained for different periods where necessary for security, legal or operational purposes. Extraction results remain in your account until you delete them.</li>
-          <li><strong>Extracted invoice data:</strong> Stored in your account for as long as your account exists. Delete individual invoices from the dashboard to remove this data.</li>
+          <li><strong>Extracted invoice data:</strong> Stored in your account for as long as your account is active. Upon account termination, extracted data and audit logs are deleted within 90 days. You can also delete individual invoices from the dashboard at any time.</li>
           <li><strong>Chat history:</strong> Stored in your account until you clear it from the dashboard chat tab or delete your account.</li>
           <li><strong>Server logs:</strong> Retained for 30 days by the hosting provider (Vercel), then automatically deleted.</li>
           <li><strong>Account data:</strong> Stored for the duration of your account. You can delete your account and all associated data at any time from Settings. Account deletion also cancels any active Stripe subscription.</li>
@@ -134,8 +134,15 @@ export default function PrivacyPolicyPage() {
           to the Service may contain personal data of multiple data subjects (e.g. vendor names, employee
           names, email addresses, bank details). The user uploading such documents is responsible for
           ensuring they have a valid legal basis under GDPR Art. 6 for processing that data, and that the
-          transfer to AI providers is lawful under Chapter V. OpenRouter and Google remain as fallback
-          providers pending SCC verification.
+          transfer to AI providers is lawful under Chapter V.
+        </p>
+        <p>
+          <strong>Important — fallback providers:</strong> OpenRouter and Google remain as fallback providers
+          pending SCC verification. Processing of personal data of EU data subjects through these providers
+          may not have appropriate safeguards in place under GDPR Chapter V until SCCs are confirmed. EU users
+          processing personal data of EU data subjects should be aware that if processing falls through to
+          OpenRouter or Google, the transfer may not be fully GDPR-compliant. We are working to verify SCCs
+          with these providers and will update this notice once confirmed.
         </p>
         <p>
           <strong>Model training:</strong> We do not intentionally use customer documents or conversations to train or fine-tune AI models. Processing by third-party AI providers is governed by the applicable provider terms and data-processing agreements. The specific terms vary by provider, service tier (paid vs. unpaid), and product configuration. Data may be temporarily processed, cached, or retained by AI providers for security, abuse prevention, monitoring, billing, debugging, or other purposes specified in their applicable terms.
@@ -267,11 +274,28 @@ export default function PrivacyPolicyPage() {
           data is deleted within 30 days (file binaries) and 90 days (extracted data, audit logs), except
           where longer retention is required by law.
         </p>
-        <h3 className="text-base font-semibold mt-4 mb-2">11.7 Acceptance</h3>
+        <h3 className="text-base font-semibold mt-4 mb-2">11.7 Subprocessor Authorization</h3>
         <p className="text-sm">
-          By uploading documents to the Service and checking the data transfer consent box in the Upload
-          tab, Customer accepts this DPA on behalf of themselves and any data subjects whose personal data
-          they upload.
+          Customer grants general written authorization for OmniParse to engage the subprocessors listed in
+          Section 11.2. OmniParse will notify Customer of any planned changes to the subprocessor list at
+          least 30 days in advance via the Service or by email. Customer may object to a new subprocessor
+          in writing within 30 days of notification. In the event of a reasonable objection, OmniParse will
+          use commercially reasonable efforts to make available an alternative or recommend a change to
+          Customer&apos;s use of the Service to avoid processing by the objected-to subprocessor. If OmniParse
+          is unable to provide a reasonable alternative, Customer may suspend or terminate the affected
+          Service.
+        </p>
+        <h3 className="text-base font-semibold mt-4 mb-2">11.8 Acceptance</h3>
+        <p className="text-sm">
+          For B2B customers (businesses, organizations, accounting firms): this DPA takes effect upon
+          acceptance of the Terms of Service and the first use of the Service. For B2B customers who
+          require a signed DPA, contact <strong>damr58h@gmail.com</strong> to execute a standalone
+          Data Processing Agreement.
+        </p>
+        <p className="text-sm">
+          For individual users: by uploading documents to the Service and checking the data transfer
+          consent box in the Upload tab, you acknowledge that this DPA applies to the extent you act as
+          a data controller processing personal data through the Service.
         </p>
       </section>
 

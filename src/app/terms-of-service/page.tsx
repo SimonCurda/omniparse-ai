@@ -365,7 +365,7 @@ export default function TermsOfServicePage() {
           provided to consumers before concluding a distance contract:
         </p>
         <ul className="list-disc pl-6 space-y-1 text-sm">
-          <li><strong>Provider:</strong> Simon Curda (natural person, sole trader registration pending), Czech Republic</li>
+          <li><strong>Provider:</strong> Simon Curda (natural person), Czech Republic</li>
           <li><strong>Contact:</strong> damr58h@gmail.com</li>
           <li><strong>Service description:</strong> AI-powered invoice extraction, validation, and analytics platform</li>
           <li><strong>Price:</strong> Free tier available (no charge). Paid plans from $49/month to $499/month as described on the pricing page</li>
@@ -390,8 +390,9 @@ export default function TermsOfServicePage() {
           634/1992 Sb. (Consumer Protection Act) §§20b–20e.
         </p>
         <p>
-          EU consumers may also use the <strong>European Online Dispute Resolution (ODR) platform</strong> at
-          <a href="https://ec.europa.eu/consumers/odr" target="_blank" rel="noopener"> ec.europa.eu/consumers/odr</a>.
+          EU consumers may also seek alternative dispute resolution through the European Commission&apos;s
+          consumer redress resources at
+          <a href="https://consumer-redress.ec.europa.eu" target="_blank" rel="noopener"> consumer-redress.ec.europa.eu</a>.
         </p>
       </section>
 
@@ -479,7 +480,7 @@ export default function TermsOfServicePage() {
 
       <p className="text-xs mt-8">
         Compliant with EU Directive 93/13/EEC (unfair contract terms), EU Directive 2011/83/EU (consumer rights, including right of withdrawal),
-        EU Regulation 524/2013 (ODR), Czech Act No. 89/2012 Sb. (Civil Code, including §§1733, 1829, 1837, 2913),
+        Czech Act No. 89/2012 Sb. (Civil Code, including §§1733, 1829, 1837, 2913),
         Czech Act No. 634/1992 Sb. (Consumer Protection, including §§16, 20b–20e), and Czech Act No. 480/2004 Sb. (Electronic Communications).
       </p>
     </LegalLayout>

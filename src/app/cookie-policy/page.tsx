@@ -4,26 +4,33 @@ export const dynamic = 'force-static';
 
 export default function CookiePolicyPage() {
   return (
-    <LegalLayout title="Cookie Policy" lastUpdated="September 9, 2026">
+    <LegalLayout title="Cookie Policy" lastUpdated="September 12, 2026">
       <section>
-        <h2>1. What Are Cookies</h2>
+        <h2>1. What Are Cookies and Local Storage</h2>
         <p>
           Cookies are small text files stored on your device by websites you visit. OmniParse primarily
-          uses browser Local Storage rather than traditional cookies, but the same principles and legal
-          requirements apply under the EU ePrivacy Directive (2002/58/EC) and GDPR.
+          uses browser Local Storage rather than traditional cookies. Under the EU ePrivacy Directive
+          (2002/58/EC) as amended by Directive 2009/136/EC, the consent requirements apply to both
+          cookies and Local Storage. Each item stored is classified as either essential or non-essential
+          based on its purpose.
         </p>
       </section>
 
       <section>
-        <h2>2. What We Use</h2>
-        <p><strong>Essential (always active — no consent required):</strong></p>
+        <h2>2. What We Store and Why</h2>
+        <p><strong>Essential storage (always active — exempt from consent per ePrivacy Art. 5(3)):</strong></p>
         <ul>
           <li><strong>Authentication token (op_token):</strong> Stores your JWT session token in Local Storage so you stay signed in across page refreshes. Required for the Service to function.</li>
-          <li><strong>Theme preference:</strong> Stores your light/dark mode choice in Local Storage.</li>
-          <li><strong>Cookie consent record (omniparse_cookie_consent):</strong> Stores your consent choice and timestamp so we do not ask again.</li>
-          <li><strong>Crash logs (op_crash_log):</strong> Stores recent client-side errors in Local Storage for debugging. Limited to the last 10 errors.</li>
+          <li><strong>Cookie consent record (omniparse_cookie_consent):</strong> Stores your consent choice and timestamp. Purpose: prevents re-showing the consent banner. Required to respect your consent decision.</li>
         </ul>
-        <p><strong>Analytics (only with your consent):</strong></p>
+        <p><strong>Non-essential storage (requires consent — only set after you accept via the cookie banner):</strong></p>
+        <ul>
+          <li><strong>Theme preference (theme):</strong> Stores your light/dark mode choice. Purpose: user preference.</li>
+          <li><strong>Keyboard shortcuts (op_shortcuts):</strong> Stores custom keyboard shortcut assignments. Purpose: user preference.</li>
+          <li><strong>Legal consent (op_legal_consent):</strong> Records GDPR data transfer consent. Purpose: compliance.</li>
+          <li><strong>Crash logs (op_crash_log):</strong> Stores recent client-side errors for debugging. Purpose: service stability. Limited to last 10 errors.</li>
+        </ul>
+        <p><strong>Analytics:</strong></p>
         <ul>
           <li>Currently, no analytics cookies are active. If we implement analytics in the future, we will update this policy and seek your consent via the cookie banner.</li>
         </ul>
@@ -40,8 +47,8 @@ export default function CookiePolicyPage() {
           Under the EU ePrivacy Directive (2002/58/EC), as amended by Directive 2009/136/EC, and GDPR:
         </p>
         <ul>
-          <li><strong>Essential storage:</strong> Exempt from consent requirements as strictly necessary for the provision of the Service (e.g. authentication token, theme preference).</li>
-          <li><strong>Non-essential storage:</strong> Requires your explicit, informed, prior consent. Currently we set no non-essential storage, but the cookie banner provides this option for future use.</li>
+          <li><strong>Essential storage (op_token, omniparse_cookie_consent):</strong> Exempt from consent requirements as strictly necessary for the provision of the Service explicitly requested by the user (ePrivacy Art. 5(3) exception).</li>
+          <li><strong>Non-essential storage (theme, op_shortcuts, op_legal_consent, op_crash_log):</strong> Requires your explicit, informed, prior consent via the cookie banner. You may withdraw consent at any time by clearing your browser&apos;s Local Storage or by using the &quot;Essential only&quot; button.</li>
           <li>You may withdraw consent at any time by clearing your browser&apos;s Local Storage.</li>
           <li>You have the right to be informed about what data is collected and for what purpose (this section).</li>
         </ul>
