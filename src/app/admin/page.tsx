@@ -1,0 +1,452 @@
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+import {
+  Shield, ShieldAlert, ShieldCheck, Snowflake, Trash2, RefreshCw,
+  Search, AlertTriangle, Users, FileText, MessageSquare, Mail, Loader2,
+} from 'lucide-react';
+import { toast } from 'sonner';
+
+interface AccountStats {
+  invoices: number;
+  chatSessions: number;
+  emailInboxes: number;
+  pendingReviews: number;
+  auditLogs: number;
+}
+
+interface AbuseRisk {
+  score: number;
+  level: 'high' | 'medium' | 'low';
+  factors: string[];
+}
+
+interface Account {
+  id: string;
+  email: string;
+  name: string;
+  plan: string;
+  createdAt: string;
+  ageDays: number;
+  active: boolean;
+  stats: AccountStats;
+  abuseRisk: AbuseRisk;
+}
+
+interface Summary {
+  totalAccounts: number;
+  highRisk: number;
+  mediumRisk: number;
+  lowRisk: number;
+  totalInvoices: number;
+  totalChatSessions: number;
+  totalEmailInboxes: number;
+  frozenAccounts: number;
+}
+
+export default function AdminPage() {
+  const [secret, setSecret] = useState('');
+  const [authed, setAuthed] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [summary, setSummary] = useState<Summary | null>(null);
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState<'all' | 'high' | 'medium' | 'low' | 'frozen'>('all');
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  // Auto-fill secret from URL param or localStorage
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const key = urlParams.get('key');
+    if (key) {
+      setSecret(key);
+      try { localStorage.setItem('op_admin_key', key); } catch {}
+    } else {
+      try {
+        const saved = localStorage.getItem('op_admin_key');
+        if (saved) setSecret(saved);
+      } catch {}
+    }
+  }, []);
+
+  const fetchAccounts = useCallback(async () => {
+    if (!secret) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/admin/accounts?key=${encodeURIComponent(secret)}`);
+      const data = await res.json();
+      if (res.ok) {
+        setAccounts(data.accounts || []);
+        setSummary(data.summary || null);
+        setAuthed(true);
+        try { localStorage.setItem('op_admin_key', secret); } catch {}
+      } else {
+        toast.error(data.error || 'Failed to load accounts');
+        if (res.status === 401) setAuthed(false);
+      }
+    } catch {
+      toast.error('Network error');
+    } finally {
+      setLoading(false);
+    }
+  }, [secret]);
+
+  // Auto-fetch if secret is pre-filled
+  useEffect(() => {
+    if (secret && !authed) {
+      fetchAccounts();
+    }
+  }, [secret, authed, fetchAccounts]);
+
+  const handleFreeze = async (id: string, email: string) => {
+    const reason = prompt(`Freeze account "${email}".\n\nReason (shown to user):`, 'Account frozen by administrator due to suspected abuse.');
+    if (!reason) return;
+    setActionLoading(id);
+    try {
+      const res = await fetch(`/api/admin/accounts/${id}/freeze?key=${encodeURIComponent(secret)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(data.message || 'Account frozen');
+        fetchAccounts();
+      } else {
+        toast.error(data.error || 'Failed to freeze');
+      }
+    } catch {
+      toast.error('Network error');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleUnfreeze = async (id: string, email: string) => {
+    if (!confirm(`Unfreeze account "${email}"?`)) return;
+    setActionLoading(id);
+    try {
+      const res = await fetch(`/api/admin/accounts/${id}/unfreeze?key=${encodeURIComponent(secret)}`, {
+        method: 'POST',
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(data.message || 'Account unfrozen');
+        fetchAccounts();
+      } else {
+        toast.error(data.error || 'Failed to unfreeze');
+      }
+    } catch {
+      toast.error('Network error');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDelete = async (id: string, email: string) => {
+    const confirmText = prompt(`DELETE account "${email}".\n\nThis is IRREVERSIBLE — all data will be permanently deleted.\n\nType DELETE to confirm:`);
+    if (confirmText !== 'DELETE') {
+      if (confirmText !== null) toast.error('Confirmation failed — you must type DELETE exactly.');
+      return;
+    }
+    setActionLoading(id);
+    try {
+      const res = await fetch(`/api/admin/accounts/${id}?key=${encodeURIComponent(secret)}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(data.message || 'Account deleted');
+        fetchAccounts();
+      } else {
+        toast.error(data.error || 'Failed to delete');
+      }
+    } catch {
+      toast.error('Network error');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // Filter accounts
+  const filtered = accounts.filter((acc) => {
+    if (filter === 'high' && acc.abuseRisk.level !== 'high') return false;
+    if (filter === 'medium' && acc.abuseRisk.level !== 'medium') return false;
+    if (filter === 'low' && acc.abuseRisk.level !== 'low') return false;
+    if (filter === 'frozen' && acc.active) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      return acc.email.toLowerCase().includes(q) || acc.name.toLowerCase().includes(q) || acc.id.includes(q);
+    }
+    return true;
+  });
+
+  // Login screen
+  if (!authed) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="max-w-md w-full">
+          <div className="flex items-center gap-2 mb-6">
+            <div className="w-10 h-10 rounded-lg bg-amber-500 flex items-center justify-center">
+              <Shield className="h-5 w-5 text-white" />
+            </div>
+            <h1 className="text-xl font-bold">OmniParse Admin</h1>
+          </div>
+          <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Enter your CRON_SECRET to access the admin dashboard.
+            </p>
+            <input
+              type="password"
+              placeholder="CRON_SECRET"
+              value={secret}
+              onChange={(e) => setSecret(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && fetchAccounts()}
+              className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm font-mono"
+            />
+            <button
+              onClick={fetchAccounts}
+              disabled={!secret || loading}
+              className="w-full px-4 py-2 rounded-lg bg-amber-500 text-white text-sm font-medium hover:bg-amber-600 disabled:opacity-50"
+            >
+              {loading ? 'Loading...' : 'Access Dashboard'}
+            </button>
+          </div>
+          <p className="text-xs text-muted-foreground mt-4 text-center">
+            Access via: /admin?key=YOUR_CRON_SECRET
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur-sm">
+        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-amber-500 flex items-center justify-center">
+              <Shield className="h-4 w-4 text-white" />
+            </div>
+            <span className="font-semibold text-sm">OmniParse Admin</span>
+          </div>
+          <button
+            onClick={fetchAccounts}
+            disabled={loading}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs hover:bg-muted/50 disabled:opacity-50"
+          >
+            {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+            Refresh
+          </button>
+        </div>
+      </header>
+
+      <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+        {/* Summary cards */}
+        {summary && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <StatCard icon={Users} label="Total Accounts" value={summary.totalAccounts} />
+            <StatCard icon={FileText} label="Total Invoices" value={summary.totalInvoices} />
+            <StatCard icon={MessageSquare} label="Chat Sessions" value={summary.totalChatSessions} />
+            <StatCard icon={Mail} label="Email Inboxes" value={summary.totalEmailInboxes} />
+          </div>
+        )}
+
+        {/* Risk summary */}
+        {summary && (
+          <div className="grid grid-cols-4 gap-3">
+            <RiskCard label="High Risk" value={summary.highRisk} color="text-red-500" bg="bg-red-500/10" icon={ShieldAlert} />
+            <RiskCard label="Medium Risk" value={summary.mediumRisk} color="text-amber-500" bg="bg-amber-500/10" icon={AlertTriangle} />
+            <RiskCard label="Low Risk" value={summary.lowRisk} color="text-emerald-500" bg="bg-emerald-500/10" icon={ShieldCheck} />
+            <RiskCard label="Frozen" value={summary.frozenAccounts} color="text-blue-500" bg="bg-blue-500/10" icon={Snowflake} />
+          </div>
+        )}
+
+        {/* Search + filters */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search by email, name, or ID..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 rounded-lg border border-border bg-card text-sm"
+            />
+          </div>
+          <div className="flex gap-1.5">
+            {(['all', 'high', 'medium', 'low', 'frozen'] as const).map((f) => (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                className={`px-3 py-2 rounded-lg text-xs font-medium capitalize transition-colors ${
+                  filter === f
+                    ? 'bg-amber-500 text-white'
+                    : 'bg-card border border-border text-muted-foreground hover:bg-muted/50'
+                }`}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Accounts table */}
+        <div className="rounded-xl border border-border overflow-hidden bg-card">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/50">
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Account</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Risk</th>
+                  <th className="text-center px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">Invoices</th>
+                  <th className="text-center px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">Chat</th>
+                  <th className="text-center px-4 py-3 font-medium text-muted-foreground hidden lg:table-cell">Inboxes</th>
+                  <th className="text-center px-4 py-3 font-medium text-muted-foreground hidden lg:table-cell">Age</th>
+                  <th className="text-center px-4 py-3 font-medium text-muted-foreground">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading && (
+                  <tr>
+                    <td colSpan={7} className="text-center py-12">
+                      <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+                    </td>
+                  </tr>
+                )}
+                {!loading && filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="text-center py-12 text-muted-foreground">
+                      No accounts found
+                    </td>
+                  </tr>
+                )}
+                {!loading && filtered.map((acc) => (
+                  <tr key={acc.id} className={`border-b border-border hover:bg-muted/30 ${!acc.active ? 'bg-blue-500/5' : ''}`}>
+                    {/* Account info */}
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="min-w-0">
+                          <div className="font-medium truncate flex items-center gap-1.5">
+                            {acc.email}
+                            {!acc.active && (
+                              <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-blue-600 bg-blue-500/10 px-1.5 py-0.5 rounded">
+                                <Snowflake className="h-2.5 w-2.5" />
+                                FROZEN
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {acc.name} · {acc.plan} · {acc.id.slice(-8)}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Risk score */}
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <span className={`font-bold text-lg ${
+                          acc.abuseRisk.level === 'high' ? 'text-red-500'
+                          : acc.abuseRisk.level === 'medium' ? 'text-amber-500'
+                          : 'text-emerald-500'
+                        }`}>
+                          {acc.abuseRisk.score}
+                        </span>
+                        {acc.abuseRisk.factors.length > 0 && (
+                          <div className="group relative">
+                            <AlertTriangle className={`h-3.5 w-3.5 ${
+                              acc.abuseRisk.level === 'high' ? 'text-red-500'
+                              : acc.abuseRisk.level === 'medium' ? 'text-amber-500'
+                              : 'text-muted-foreground'
+                            } cursor-help`} />
+                            <div className="hidden group-hover:block absolute z-50 left-0 top-5 w-64 p-2 rounded-lg border border-border bg-popover shadow-lg text-xs">
+                              <p className="font-semibold mb-1">Risk factors:</p>
+                              <ul className="space-y-0.5 text-muted-foreground">
+                                {acc.abuseRisk.factors.map((f, i) => (
+                                  <li key={i}>• {f}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </td>
+
+                    {/* Stats */}
+                    <td className="px-4 py-3 text-center font-mono text-xs hidden md:table-cell">{acc.stats.invoices}</td>
+                    <td className="px-4 py-3 text-center font-mono text-xs hidden md:table-cell">{acc.stats.chatSessions}</td>
+                    <td className="px-4 py-3 text-center font-mono text-xs hidden lg:table-cell">{acc.stats.emailInboxes}</td>
+                    <td className="px-4 py-3 text-center font-mono text-xs hidden lg:table-cell">{acc.ageDays}d</td>
+
+                    {/* Actions */}
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-center gap-1">
+                        {actionLoading === acc.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                        ) : acc.active ? (
+                          <button
+                            onClick={() => handleFreeze(acc.id, acc.email)}
+                            title="Freeze account"
+                            className="p-1.5 rounded hover:bg-blue-500/20 text-blue-500 transition-colors"
+                          >
+                            <Snowflake className="h-4 w-4" />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleUnfreeze(acc.id, acc.email)}
+                            title="Unfreeze account"
+                            className="p-1.5 rounded hover:bg-emerald-500/20 text-emerald-500 transition-colors"
+                          >
+                            <ShieldCheck className="h-4 w-4" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleDelete(acc.id, acc.email)}
+                          title="Delete account (irreversible)"
+                          className="p-1.5 rounded hover:bg-red-500/20 text-red-500 transition-colors"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <p className="text-xs text-muted-foreground text-center">
+          OmniParse Admin Dashboard · Sorted by abuse risk score (highest first) · Data refreshes on demand
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function StatCard({ icon: Icon, label, value }: { icon: any; label: string; value: number }) {
+  return (
+    <div className="rounded-xl border border-border bg-card p-4">
+      <div className="flex items-center gap-2 mb-1">
+        <Icon className="h-4 w-4 text-muted-foreground" />
+        <span className="text-xs text-muted-foreground">{label}</span>
+      </div>
+      <p className="text-2xl font-bold">{value.toLocaleString()}</p>
+    </div>
+  );
+}
+
+function RiskCard({ label, value, color, bg, icon: Icon }: { label: string; value: number; color: string; bg: string; icon: any }) {
+  return (
+    <div className={`rounded-xl border border-border p-3 ${bg}`}>
+      <div className="flex items-center gap-1.5 mb-1">
+        <Icon className={`h-3.5 w-3.5 ${color}`} />
+        <span className="text-xs text-muted-foreground">{label}</span>
+      </div>
+      <p className={`text-xl font-bold ${color}`}>{value}</p>
+    </div>
+  );
+}
