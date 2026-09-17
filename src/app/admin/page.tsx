@@ -210,6 +210,28 @@ export default function AdminPage() {
     finally { setActionLoading(null); }
   };
 
+  const handlePlanChange = async (id: string, email: string, currentPlan: string) => {
+    const plans = ['free', 'pro', 'plus', 'business', 'enterprise'];
+    const planStr = prompt(`Change plan for "${email}".\n\nCurrent plan: ${currentPlan}\n\nEnter new plan (${plans.join(', ')}):`, currentPlan);
+    if (!planStr || planStr.toLowerCase() === currentPlan) return;
+    if (!plans.includes(planStr.toLowerCase())) {
+      toast.error(`Invalid plan. Must be one of: ${plans.join(', ')}`);
+      return;
+    }
+    setActionLoading(id);
+    try {
+      const res = await fetch(`/api/admin/accounts/${id}/plan?key=${encodeURIComponent(secret)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: planStr.toLowerCase() }),
+      });
+      const data = await res.json();
+      if (res.ok) { toast.success(data.message || 'Plan changed'); fetchAccounts(); }
+      else toast.error(data.error || 'Failed to change plan');
+    } catch { toast.error('Network error'); }
+    finally { setActionLoading(null); }
+  };
+
   // Login screen
   if (!authed) {
     return (
@@ -344,7 +366,15 @@ export default function AdminPage() {
                           </div>
                           <div className="text-xs text-muted-foreground">{acc.name} · ...{acc.id.slice(-8)}</div>
                         </td>
-                        <td className="px-4 py-3"><span className="text-xs font-medium capitalize bg-muted px-2 py-0.5 rounded">{acc.plan}</span></td>
+                        <td className="px-4 py-3">
+                          <button
+                            onClick={() => handlePlanChange(acc.id, acc.email, acc.plan)}
+                            title="Click to change plan"
+                            className="text-xs font-medium capitalize bg-muted px-2 py-0.5 rounded hover:bg-amber-500/20 hover:text-amber-600 cursor-pointer transition-colors"
+                          >
+                            {acc.plan} ✎
+                          </button>
+                        </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
                             <span className={`font-bold text-lg ${acc.abuseRisk.level === 'high' ? 'text-red-500' : acc.abuseRisk.level === 'medium' ? 'text-amber-500' : 'text-emerald-500'}`}>{acc.abuseRisk.score}</span>

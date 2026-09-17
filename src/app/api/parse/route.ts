@@ -697,7 +697,41 @@ Return ONLY valid JSON with no markdown, no code fences, no explanation. Use thi
 }
 
 IMPORTANT: For each field, estimate your extraction confidence (0.0 to 1.0). If a field is not found, use null. Extract all line items if present. Be precise with numbers — parse European number formats correctly.${customFieldPrompt}${textHint}`;
-        responseText = await geminiChatCall(textPrompt, [{ role: 'user', content: `Here is the invoice text (numbers normalized to standard format):\n\n${normalizedText}` }]);
+        try {
+          responseText = await geminiChatCall(textPrompt, [{ role: 'user', content: `Here is the invoice text (numbers normalized to standard format):\n\n${normalizedText}` }]);
+        } catch (chatErr) {
+          // Text model cascade failed (all providers rate-limited).
+          // Fall back to VISION model — render the PDF pages as images
+          // and send to geminiVisionCall, which has a different cascade
+          // (Mistral vision → OpenRouter vision → Groq vision → Gemini vision).
+          // This gives PDFs access to the same providers that work for images.
+          console.warn('[parse] Text model cascade failed for PDF, falling back to vision model...', chatErr instanceof Error ? chatErr.message : String(chatErr));
+
+          // Re-extract PDF as images (same as scanned PDF path)
+          const pdfImgResult = await extractPdfContent(buffer);
+          if (pdfImgResult.source === 'image' && pdfImgResult.images && pdfImgResult.images.length > 0) {
+            const visionContent: Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }> = [
+              { type: 'text', text: VLM_PROMPT },
+            ];
+            const MAX_IMG = 3 * 1024 * 1024;
+            for (const imgBuf of pdfImgResult.images.slice(0, 3)) {
+              const isJpeg = imgBuf.length >= 3 && imgBuf[0] === 0xFF && imgBuf[1] === 0xD8 && imgBuf[2] === 0xFF;
+              if (!isJpeg) continue;
+              if (imgBuf.length > MAX_IMG) continue;
+              visionContent.push({
+                type: 'image_url' as const,
+                image_url: { url: `data:image/jpeg;base64,${imgBuf.toString('base64')}` },
+              });
+            }
+            if (visionContent.length > 1) {
+              responseText = await geminiVisionCall([{ role: 'user', content: visionContent }]);
+            } else {
+              throw chatErr; // No images either — re-throw the original error
+            }
+          } else {
+            throw chatErr; // Can't extract images — re-throw
+          }
+        }
       }
     } else {
       // Image files: send to vision model

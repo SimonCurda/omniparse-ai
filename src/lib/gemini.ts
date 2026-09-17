@@ -841,6 +841,75 @@ export async function geminiChatCall(
     }
   }
 
+  // ─── Final fallback: Google Gemini text models ────────────────────
+  // Same as the vision cascade — Google Gemini has its own free tier
+  // quota, independent from Mistral/Groq/OpenRouter.
+  const geminiKeys = [
+    process.env.GEMINI_API_KEY,
+    process.env.GEMINI_API_KEY_2,
+    process.env.GEMINI_API_KEY_3,
+  ].filter(Boolean) as string[];
+
+  if (geminiKeys.length > 0) {
+    const geminiTextModels = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-1.5-flash'];
+
+    for (const gm of geminiTextModels) {
+      for (let keyIdx = 0; keyIdx < geminiKeys.length; keyIdx++) {
+        const geminiKey = geminiKeys[keyIdx];
+        try {
+          console.warn(`[gemini-chat] Trying Google Gemini text: ${gm} (key ${keyIdx + 1}/${geminiKeys.length})...`);
+
+          // Convert OpenAI messages to Gemini format
+          const contents = openaiMessages.map((m) => ({
+            role: m.role === 'assistant' ? 'model' : 'user',
+            parts: [{ text: m.content }],
+          }));
+
+          const res = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${gm}:generateContent?key=${geminiKey}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents,
+                generationConfig: {
+                  temperature: 0.1,
+                  maxOutputTokens: MAX_TOKENS_HIGH,
+                  responseMimeType: 'application/json',
+                },
+              }),
+            },
+          );
+
+          if (res.ok) {
+            const data = await res.json();
+            const content = data.candidates?.[0]?.content?.parts
+              ?.map((p: { text?: string }) => p.text || '')
+              .join('') || '';
+            if (content) {
+              console.warn(`[gemini-chat] Google Gemini text succeeded (model: ${gm}, key ${keyIdx + 1})!`);
+              return content;
+            }
+          }
+
+          if (res.status === 429) {
+            console.warn(`[gemini-chat] Google Gemini ${gm} rate limited (key ${keyIdx + 1}). Trying next key...`);
+            continue;
+          }
+          if (res.status === 400 || res.status === 404) {
+            console.warn(`[gemini-chat] Google Gemini ${gm} not available (status ${res.status}). Trying next model...`);
+            break;
+          }
+          console.warn(`[gemini-chat] Google Gemini ${gm} failed (key ${keyIdx + 1}, status ${res.status})`);
+          break;
+        } catch (err) {
+          console.warn(`[gemini-chat] Google Gemini ${gm} error (key ${keyIdx + 1}):`, err instanceof Error ? err.message : String(err));
+          continue;
+        }
+      }
+    }
+  }
+
   const allTriedModels = [...triedMistralModels, ...triedModels];
   throw new Error(`AI is temporarily busy. Please wait 30 seconds and try again. (Tried: ${allTriedModels.join(', ') || 'all models'})`);
 }
