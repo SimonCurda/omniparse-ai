@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
+import { checkMonthlyParseLimit } from '@/lib/parse-limit';
 import { scanInbox } from '@/lib/email-scanner';
 import { rateLimit } from '@/lib/rate-limit';
 
@@ -33,13 +34,28 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // Frozen account check
   const scanUser = await db.user.findUnique({
     where: { id: auth.userId },
-    select: { id: true, active: true, frozenReason: true },
+    select: { id: true, active: true, frozenReason: true, plan: true },
   });
   if (!scanUser) return NextResponse.json({ error: 'User not found' }, { status: 404 });
   if (!scanUser.active) {
     return NextResponse.json(
       { error: scanUser.frozenReason || 'Your account has been frozen. Please contact support.', code: 'ACCOUNT_FROZEN' },
       { status: 403 },
+    );
+  }
+
+  // ─── Monthly parse limit check ──────────────────────────────────────
+  // If the user has already hit their monthly parse limit, block scanning
+  // — there's no point scanning emails if the user can't approve any
+  // invoices (approval would be blocked by the same limit).
+  const parseLimit = await checkMonthlyParseLimit(auth.userId, scanUser.plan);
+  if (!parseLimit.allowed) {
+    return NextResponse.json(
+      { 
+        error: `Monthly parse limit reached (${parseLimit.count}/${parseLimit.limit}). You can't scan for new invoices because you wouldn't be able to approve them. The limit resets on the 1st of next month. Upgrade to a higher plan for more capacity.`,
+        code: 'MONTHLY_LIMIT_REACHED',
+      },
+      { status: 429 },
     );
   }
 

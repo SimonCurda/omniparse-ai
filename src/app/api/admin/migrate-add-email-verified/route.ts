@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
       SELECT column_name
       FROM information_schema.columns
       WHERE table_name = 'User'
-        AND column_name IN ('emailVerified', 'active', 'frozenReason', 'frozenAt')
+        AND column_name IN ('emailVerified', 'active', 'frozenReason', 'frozenAt', 'monthlyParseCount', 'parseCountResetAt')
     `;
 
     const existingSet = new Set(existingColumns.map((c) => c.column_name));
@@ -68,6 +68,18 @@ export async function POST(req: NextRequest) {
     if (!existingSet.has('frozenAt')) {
       await db.$executeRaw`ALTER TABLE "User" ADD COLUMN "frozenAt" TIMESTAMP(3)`;
       added.push('frozenAt');
+    }
+
+    // Add monthlyParseCount if missing (hard monthly parse counter)
+    if (!existingSet.has('monthlyParseCount')) {
+      await db.$executeRaw`ALTER TABLE "User" ADD COLUMN "monthlyParseCount" INTEGER NOT NULL DEFAULT 0`;
+      added.push('monthlyParseCount');
+    }
+
+    // Add parseCountResetAt if missing
+    if (!existingSet.has('parseCountResetAt')) {
+      await db.$executeRaw`ALTER TABLE "User" ADD COLUMN "parseCountResetAt" TIMESTAMP(3)`;
+      added.push('parseCountResetAt');
     }
 
     if (added.length === 0) {

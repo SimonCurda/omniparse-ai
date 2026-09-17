@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
 import { db } from '@/lib/db';
 import { getUserFromRequest, hasFeature, PLAN_LIMITS } from '@/lib/auth';
+import { checkMonthlyParseLimit, incrementMonthlyParseCount } from '@/lib/parse-limit';
 import {
   runValidationRules,
   runVarianceChecks,
@@ -505,13 +506,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Count invoices this month only (hard wall per month)
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-    const invoiceCount = await db.invoice.count({ where: { userId: auth.userId, createdAt: { gte: new Date(startOfMonth) } } });
-    const limit = PLAN_LIMITS[user.plan] || PLAN_LIMITS.free;
-    if (invoiceCount >= limit) {
-      return NextResponse.json({ error: `Plan limit reached (${limit} invoices). Upgrade to process more.` }, { status: 429 });
+    // ─── Hard monthly parse limit ────────────────────────────────────
+    // Uses a persistent counter on the User model — if a Free user parses
+    // 15 invoices, deletes them all, they STILL can't parse more this month.
+    // Counter resets on the 1st of each month (checked at runtime).
+    const parseLimit = await checkMonthlyParseLimit(auth.userId, user.plan);
+    if (!parseLimit.allowed) {
+      return NextResponse.json(
+        { error: parseLimit.message || `Monthly limit reached (${parseLimit.count}/${parseLimit.limit}). Resets on the 1st of next month.`, code: 'MONTHLY_LIMIT_REACHED' },
+        { status: 429 },
+      );
     }
 
     // Load user settings for custom fields and validation rules
@@ -1078,6 +1082,12 @@ IMPORTANT: For each field, estimate your extraction confidence (0.0 to 1.0). If 
         fileDataExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       },
     });
+
+    // ─── Increment the hard monthly parse counter ─────────────────────
+    // This counter is NOT affected by invoice deletion — once you've
+    // parsed 15 invoices this month, you can't parse more even if you
+    // delete them all. Resets on the 1st of each month.
+    await incrementMonthlyParseCount(auth.userId);
 
     // ---- Duplicate Detection ----
     let duplicateCheckResult: { isDuplicate: boolean; duplicateCount: number } | null = null;
