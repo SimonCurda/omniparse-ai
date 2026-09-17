@@ -634,18 +634,30 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
       const wsData = [
         ['Vendor', 'Invoice #', 'Date', 'Amount', 'VAT', 'Total', 'Currency', 'Status', 'Confidence (%)', 'Validation Status', 'Processing Time'],
         ...checkedInvoices.map((inv) => [
-          inv.vendor, inv.invNumber, inv.invDate, inv.amount, inv.vatAmount, inv.total,
-          inv.currency, inv.status, inv.confidence != null ? Math.round(inv.confidence * 100) : null,
-          inv.validationStatus ?? '', inv.processingTime != null ? `${inv.processingTime.toFixed(1)}s` : '',
+          inv.vendor || '',
+          inv.invNumber || '',
+          inv.invDate || '',
+          inv.amount ?? '',
+          inv.vatAmount ?? '',
+          inv.total ?? '',
+          inv.currency || 'USD',
+          inv.isDuplicate ? 'Duplicate' : inv.status === 'review' ? 'Review' : 'Done',
+          inv.confidence ?? '',
+          inv.validationStatus ?? 'N/A',
+          inv.processingTime != null ? `${inv.processingTime.toFixed(1)}s` : '',
         ]),
       ];
       const ws = XLSX.utils.aoa_to_sheet(wsData);
+      ws['!cols'] = [
+        { wch: 28 }, { wch: 20 }, { wch: 16 }, { wch: 14 }, { wch: 14 },
+        { wch: 14 }, { wch: 10 }, { wch: 12 }, { wch: 16 }, { wch: 14 }, { wch: 14 },
+      ];
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Checked Invoices');
       XLSX.writeFile(wb, 'checked-invoices.xlsx');
       toast.success(`Exported ${checkedInvoices.length} checked invoices to Excel`);
     } catch {
-      toast.error('Excel export failed');
+      toast.error('Failed to generate Excel file');
     }
   };
 
