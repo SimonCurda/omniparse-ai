@@ -35,32 +35,53 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Check if column already exists (Postgres metadata query)
-    const columnCheck = await db.$queryRaw<Array<{ column_name: string }>>`
+    // Check which columns already exist
+    const existingColumns = await db.$queryRaw<Array<{ column_name: string }>>`
       SELECT column_name
       FROM information_schema.columns
       WHERE table_name = 'User'
-        AND column_name = 'emailVerified'
+        AND column_name IN ('emailVerified', 'active', 'frozenReason', 'frozenAt')
     `;
 
-    if (columnCheck.length > 0) {
+    const existingSet = new Set(existingColumns.map((c) => c.column_name));
+    const added: string[] = [];
+
+    // Add emailVerified if missing
+    if (!existingSet.has('emailVerified')) {
+      await db.$executeRaw`ALTER TABLE "User" ADD COLUMN "emailVerified" TIMESTAMP(3) NULL`;
+      added.push('emailVerified');
+    }
+
+    // Add active if missing (for freeze functionality)
+    if (!existingSet.has('active')) {
+      await db.$executeRaw`ALTER TABLE "User" ADD COLUMN "active" BOOLEAN NOT NULL DEFAULT true`;
+      added.push('active');
+    }
+
+    // Add frozenReason if missing
+    if (!existingSet.has('frozenReason')) {
+      await db.$executeRaw`ALTER TABLE "User" ADD COLUMN "frozenReason" TEXT`;
+      added.push('frozenReason');
+    }
+
+    // Add frozenAt if missing
+    if (!existingSet.has('frozenAt')) {
+      await db.$executeRaw`ALTER TABLE "User" ADD COLUMN "frozenAt" TIMESTAMP(3)`;
+      added.push('frozenAt');
+    }
+
+    if (added.length === 0) {
       return NextResponse.json({
         success: true,
-        message: 'emailVerified column already exists. No action needed.',
+        message: 'All columns already exist. No action needed.',
         alreadyExists: true,
       });
     }
 
-    // Add the column. NULL by default — existing users are grandfathered.
-    await db.$executeRaw`
-      ALTER TABLE "User"
-      ADD COLUMN "emailVerified" TIMESTAMP(3) NULL
-    `;
-
     return NextResponse.json({
       success: true,
-      message: 'emailVerified column added to User table. Existing users are grandfathered. New users will need to verify their email.',
-      alreadyExists: false,
+      message: `Added columns: ${added.join(', ')}. Existing users are active by default.`,
+      added,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown migration error';
