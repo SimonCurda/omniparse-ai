@@ -593,145 +593,70 @@ export async function POST(req: NextRequest) {
       fileMetadata = await extractImageMetadata(buffer, file.type);
     }
 
-    // ── AI extraction: PDFs need text/image extraction first, images go straight to vision ──
+    // ── AI extraction: PDFs and images both go to vision model ──────
+    // Previously, text-based PDFs used geminiChatCall (text cascade) which
+    // has fewer providers and fails more often. Now ALL files go through
+    // geminiVisionCall (4-provider vision cascade) for reliability.
+    // Text extraction is only used as a fallback if vision also fails.
     let responseText: string;
 
     if (file.type === 'application/pdf') {
       const pdfResult = await extractPdfContent(buffer);
 
+      // ── Path A: PDF has extractable images (scanned PDFs) ────────
+      // Send images directly to vision model.
       if (pdfResult.source === 'image' && pdfResult.images && pdfResult.images.length > 0) {
-        // Scanned PDF: send extracted page images (JPEG) to vision model
         const visionContent: Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }> = [
           { type: 'text', text: VLM_PROMPT },
         ];
-        const MAX_IMG_RAW_BYTES = 3 * 1024 * 1024; // 3MB per image raw limit for Groq
+        const MAX_IMG_RAW_BYTES = 3 * 1024 * 1024;
         for (const imgBuf of pdfResult.images.slice(0, 3)) {
-          // Validate image has proper JPEG magic bytes
           const isJpeg = imgBuf.length >= 3 && imgBuf[0] === 0xFF && imgBuf[1] === 0xD8 && imgBuf[2] === 0xFF;
           const isPng = imgBuf.length >= 8 && imgBuf[0] === 0x89 && imgBuf[1] === 0x50 && imgBuf[2] === 0x4E && imgBuf[3] === 0x47;
-          if (!isJpeg && !isPng) continue; // skip invalid image data
-          // Skip images larger than 3MB raw (~4MB base64)
+          if (!isJpeg && !isPng) continue;
           if (imgBuf.length > MAX_IMG_RAW_BYTES) continue;
           const imgMime = isJpeg ? 'image/jpeg' : 'image/png';
-          const imgB64 = imgBuf.toString('base64');
           visionContent.push({
             type: 'image_url' as const,
-            image_url: { url: `data:${imgMime};base64,${imgB64}` },
+            image_url: { url: `data:${imgMime};base64,${imgBuf.toString('base64')}` },
           });
         }
-        if (visionContent.length <= 1) {
-          // No valid images could be prepared
-          return NextResponse.json(
-            {
-              error: 'Extracted images from PDF were invalid or too large for the AI vision model.',
-              hint: 'Try uploading a photo/screenshot of the invoice instead (JPG or PNG).',
-              diagnostics: pdfResult.errors,
-              imageInfo: pdfResult.images?.map((img) => ({
-                size: img.length,
-                firstBytes: Array.from(img.slice(0, 4)).map((b) => b.toString(16).padStart(2, '0')).join(' '),
-              })),
-            },
-            { status: 400 },
-          );
-        }
-        responseText = await geminiVisionCall([{ role: 'user', content: visionContent }]);
-      } else {
-        // Text-based PDF: send extracted text to chat model
-        const pdfText = pdfResult.text.trim();
-        if (!pdfText) {
-          // All extraction paths failed — build a detailed error
-          const diagStr = pdfResult.errors?.join('; ') || 'no diagnostics available';
-          console.error(`[parse] PDF extraction failed for ${file.name}: ${diagStr}`);
-          return NextResponse.json(
-            {
-              error: 'Could not extract any text or images from this PDF.',
-              hint: 'If this is a scanned document, take a screenshot or export as PNG/JPG and upload that instead. If it is a generated PDF, the file may be corrupted or use an unsupported encoding.',
-              diagnostics: pdfResult.errors,
-            },
-            { status: 400 },
-          );
-        }
-        const textHint = pdfText.length < 30
-          ? '\n\nNOTE: The extracted text is very short. Do your best to extract any useful information from it.'
-          : '';
-
-        // Pre-process: convert European number formats to standard format
-        // so the AI doesn't misparse "12 705,00" as "7.00"
-        // Pattern: digits, space/dot, 3 digits, comma, 2 digits → standard float
-        // Example: "12 705,00" → "12705.00", "1.234,56" → "1234.56"
-        const normalizedText = pdfText
-          // Replace "12 705,00" → "12705.00" (space as thousands separator)
-          .replace(/(\d)\s(\d{3}),(\d{2})/g, '$1$2.$3')
-          // Replace "12.705,00" → "12705.00" (dot as thousands separator)
-          .replace(/(\d)\.(\d{3}),(\d{2})/g, '$1$2.$3')
-          // Replace remaining "1234,56" → "1234.56" (comma as decimal separator)
-          .replace(/(\d),(\d{2})\b/g, '$1.$2');
-
-        const textPrompt = `You are an expert invoice parser. I will give you the extracted text from a PDF invoice. Parse it and return ONLY valid JSON.
-
-The invoice may be in ANY language. Map foreign labels:
-- Czech: Dodavatel=vendor, Číslo dokladu=invoice number, Datum vystavení=invoice date, Datum splatnosti=due date, Celkem/Celkem uhradit=total, DPH=VAT, Kč=CZK, Základ=amount(net)
-- German: Lieferant=vendor, Rechnungsnummer=invoice number, Rechnungsdatum=invoice date, Fälligkeitsdatum=due date, Gesamtbetrag=total, MwSt=VAT
-- French: Fournisseur=vendor, Numéro de facture=invoice number, Date d'échéance=due date, Montant TTC=total, TVA=VAT
-
-EUROPEAN NUMBER FORMAT: "12 705,00" or "12.705,00" = 12705.00 (space/dot=thousands, comma=decimal). "7 000,00" = 7000.00 NOT 7.00.
-
-NEVER put confidence labels ("High", "Low") as field values. Only extract actual data.
-
-Return ONLY valid JSON with no markdown, no code fences, no explanation. Use this EXACT schema:
-{
-  "vendor": "company name or null",
-  "invoiceNumber": "invoice number string or null",
-  "invoiceDate": "YYYY-MM-DD or null",
-  "dueDate": "YYYY-MM-DD or null",
-  "amount": 1234.56 or null,
-  "vatAmount": 234.56 or null,
-  "total": 1468.12 or null,
-  "currency": "USD or EUR or GBP or CZK etc. or null",
-  "lineItems": [{"description": "item", "quantity": 1, "unitPrice": 10.00}],
-  "fieldConfidence": {
-    "vendor": 0.95, "invoiceNumber": 0.99, "invoiceDate": 0.90, "dueDate": 0.90,
-    "amount": 0.98, "vatAmount": 0.95, "total": 0.99, "currency": 1.0
-  },
-  "confidence": 0.93${customFieldPrompt ? ',\n  ...customFieldsHere' : ''}
-}
-
-IMPORTANT: For each field, estimate your extraction confidence (0.0 to 1.0). If a field is not found, use null. Extract all line items if present. Be precise with numbers — parse European number formats correctly.${customFieldPrompt}${textHint}`;
-        try {
-          responseText = await geminiChatCall(textPrompt, [{ role: 'user', content: `Here is the invoice text (numbers normalized to standard format):\n\n${normalizedText}` }]);
-        } catch (chatErr) {
-          // Text model cascade failed (all providers rate-limited).
-          // Fall back to VISION model — render the PDF pages as images
-          // and send to geminiVisionCall, which has a different cascade
-          // (Mistral vision → OpenRouter vision → Groq vision → Gemini vision).
-          // This gives PDFs access to the same providers that work for images.
-          console.warn('[parse] Text model cascade failed for PDF, falling back to vision model...', chatErr instanceof Error ? chatErr.message : String(chatErr));
-
-          // Re-extract PDF as images (same as scanned PDF path)
-          const pdfImgResult = await extractPdfContent(buffer);
-          if (pdfImgResult.source === 'image' && pdfImgResult.images && pdfImgResult.images.length > 0) {
-            const visionContent: Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }> = [
-              { type: 'text', text: VLM_PROMPT },
-            ];
-            const MAX_IMG = 3 * 1024 * 1024;
-            for (const imgBuf of pdfImgResult.images.slice(0, 3)) {
-              const isJpeg = imgBuf.length >= 3 && imgBuf[0] === 0xFF && imgBuf[1] === 0xD8 && imgBuf[2] === 0xFF;
-              if (!isJpeg) continue;
-              if (imgBuf.length > MAX_IMG) continue;
-              visionContent.push({
-                type: 'image_url' as const,
-                image_url: { url: `data:image/jpeg;base64,${imgBuf.toString('base64')}` },
-              });
-            }
-            if (visionContent.length > 1) {
-              responseText = await geminiVisionCall([{ role: 'user', content: visionContent }]);
-            } else {
-              throw chatErr; // No images either — re-throw the original error
-            }
+        if (visionContent.length > 1) {
+          responseText = await geminiVisionCall([{ role: 'user', content: visionContent }]);
+        } else {
+          // Images were invalid — try text path as fallback
+          if (pdfResult.text.trim()) {
+            responseText = await geminiChatCall('You are an invoice parser. Extract all fields and return ONLY valid JSON.', [{ role: 'user', content: pdfResult.text }]);
           } else {
-            throw chatErr; // Can't extract images — re-throw
+            return NextResponse.json({ error: 'Could not extract usable content from this PDF.', diagnostics: pdfResult.errors }, { status: 400 });
           }
         }
+      }
+      // ── Path B: PDF has extractable text (text-based PDFs) ───────
+      // Send the text to the VISION model cascade (same 4 providers as
+      // images: Mistral → OpenRouter → Groq → Gemini). Vision models are
+      // multimodal — they can read text too. This gives PDFs the same
+      // reliability as image uploads.
+      else if (pdfResult.text.trim()) {
+        const normalizedText = pdfResult.text
+          .replace(/(\d)\s(\d{3}),(\d{2})/g, '$1$2.$3')
+          .replace(/(\d)\.(\d{3}),(\d{2})/g, '$1$2.$3')
+          .replace(/(\d),(\d{2})\b/g, '$1.$2');
+
+        // Send text to vision model as a text-only message
+        // (vision models accept text — they're multimodal LLMs)
+        responseText = await geminiVisionCall([{
+          role: 'user',
+          content: [
+            { type: 'text', text: VLM_PROMPT + '\n\n--- EXTRACTED PDF TEXT ---\n' + normalizedText },
+          ],
+        }]);
+      } else {
+        // No text and no images — can't process
+        return NextResponse.json(
+          { error: 'Could not extract any text or images from this PDF.', hint: 'Try uploading a photo/screenshot (JPG or PNG) instead.', diagnostics: pdfResult.errors },
+          { status: 400 },
+        );
       }
     } else {
       // Image files: send to vision model
