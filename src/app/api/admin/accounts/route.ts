@@ -49,6 +49,7 @@ export async function GET(req: NextRequest) {
         plan: true,
         createdAt: true,
         active: true,
+        hidden: true,
         _count: {
           select: {
             invoices: true,
@@ -125,6 +126,7 @@ export async function GET(req: NextRequest) {
           createdAt: user.createdAt.toISOString(),
           ageDays,
           active: user.active,
+          hidden: user.hidden,
           stats: {
             invoices: user._count.invoices,
             chatSessions: user._count.chatSessions,

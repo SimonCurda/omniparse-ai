@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Shield, ShieldAlert, ShieldCheck, Snowflake, Trash2, RefreshCw,
   Search, AlertTriangle, Users, FileText, MessageSquare, Mail, Loader2,
-  ArrowUpDown, ArrowUp, ArrowDown, History,
+  ArrowUpDown, ArrowUp, ArrowDown, History, EyeOff, Eye,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -30,6 +30,7 @@ interface Account {
   createdAt: string;
   ageDays: number;
   active: boolean;
+  hidden: boolean;
   stats: AccountStats;
   abuseRisk: AbuseRisk;
 }
@@ -74,7 +75,7 @@ export default function AdminPage() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'high' | 'medium' | 'low' | 'frozen'>('all');
-  const [tab, setTab] = useState<'accounts' | 'deleted'>('accounts');
+  const [tab, setTab] = useState<'accounts' | 'hidden' | 'deleted'>('accounts');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [sortField, setSortField] = useState<SortField>('risk');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
@@ -131,6 +132,7 @@ export default function AdminPage() {
 
   const sortedAccounts = useMemo(() => {
     const filtered = accounts.filter((acc) => {
+      if (acc.hidden) return false;
       if (filter === 'high' && acc.abuseRisk.level !== 'high') return false;
       if (filter === 'medium' && acc.abuseRisk.level !== 'medium') return false;
       if (filter === 'low' && acc.abuseRisk.level !== 'low') return false;
@@ -162,6 +164,8 @@ export default function AdminPage() {
 
     return sorted;
   }, [accounts, filter, search, sortField, sortDir]);
+
+  const hiddenAccounts = useMemo(() => accounts.filter((a) => a.hidden), [accounts]);
 
   const handleFreeze = async (id: string, email: string) => {
     const reason = prompt(`Freeze account "${email}".\n\nReason:`, 'Account frozen by administrator due to suspected abuse.');
@@ -232,6 +236,28 @@ export default function AdminPage() {
     finally { setActionLoading(null); }
   };
 
+  const handleHide = async (id: string, email: string) => {
+    setActionLoading(id);
+    try {
+      const res = await fetch(`/api/admin/accounts/${id}/hide?key=${encodeURIComponent(secret)}`, { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) { toast.success(data.message || 'Account hidden'); fetchAccounts(); }
+      else toast.error(data.error || 'Failed to hide');
+    } catch { toast.error('Network error'); }
+    finally { setActionLoading(null); }
+  };
+
+  const handleUnhide = async (id: string, email: string) => {
+    setActionLoading(id);
+    try {
+      const res = await fetch(`/api/admin/accounts/${id}/unhide?key=${encodeURIComponent(secret)}`, { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) { toast.success(data.message || 'Account restored'); fetchAccounts(); }
+      else toast.error(data.error || 'Failed to unhide');
+    } catch { toast.error('Network error'); }
+    finally { setActionLoading(null); }
+  };
+
   // Login screen
   if (!authed) {
     return (
@@ -296,11 +322,15 @@ export default function AdminPage() {
         <div className="flex gap-2 border-b border-border">
           <button onClick={() => setTab('accounts')}
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${tab === 'accounts' ? 'border-amber-500 text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
-            <Users className="h-4 w-4 inline mr-1.5" /> Active Accounts ({accounts.length})
+            <Users className="h-4 w-4 inline mr-1.5" /> Active ({sortedAccounts.length})
+          </button>
+          <button onClick={() => setTab('hidden')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${tab === 'hidden' ? 'border-amber-500 text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
+            <EyeOff className="h-4 w-4 inline mr-1.5" /> Hidden ({hiddenAccounts.length})
           </button>
           <button onClick={() => setTab('deleted')}
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${tab === 'deleted' ? 'border-amber-500 text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
-            <History className="h-4 w-4 inline mr-1.5" /> Deleted Accounts ({deletionLogs.length})
+            <History className="h-4 w-4 inline mr-1.5" /> Deleted ({deletionLogs.length})
           </button>
         </div>
 
@@ -402,6 +432,7 @@ export default function AdminPage() {
                                 ) : (
                                   <button onClick={() => handleUnfreeze(acc.id, acc.email)} title="Unfreeze" className="p-1.5 rounded hover:bg-emerald-500/20 text-emerald-500"><ShieldCheck className="h-4 w-4" /></button>
                                 )}
+                                <button onClick={() => handleHide(acc.id, acc.email)} title="Hide from active view" className="p-1.5 rounded hover:bg-muted text-muted-foreground"><EyeOff className="h-4 w-4" /></button>
                                 <button onClick={() => handleDelete(acc.id, acc.email)} title="Delete" className="p-1.5 rounded hover:bg-red-500/20 text-red-500"><Trash2 className="h-4 w-4" /></button>
                               </>
                             )}
@@ -414,6 +445,56 @@ export default function AdminPage() {
               </div>
             </div>
           </>
+        )}
+
+        {/* === HIDDEN ACCOUNTS TAB === */}
+        {tab === 'hidden' && (
+          <div className="rounded-xl border border-border overflow-hidden bg-card">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/50">
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Account</th>
+                    <th className="text-center px-4 py-3 font-medium text-muted-foreground">Plan</th>
+                    <th className="text-center px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">Invoices</th>
+                    <th className="text-center px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">Chat</th>
+                    <th className="text-center px-4 py-3 font-medium text-muted-foreground">Status</th>
+                    <th className="text-center px-4 py-3 font-medium text-muted-foreground">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {hiddenAccounts.length === 0 && (<tr><td colSpan={6} className="text-center py-12 text-muted-foreground">No hidden accounts</td></tr>)}
+                  {hiddenAccounts.map((acc) => (
+                    <tr key={acc.id} className="border-b border-border hover:bg-muted/30 opacity-60">
+                      <td className="px-4 py-3">
+                        <div className="font-medium truncate flex items-center gap-1.5">
+                          {acc.email}
+                          {!acc.active && (<span className="text-[10px] font-bold text-blue-600 bg-blue-500/10 px-1.5 py-0.5 rounded">FROZEN</span>)}
+                        </div>
+                        <div className="text-xs text-muted-foreground">{acc.name} · ...{acc.id.slice(-8)}</div>
+                      </td>
+                      <td className="px-4 py-3 text-center"><span className="text-xs font-medium capitalize bg-muted px-2 py-0.5 rounded">{acc.plan}</span></td>
+                      <td className="px-4 py-3 text-center font-mono text-xs hidden md:table-cell">{acc.stats.invoices}</td>
+                      <td className="px-4 py-3 text-center font-mono text-xs hidden md:table-cell">{acc.stats.chatSessions}</td>
+                      <td className="px-4 py-3 text-center">
+                        <span className="text-[10px] font-bold text-muted-foreground bg-muted px-1.5 py-0.5 rounded">HIDDEN</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-center gap-1">
+                          {actionLoading === acc.id ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : (
+                            <>
+                              <button onClick={() => handleUnhide(acc.id, acc.email)} title="Restore to active view" className="p-1.5 rounded hover:bg-emerald-500/20 text-emerald-500"><Eye className="h-4 w-4" /></button>
+                              <button onClick={() => handleDelete(acc.id, acc.email)} title="Delete" className="p-1.5 rounded hover:bg-red-500/20 text-red-500"><Trash2 className="h-4 w-4" /></button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         )}
 
         {/* === DELETED ACCOUNTS TAB === */}

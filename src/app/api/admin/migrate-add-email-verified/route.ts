@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
       SELECT column_name
       FROM information_schema.columns
       WHERE table_name = 'User'
-        AND column_name IN ('emailVerified', 'active', 'frozenReason', 'frozenAt', 'monthlyParseCount', 'parseCountResetAt')
+        AND column_name IN ('emailVerified', 'active', 'frozenReason', 'frozenAt', 'monthlyParseCount', 'parseCountResetAt', 'hidden')
     `;
 
     const existingSet = new Set(existingColumns.map((c) => c.column_name));
@@ -80,6 +80,12 @@ export async function POST(req: NextRequest) {
     if (!existingSet.has('parseCountResetAt')) {
       await db.$executeRaw`ALTER TABLE "User" ADD COLUMN "parseCountResetAt" TIMESTAMP(3)`;
       added.push('parseCountResetAt');
+    }
+
+    // Add hidden if missing (admin can hide accounts from dashboard)
+    if (!existingSet.has('hidden')) {
+      await db.$executeRaw`ALTER TABLE "User" ADD COLUMN "hidden" BOOLEAN NOT NULL DEFAULT false`;
+      added.push('hidden');
     }
 
     // Create AdminDeletionLog table if it doesn't exist

@@ -44,6 +44,10 @@ model User {
   // Displayed to the user when they try to use AI features.
   frozenReason      String?
   frozenAt         DateTime?
+  // Admin can hide accounts from the default admin view (not deleted,
+  // not frozen — just hidden from the "Active" tab). Useful for test
+  // accounts or accounts you don't want cluttering the dashboard.
+  hidden           Boolean  @default(false)
   // Hard monthly parse counter — tracks total invoices PARSED per month,
   // NOT just existing ones. If a Free user parses 15 invoices, deletes
   // them all, they STILL can't parse more this month. Counter resets

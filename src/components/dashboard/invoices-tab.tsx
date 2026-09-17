@@ -648,6 +648,11 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
         ]),
       ];
       const ws = XLSX.utils.aoa_to_sheet(wsData);
+      // Auto-size columns based on content
+      ws['!cols'] = wsData[0].map((_, colIdx) => {
+        const maxLen = Math.max(...wsData.map((row) => String(row[colIdx] ?? '').length));
+        return { wch: Math.min(Math.max(maxLen + 2, 8), 50) };
+      });
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Checked Invoices');
       XLSX.writeFile(wb, 'checked-invoices.xlsx');
@@ -688,6 +693,11 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
         ]),
       ];
       const ws = XLSX.utils.aoa_to_sheet(wsData);
+      // Auto-size columns based on content
+      ws['!cols'] = wsData[0].map((_, colIdx) => {
+        const maxLen = Math.max(...wsData.map((row) => String(row[colIdx] ?? '').length));
+        return { wch: Math.min(Math.max(maxLen + 2, 8), 50) };
+      });
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Invoices');
       XLSX.writeFile(wb, 'invoices.xlsx');
