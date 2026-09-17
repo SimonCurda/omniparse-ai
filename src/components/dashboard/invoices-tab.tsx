@@ -648,10 +648,6 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
         ]),
       ];
       const ws = XLSX.utils.aoa_to_sheet(wsData);
-      ws['!cols'] = [
-        { wch: 28 }, { wch: 20 }, { wch: 16 }, { wch: 14 }, { wch: 14 },
-        { wch: 14 }, { wch: 10 }, { wch: 12 }, { wch: 16 }, { wch: 14 }, { wch: 14 },
-      ];
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Checked Invoices');
       XLSX.writeFile(wb, 'checked-invoices.xlsx');
@@ -692,10 +688,6 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
         ]),
       ];
       const ws = XLSX.utils.aoa_to_sheet(wsData);
-      ws['!cols'] = [
-        { wch: 28 }, { wch: 20 }, { wch: 16 }, { wch: 14 }, { wch: 14 },
-        { wch: 14 }, { wch: 10 }, { wch: 12 }, { wch: 16 }, { wch: 14 }, { wch: 14 },
-      ];
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Invoices');
       XLSX.writeFile(wb, 'invoices.xlsx');
