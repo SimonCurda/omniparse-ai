@@ -64,7 +64,7 @@ export default function PrivacyPolicyPage() {
       <section>
         <h2>4. Data Retention</h2>
         <ul>
-          <li><strong>Uploaded document files:</strong> Stored for 30 days for preview, then automatically purged by a scheduled job. Extraction results remain.</li>
+          <li><strong>Uploaded document files:</strong> We retain uploaded documents for up to 30 days in the active application environment. Backup copies, security logs and data processed by third-party providers may be retained for different periods where necessary for security, legal or operational purposes. Extraction results remain in your account until you delete them.</li>
           <li><strong>Extracted invoice data:</strong> Stored in your account for as long as your account exists. Delete individual invoices from the dashboard to remove this data.</li>
           <li><strong>Chat history:</strong> Stored in your account until you clear it from the dashboard chat tab or delete your account.</li>
           <li><strong>Server logs:</strong> Retained for 30 days by the hosting provider (Vercel), then automatically deleted.</li>
