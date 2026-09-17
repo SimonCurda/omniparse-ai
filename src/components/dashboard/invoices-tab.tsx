@@ -588,6 +588,67 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
     toast.success('CSV exported');
   };
 
+  // ─── Export Checked Only ─────────────────────────────────────────
+  // Same as exportCSV/exportJSON/exportExcel but filters to only
+  // invoices where the user has manually marked them as "checked"
+  // (customFields.reviewed === true). Pre-selected as default.
+
+  const checkedInvoices = useMemo(() => displayed.filter(isReviewed), [displayed, isReviewed]);
+
+  const exportCheckedCSV = () => {
+    if (checkedInvoices.length === 0) { toast.error('No checked invoices to export'); return; }
+    const header = 'Vendor,Invoice #,Date,Amount,VAT,Total,Currency,Status,Confidence,Validation Status,Processing Time\n';
+    const esc = (v: unknown) => {
+      const s = String(v ?? '');
+      return s.includes(',') || s.includes('"') || s.includes('\n') ? '"' + s.replace(/"/g, '""') + '"' : s;
+    };
+    const rows = checkedInvoices.map((inv) =>
+      [inv.vendor, inv.invNumber, inv.invDate, inv.amount, inv.vatAmount, inv.total, inv.currency, inv.status, inv.confidence, inv.validationStatus ?? '', inv.processingTime != null ? `${inv.processingTime.toFixed(1)}s` : ''].map(esc).join(',')
+    ).join('\n');
+    const blob = new Blob([header + rows], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'checked-invoices.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${checkedInvoices.length} checked invoices to CSV`);
+  };
+
+  const exportCheckedJSON = () => {
+    if (checkedInvoices.length === 0) { toast.error('No checked invoices to export'); return; }
+    const blob = new Blob([JSON.stringify(checkedInvoices, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'checked-invoices.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${checkedInvoices.length} checked invoices to JSON`);
+  };
+
+  const exportCheckedExcel = async () => {
+    if (checkedInvoices.length === 0) { toast.error('No checked invoices to export'); return; }
+    try {
+      const XLSX = await import('xlsx');
+      const wsData = [
+        ['Vendor', 'Invoice #', 'Date', 'Amount', 'VAT', 'Total', 'Currency', 'Status', 'Confidence (%)', 'Validation Status', 'Processing Time'],
+        ...checkedInvoices.map((inv) => [
+          inv.vendor, inv.invNumber, inv.invDate, inv.amount, inv.vatAmount, inv.total,
+          inv.currency, inv.status, inv.confidence != null ? Math.round(inv.confidence * 100) : null,
+          inv.validationStatus ?? '', inv.processingTime != null ? `${inv.processingTime.toFixed(1)}s` : '',
+        ]),
+      ];
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Checked Invoices');
+      XLSX.writeFile(wb, 'checked-invoices.xlsx');
+      toast.success(`Exported ${checkedInvoices.length} checked invoices to Excel`);
+    } catch {
+      toast.error('Excel export failed');
+    }
+  };
+
   const exportJSON = () => {
     const blob = new Blob([JSON.stringify(displayed, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -1534,7 +1595,25 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                 <Download className="h-4 w-4 mr-1" /> Export
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent>
+            <DropdownMenuContent className="w-56">
+              {/* Checked invoices — pre-selected as default */}
+              <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                Checked Only ({checkedInvoices.length})
+              </div>
+              <DropdownMenuItem onClick={exportCheckedCSV} disabled={checkedInvoices.length === 0}>
+                <FileJson className="mr-2 h-4 w-4" /> CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={exportCheckedJSON} disabled={checkedInvoices.length === 0}>
+                <FileJson className="mr-2 h-4 w-4" /> JSON
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={exportCheckedExcel} disabled={checkedInvoices.length === 0}>
+                <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel (.xlsx)
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              {/* All invoices */}
+              <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                All Invoices ({displayed.length})
+              </div>
               <DropdownMenuItem onClick={exportCSV}>
                 <FileJson className="mr-2 h-4 w-4" /> CSV
               </DropdownMenuItem>
