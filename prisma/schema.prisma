@@ -35,6 +35,15 @@ model User {
   // (upload, scan, chat) can be used. Prevents account spam creation
   // with fake email addresses.
   emailVerified     DateTime?
+  // Account status: true = active, false = frozen by admin.
+  // When frozen, user can log in but AI features are blocked.
+  // Used for abuse prevention — admin can freeze suspicious accounts
+  // without deleting them (preserves data for audit).
+  active            Boolean  @default(true)
+  // Admin freeze reason — set when account is frozen.
+  // Displayed to the user when they try to use AI features.
+  frozenReason      String?
+  frozenAt         DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   invoices         Invoice[]

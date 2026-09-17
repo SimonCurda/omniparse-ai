@@ -10,7 +10,7 @@ import { AlertTriangle, X } from 'lucide-react';
  * involve transfer of personal data to AI providers — Mistral (EU-based,
  * primary) and US-based providers as fallback.
  *
- * As of December 9, 2026:
+ * As of September 12, 2026:
  * - Mistral (EU): ✅ No SCC needed — stays in EU
  * - Groq (US): ✅ SCCs confirmed in effect
  * - OpenRouter + Google (US): ⏳ Pending SCC verification

@@ -4,7 +4,7 @@ export const dynamic = 'force-static';
 
 export default function TermsOfServicePage() {
   return (
-    <LegalLayout title="Terms of Service" lastUpdated="December 9, 2026">
+    <LegalLayout title="Terms of Service" lastUpdated="September 12, 2026">
       <section>
         <h2>1. Acceptance of Terms</h2>
         <p>
@@ -116,7 +116,7 @@ export default function TermsOfServicePage() {
           communications, or tax filings based on them.
         </p>
         <p>
-          <strong>AI providers:</strong> OmniParse uses third-party AI providers for vision extraction and text generation. The primary provider is <strong>Mistral AI</strong> (Paris, France — EU-based, no SCC required for transfers). <strong>Groq Inc.</strong> (US-based) has confirmed Standard Contractual Clauses (SCCs) in effect as of December 9, 2026 (EU SCC Module 2, self-executing under Groq's DPA). Fallback providers OpenRouter and Google Gemini (both US-based) have SCCs pending verification. These providers may experience rate limits, outages, or model deprecations that affect the availability and quality of AI features. We do not control and are not responsible for the behavior of these upstream models beyond our integration layer.
+          <strong>AI providers:</strong> OmniParse uses third-party AI providers for vision extraction and text generation. The primary provider is <strong>Mistral AI</strong> (Paris, France — EU-based, no SCC required for transfers). <strong>Groq Inc.</strong> (US-based) has confirmed Standard Contractual Clauses (SCCs) in effect as of September 12, 2026 (EU SCC Module 2, self-executing under Groq's DPA). Fallback providers OpenRouter and Google Gemini (both US-based) have SCCs pending verification. These providers may experience rate limits, outages, or model deprecations that affect the availability and quality of AI features. We do not control and are not responsible for the behavior of these upstream models beyond our integration layer.
         </p>
         <p>
           See our <a href="/ai-act-notice" className="underline">AI Transparency Notice</a> for full
@@ -336,10 +336,23 @@ export default function TermsOfServicePage() {
           <li>Reverse-engineer, decompile, or attempt to extract AI model weights, training data, or proprietary algorithms;</li>
           <li>Resell or sublicense access to the Service without written permission;</li>
           <li>Interfere with the proper functioning of the Service, including by introducing viruses, malware, or other malicious code.</li>
+          <li>Create multiple accounts to bypass plan limits or rate limits;</li>
+          <li>Use the Service to burn AI provider quotas in an abusive or automated manner.</li>
         </ul>
         <p>
-          We reserve the right to suspend or terminate your account immediately upon any violation of this
-          Acceptable Use Policy. Suspected illegal activity will be reported to the relevant authorities.
+          <strong>Account monitoring and enforcement:</strong> We monitor account activity to detect
+          potential abuse, including excessive API usage, rapid account creation, and unusual patterns
+          of document processing. We reserve the right to:
+        </p>
+        <ul className="list-disc pl-6 space-y-1 text-sm mt-2">
+          <li><strong>Freeze</strong> accounts suspected of abuse — the user can still log in but AI features are blocked;</li>
+          <li><strong>Delete</strong> accounts that violate this Acceptable Use Policy, including all associated data;</li>
+          <li><strong>Suspend</strong> accounts immediately upon any violation, without prior notice;</li>
+          <li><strong>Report</strong> suspected illegal activity to the relevant authorities (Czech Police, ÚOOÚ, Europol).</li>
+        </ul>
+        <p>
+          If your account is frozen, you will see a message indicating the reason when you attempt to
+          use AI features. To request reinstatement, contact <strong>damr58h@gmail.com</strong>.
         </p>
       </section>
 

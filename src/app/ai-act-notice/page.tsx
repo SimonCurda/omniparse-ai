@@ -4,7 +4,7 @@ export const dynamic = 'force-static';
 
 export default function AIActNoticePage() {
   return (
-    <LegalLayout title="AI Transparency Notice" lastUpdated="December 9, 2026">
+    <LegalLayout title="AI Transparency Notice" lastUpdated="September 12, 2026">
       <section>
         <h2>EU AI Act Compliance (Regulation EU 2024/1689)</h2>
         <p>
@@ -125,10 +125,10 @@ export default function AIActNoticePage() {
         </p>
         <div className="border-l-4 border-emerald-500 bg-emerald-500/5 p-3 my-3 rounded-r">
           <p className="text-sm">
-            <strong className="text-emerald-700 dark:text-emerald-500">SCC Status by provider (as of December 9, 2026):</strong>
+            <strong className="text-emerald-700 dark:text-emerald-500">SCC Status by provider (as of September 12, 2026):</strong>
           </p>
           <ul className="list-disc pl-5 mt-2 text-sm space-y-1">
-            <li><strong>Groq Inc.</strong> — ✅ SCCs confirmed in effect (December 9, 2026). DPA with EU SCC Module 2 is self-executing upon acceptance of Groq Services Agreement. Governing law: Ireland. Competent authority: Irish DPC. 72-hour breach notification.</li>
+            <li><strong>Groq Inc.</strong> — ✅ SCCs confirmed in effect (September 12, 2026). DPA with EU SCC Module 2 is self-executing upon acceptance of Groq Services Agreement. Governing law: Ireland. Competent authority: Irish DPC. 72-hour breach notification.</li>
             <li><strong>Mistral AI</strong> — EU-based (Paris, France). As an EU-established provider, transfers are expected to remain within the EEA, subject to Mistral&apos;s applicable terms and data-processing agreements.</li>
             <li><strong>OpenRouter</strong> — ⏳ SCC status: pending verification. DPA request sent December 2026.</li>
             <li><strong>Google LLC (Gemini)</strong> — ⏳ SCC status: pending verification. Google Cloud DPA available at cloud.google.com/terms/data-processing-addendum (self-executing upon acceptance of Google Cloud Terms).</li>

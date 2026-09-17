@@ -497,6 +497,13 @@ export async function POST(req: NextRequest) {
     const user = await db.user.findUnique({ where: { id: auth.userId } });
     if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
+    // Frozen account check — admin can freeze accounts for abuse prevention
+    if (!user.active) {
+      return NextResponse.json(
+        { error: user.frozenReason || 'Your account has been frozen. Please contact support.', code: 'ACCOUNT_FROZEN' },
+        { status: 403 },
+      );
+    }
 
     // Count invoices this month only (hard wall per month)
     const now = new Date();

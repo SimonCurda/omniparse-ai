@@ -30,6 +30,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const auth = await getUserFromRequest(req);
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+  // Frozen account check
+  const scanUser = await db.user.findUnique({
+    where: { id: auth.userId },
+    select: { id: true, active: true, frozenReason: true },
+  });
+  if (!scanUser) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+  if (!scanUser.active) {
+    return NextResponse.json(
+      { error: scanUser.frozenReason || 'Your account has been frozen. Please contact support.', code: 'ACCOUNT_FROZEN' },
+      { status: 403 },
+    );
+  }
+
   // ─── Per-user scan rate limit (prevents scan spam) ──────────────
   // Scoped to userId, not IP — prevents a single user from burning
   // AI quota by spamming the Scan button or scripting the endpoint.

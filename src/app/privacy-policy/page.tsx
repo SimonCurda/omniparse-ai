@@ -4,7 +4,7 @@ export const dynamic = 'force-static';
 
 export default function PrivacyPolicyPage() {
   return (
-    <LegalLayout title="Privacy Policy" lastUpdated="December 9, 2026">
+    <LegalLayout title="Privacy Policy" lastUpdated="September 12, 2026">
       <section>
         <h2>1. Data Controller</h2>
         <p>
@@ -56,7 +56,7 @@ export default function PrivacyPolicyPage() {
           <li><strong>Document parsing:</strong> Consent (Art. 6(1)(a)) — you actively upload documents for processing. You can withdraw this consent by deleting your invoices.</li>
           <li><strong>Chat interactions:</strong> Consent (Art. 6(1)(a)) — you actively send messages to the AI chat.</li>
           <li><strong>Terms acceptance:</strong> Consent (Art. 6(1)(a)) — recorded at signup with timestamps. We do not collect or verify age at signup.</li>
-          <li><strong>Security and service stability:</strong> Legitimate interest (Art. 6(1)(f)) — server logs for abuse prevention, rate limiting, and fraud detection.</li>
+          <li><strong>Security, service stability, and abuse prevention:</strong> Legitimate interest (Art. 6(1)(f)) — server logs for abuse prevention, rate limiting, fraud detection, and account monitoring. We monitor account activity patterns (invoice volume, chat usage, email scanning frequency, account age) to detect potential abuse. Accounts suspected of abuse may be frozen (AI features blocked) or deleted in accordance with our Terms of Service.</li>
           <li><strong>Local storage preferences:</strong> Consent via cookie banner (Art. 6(1)(a) + ePrivacy Directive).</li>
         </ul>
       </section>
@@ -120,9 +120,9 @@ export default function PrivacyPolicyPage() {
           For EU users concerned about US transfers, ensuring Mistral is configured means vision extraction stays within the EU.
         </p>
         <p>
-          <strong>SCC Status (as of December 9, 2026):</strong>
+          <strong>SCC Status (as of September 12, 2026):</strong>
           <ul className="list-disc pl-6 space-y-1 mt-2 text-sm">
-            <li><strong>Groq Inc.</strong> — ✅ SCCs confirmed in effect (DPA effective October 15, 2025; EU SCC Module 2 self-executing upon acceptance of Groq Services Agreement). Confirmed December 9, 2026. Governing law: Ireland. <a href="https://groq.com/legal/dpa" target="_blank" rel="noopener">Groq DPA</a>.</li>
+            <li><strong>Groq Inc.</strong> — ✅ SCCs confirmed in effect (DPA effective October 15, 2025; EU SCC Module 2 self-executing upon acceptance of Groq Services Agreement). Confirmed September 12, 2026. Governing law: Ireland. <a href="https://groq.com/legal/dpa" target="_blank" rel="noopener">Groq DPA</a>.</li>
             <li><strong>Mistral AI</strong> — EU-based (Paris, France). As an EU-established provider, transfers to Mistral are expected to remain within the EEA, subject to Mistral&apos;s applicable terms and data-processing agreements.</li>
             <li><strong>OpenRouter</strong> — ⏳ SCC status: pending verification. DPA request sent December 2026.</li>
             <li><strong>Google LLC (Gemini)</strong> — ⏳ SCC status: pending verification. Google Cloud DPA available at <a href="https://cloud.google.com/terms/data-processing-addendum" target="_blank" rel="noopener">cloud.google.com/terms/data-processing-addendum</a> (self-executing upon acceptance of Google Cloud Terms).</li>
@@ -245,10 +245,10 @@ export default function PrivacyPolicyPage() {
         <p className="text-sm">
           Personal data may be transferred to the United States for AI processing by Groq, OpenRouter, and
           Google. The US does not have an adequacy decision. We rely on Standard Contractual Clauses
-          (SCCs) consistent with the Schrems II ruling. <strong>SCC status by provider (as of December 9, 2026):</strong>
+          (SCCs) consistent with the Schrems II ruling. <strong>SCC status by provider (as of September 12, 2026):</strong>
         </p>
         <ul className="list-disc pl-6 space-y-1 text-sm mt-2">
-          <li><strong>Groq Inc.</strong> — ✅ SCCs confirmed in effect (December 9, 2026). DPA with EU SCC Module 2 is self-executing upon acceptance of Groq Services Agreement. Governing law: Ireland. Competent authority: Irish Data Protection Commission. 72-hour breach notification.</li>
+          <li><strong>Groq Inc.</strong> — ✅ SCCs confirmed in effect (September 12, 2026). DPA with EU SCC Module 2 is self-executing upon acceptance of Groq Services Agreement. Governing law: Ireland. Competent authority: Irish Data Protection Commission. 72-hour breach notification.</li>
           <li><strong>Mistral AI</strong> — EU-based (Paris, France). As an EU-established provider, transfers are expected to remain within the EEA, subject to Mistral&apos;s applicable terms.</li>
           <li><strong>OpenRouter</strong> — ⏳ SCC status: pending verification. DPA request sent December 2026.</li>
           <li><strong>Google LLC</strong> — ⏳ SCC status: pending verification. Google Cloud DPA available at cloud.google.com/terms/data-processing-addendum (self-executing upon acceptance of Google Cloud Terms).</li>

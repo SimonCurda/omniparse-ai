@@ -270,7 +270,7 @@ export function UploadTab() {
               <p className="text-xs text-muted-foreground leading-relaxed mb-2">
                 Uploaded documents are processed by AI providers: <strong>Mistral (Paris, EU)</strong> is used
                 first; <strong>Groq (US)</strong> has confirmed Standard Contractual Clauses (SCCs) in effect
-                as of December 9, 2026. <strong>OpenRouter</strong> and <strong>Google</strong> (US) are
+                as of September 12, 2026. <strong>OpenRouter</strong> and <strong>Google</strong> (US) are
                 fallbacks pending SCC verification. Processing by AI providers is governed by their applicable
                 terms and data-processing agreements.
               </p>
