@@ -151,7 +151,11 @@ export default function AdminPage() {
         case 'inboxes': cmp = a.stats.emailInboxes - b.stats.emailInboxes; break;
         case 'age': cmp = a.ageDays - b.ageDays; break;
         case 'email': cmp = a.email.localeCompare(b.email); break;
-        case 'plan': cmp = a.plan.localeCompare(b.plan); break;
+        case 'plan': {
+          const planRank: Record<string, number> = { free: 0, pro: 1, plus: 2, business: 3, enterprise: 4 };
+          cmp = (planRank[a.plan] ?? 0) - (planRank[b.plan] ?? 0);
+          break;
+        }
       }
       return sortDir === 'asc' ? cmp : -cmp;
     });
