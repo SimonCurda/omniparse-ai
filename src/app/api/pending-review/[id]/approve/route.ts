@@ -28,17 +28,38 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   // Check user's plan limit before creating a new invoice
+  // Uses the SAME monthly counting logic as /api/parse — only counts
+  // invoices created since the 1st of the current month (server time).
+  // This ensures consistency: a Free user who uploaded 15 invoices last
+  // month can still approve email-captured invoices this month.
   const user = await db.user.findUnique({ where: { id: auth.userId }, select: { plan: true } });
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+
+  // Frozen account check
+  const fullUser = await db.user.findUnique({
+    where: { id: auth.userId },
+    select: { active: true, frozenReason: true },
+  });
+  if (fullUser && !fullUser.active) {
+    return NextResponse.json(
+      { error: fullUser.frozenReason || 'Your account has been frozen. Please contact support.', code: 'ACCOUNT_FROZEN' },
+      { status: 403 },
+    );
+  }
 
   const PLAN_LIMITS: Record<string, number> = {
     free: 15, pro: 500, plus: 2000, business: 10000, enterprise: Infinity,
   };
   const limit = PLAN_LIMITS[user.plan] ?? PLAN_LIMITS.free;
-  const currentInvoiceCount = await db.invoice.count({ where: { userId: auth.userId } });
+  // Count only invoices created THIS MONTH (same logic as /api/parse)
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const currentInvoiceCount = await db.invoice.count({ 
+    where: { userId: auth.userId, createdAt: { gte: startOfMonth } } 
+  });
   if (currentInvoiceCount >= limit) {
     return NextResponse.json(
-      { error: `You've reached your plan limit of ${limit} invoices. Upgrade to import more.` },
+      { error: `You've reached your plan limit of ${limit} invoices this month. Upgrade to import more.` },
       { status: 403 },
     );
   }
