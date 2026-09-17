@@ -24,7 +24,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     const user = await db.user.findUnique({
       where: { id },
       select: {
-        id: true, email: true, name: true,
+        id: true, email: true, name: true, plan: true,
         _count: {
           select: {
             invoices: true, chatSessions: true, emailInboxes: true,
@@ -38,8 +38,26 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    // Log the deletion before cascade (since the audit log will also be deleted)
+    // Log the deletion BEFORE cascade (since the audit log will also be deleted)
     console.warn(`[admin/delete] Deleting account ${user.email} (ID: ${user.id}) — ${user._count.invoices} invoices, ${user._count.chatSessions} chat sessions, ${user._count.emailInboxes} email inboxes`);
+
+    // Save a deletion record that survives the cascade (no FK to User)
+    // This lets the admin see what accounts they've deleted in the dashboard.
+    const body = await req.json().catch(() => ({}));
+    await db.adminDeletionLog.create({
+      data: {
+        deletedUserId: user.id,
+        deletedUserEmail: user.email,
+        deletedUserName: user.name,
+        deletedUserPlan: user.plan,
+        invoiceCount: user._count.invoices,
+        chatSessionCount: user._count.chatSessions,
+        emailInboxCount: user._count.emailInboxes,
+        pendingReviewCount: user._count.pendingReviews,
+        reason: body.reason || 'Deleted by administrator',
+        deletedBy: 'admin',
+      },
+    });
 
     // Hard delete with cascade
     await db.user.delete({ where: { id } });

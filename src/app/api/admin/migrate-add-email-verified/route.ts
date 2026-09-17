@@ -82,6 +82,31 @@ export async function POST(req: NextRequest) {
       added.push('parseCountResetAt');
     }
 
+    // Create AdminDeletionLog table if it doesn't exist
+    const tableCheck = await db.$queryRaw<Array<{ table_name: string }>>`
+      SELECT table_name FROM information_schema.tables WHERE table_name = 'AdminDeletionLog'
+    `;
+    if (tableCheck.length === 0) {
+      await db.$executeRaw`
+        CREATE TABLE "AdminDeletionLog" (
+          id TEXT PRIMARY KEY,
+          "deletedUserId" TEXT NOT NULL,
+          "deletedUserEmail" TEXT NOT NULL,
+          "deletedUserName" TEXT NOT NULL,
+          "deletedUserPlan" TEXT NOT NULL,
+          "invoiceCount" INTEGER NOT NULL DEFAULT 0,
+          "chatSessionCount" INTEGER NOT NULL DEFAULT 0,
+          "emailInboxCount" INTEGER NOT NULL DEFAULT 0,
+          "pendingReviewCount" INTEGER NOT NULL DEFAULT 0,
+          reason TEXT,
+          "deletedBy" TEXT NOT NULL DEFAULT 'admin',
+          "deletedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+      `;
+      await db.$executeRaw`CREATE INDEX "AdminDeletionLog_deletedAt_idx" ON "AdminDeletionLog"("deletedAt")`;
+      added.push('AdminDeletionLog table');
+    }
+
     if (added.length === 0) {
       return NextResponse.json({
         success: true,

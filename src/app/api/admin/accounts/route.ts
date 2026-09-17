@@ -156,9 +156,31 @@ export async function GET(req: NextRequest) {
       frozenAccounts: accountsWithRisk.filter((a) => !a.active).length,
     };
 
+    // Fetch deletion logs (accounts that were deleted via admin dashboard)
+    const deletionLogs = await db.adminDeletionLog.findMany({
+      orderBy: { deletedAt: 'desc' },
+      take: 100,
+    });
+
     return NextResponse.json({
       summary,
       accounts: accountsWithRisk,
+      deletionLogs: deletionLogs.map((log) => ({
+        id: log.id,
+        deletedUserId: log.deletedUserId,
+        email: log.deletedUserEmail,
+        name: log.deletedUserName,
+        plan: log.deletedUserPlan,
+        stats: {
+          invoices: log.invoiceCount,
+          chatSessions: log.chatSessionCount,
+          emailInboxes: log.emailInboxCount,
+          pendingReviews: log.pendingReviewCount,
+        },
+        reason: log.reason,
+        deletedBy: log.deletedBy,
+        deletedAt: log.deletedAt.toISOString(),
+      })),
     });
   } catch (err) {
     console.error('[admin/accounts] Error:', err);

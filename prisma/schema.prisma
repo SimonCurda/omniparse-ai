@@ -315,3 +315,29 @@ model EmailBlocklist {
   @@index([userId])
   @@unique([userId, address])
 }
+
+// ─── Admin Deletion Log ───────────────────────────────────────────────────
+// Records accounts that were deleted via the admin dashboard.
+// This table is NOT linked to the User model (no foreign key) because
+// the user is deleted — we need the record to survive the cascade.
+// Used for audit trail: "what accounts did I delete and when?"
+
+model AdminDeletionLog {
+  id              String   @id @default(cuid())
+  // Snapshot of the deleted user's data (no FK — user is gone)
+  deletedUserId   String
+  deletedUserEmail String
+  deletedUserName  String
+  deletedUserPlan  String
+  // Stats at time of deletion
+  invoiceCount    Int      @default(0)
+  chatSessionCount Int     @default(0)
+  emailInboxCount Int      @default(0)
+  pendingReviewCount Int   @default(0)
+  // Why was it deleted?
+  reason          String?
+  // Who deleted it (admin email or "admin")
+  deletedBy       String   @default("admin")
+  deletedAt       DateTime @default(now())
+  @@index([deletedAt])
+}
