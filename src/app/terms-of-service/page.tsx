@@ -173,12 +173,12 @@ export default function TermsOfServicePage() {
           <strong>Czech law grounding:</strong> This limitation is consistent with:
         </p>
         <ul className="list-disc pl-6 space-y-1 text-sm">
-          <li><strong>Act No. 89/2012 Sb. (Civil Code) § 2896, 2936-2937:</strong> Service provider
-          liability for damages caused by defective service is limited for auxiliary services that
-          are not the provider&apos;s primary business activity. Invoice extraction is auxiliary to
-          the user&apos;s primary business of managing their finances.</li>
-          <li><strong>Act No. 89/2012 Sb. § 2913:</strong> Liability for damages is excluded where
-          the service is provided free of charge (Free tier) unless the damage was caused intentionally.</li>
+          <li><strong>Act No. 89/2012 Sb. (Civil Code) § 2913:</strong> Parties may agree to limit
+          contractual liability, except for damage caused intentionally or by gross negligence.
+          Invoice extraction is an auxiliary convenience, not the user&apos;s primary business activity.</li>
+          <li><strong>Act No. 89/2012 Sb. § 2913(2):</strong> In gratuitous (free) contracts,
+          liability for slight negligence is generally excluded unless the damage was caused
+          intentionally or by gross negligence.</li>
           <li><strong>Directive 93/13/EEC (Unfair Contract Terms) Art. 3 + 4:</strong> This clause
           is not unfair because (a) the Service is clearly auxiliary, (b) the user has alternative
           invoice management options, (c) the limitation is transparent and brought to the
@@ -275,7 +275,83 @@ export default function TermsOfServicePage() {
       </section>
 
       <section>
-        <h2>14. Governing Law and Dispute Resolution</h2>
+        <h2>14. Right of Withdrawal (EU Consumers)</h2>
+        <p>
+          Under Czech Civil Code (Act No. 89/2012 Sb.) §1829 and §1837, consumers concluding distance
+          contracts (contracts concluded online) have a 14-day right of withdrawal.
+        </p>
+        <p>
+          <strong>However</strong>, pursuant to §1837(j) of the Civil Code, the right of withdrawal
+          does NOT apply to:
+        </p>
+        <ul className="list-disc pl-6 space-y-1 text-sm">
+          <li>Digital content or services where the consumer has expressly requested that the service
+          begin during the withdrawal period and has acknowledged that by doing so, they lose the
+          right to withdraw;</li>
+          <li>Services that have been fully performed with the consumer&apos;s prior express consent
+          and acknowledgment.</li>
+        </ul>
+        <p>
+          <strong>By creating an OmniParse account and using AI features, you expressly agree that:</strong>
+        </p>
+        <ul className="list-disc pl-6 space-y-1 text-sm">
+          <li>The Service begins immediately upon your first use of AI features (upload, scan, or chat);</li>
+          <li>You acknowledge that you are losing the 14-day right of withdrawal pursuant to §1837(j)
+          of the Civil Code by requesting the Service to begin during the withdrawal period;</li>
+          <li>This waiver applies only to the AI processing features. You may still delete your account
+          at any time (Settings → Delete Account) without obligation.</li>
+        </ul>
+        <p>
+          For Free tier users: since no payment is made, no withdrawal refund is applicable. Account
+          deletion is available at any time.
+        </p>
+        <p>
+          For paid subscribers: if you cancel your subscription within 14 days of payment AND have not
+          used any AI features in that period, you are entitled to a full refund. Contact
+          <strong> damr58h@gmail.com</strong> to request a refund. If you have used AI features during
+          the 14-day period, the right of withdrawal is forfeited per §1837(j).
+        </p>
+      </section>
+
+      <section>
+        <h2>15. Consumer Information and Dispute Resolution</h2>
+        <p>
+          Pursuant to §1733 of the Civil Code (Act No. 89/2012 Sb.), the following information is
+          provided to consumers before concluding a distance contract:
+        </p>
+        <ul className="list-disc pl-6 space-y-1 text-sm">
+          <li><strong>Provider:</strong> Simon Curda (natural person, sole trader registration pending), Czech Republic</li>
+          <li><strong>Contact:</strong> damr58h@gmail.com</li>
+          <li><strong>Service description:</strong> AI-powered invoice extraction, validation, and analytics platform</li>
+          <li><strong>Price:</strong> Free tier available (no charge). Paid plans from $49/month to $499/month as described on the pricing page</li>
+          <li><strong>Contract duration:</strong> Monthly subscription, cancelable at any time</li>
+          <li><strong>Right of withdrawal:</strong> See Section 14 above</li>
+          <li><strong>Applicable law:</strong> Czech law (see Section 16 below)</li>
+          <li><strong>Language:</strong> These Terms are available in English. Communication with the provider may be conducted in English or Czech</li>
+        </ul>
+        <h3 className="text-base font-semibold mt-4 mb-2">Out-of-Court Dispute Resolution (ADR)</h3>
+        <p>
+          Czech consumers may seek out-of-court dispute resolution through the following entity:
+        </p>
+        <ul className="list-disc pl-6 space-y-1 text-sm">
+          <li><strong>Česká obchodní inspekce (ČOI)</strong> — Czech Trade Inspection Authority</li>
+          <li>Address: Štěpánská 567, 120 00 Praha 2, Czech Republic</li>
+          <li>Website: <a href="https://coi.gov.cz" target="_blank" rel="noopener">coi.gov.cz</a></li>
+          <li>ADR information: <a href="https://coi.gov.cz/informace-o-adr" target="_blank" rel="noopener">coi.gov.cz/informace-o-adr</a></li>
+        </ul>
+        <p>
+          A proposal for out-of-court dispute resolution must be submitted within 1 year from the date
+          the consumer first exercised their right in the matter. The procedure is governed by Act No.
+          634/1992 Sb. (Consumer Protection Act) §§20b–20e.
+        </p>
+        <p>
+          EU consumers may also use the <strong>European Online Dispute Resolution (ODR) platform</strong> at
+          <a href="https://ec.europa.eu/consumers/odr" target="_blank" rel="noopener"> ec.europa.eu/consumers/odr</a>.
+        </p>
+      </section>
+
+      <section>
+        <h2>16. Governing Law and Dispute Resolution</h2>
         <p>
           These Terms are governed by the laws of the Czech Republic, without regard to conflict of law
           principles. EU consumer protection laws apply additionally for users classified as consumers
@@ -284,18 +360,13 @@ export default function TermsOfServicePage() {
         <p>
           For disputes arising from these Terms, you agree to first attempt resolution by contacting us
           at <strong>damr58h@gmail.com</strong>. If the dispute cannot be resolved within 30 days, it
-          shall be submitted to the competent courts of the Czech Republic.
-        </p>
-        <p>
-          Under EU Regulation 524/2013, EU consumers may use the
-          <strong> European Online Dispute Resolution (ODR) platform</strong> at
-          <a href="https://ec.europa.eu/consumers/odr" target="_blank" rel="noopener">
-          ec.europa.eu/consumers/odr</a> for out-of-court dispute resolution.
+          shall be submitted to the competent courts of the Czech Republic. For consumer disputes,
+          the court of the consumer&apos;s domicile shall have jurisdiction.
         </p>
       </section>
 
       <section>
-        <h2>15. Severability</h2>
+        <h2>17. Severability</h2>
         <p>
           If any provision of these Terms is found to be unenforceable or invalid, that provision shall
           be limited or eliminated to the minimum extent necessary, and the remaining provisions shall
@@ -304,7 +375,7 @@ export default function TermsOfServicePage() {
       </section>
 
       <section>
-        <h2>16. Non-Reliance on AI Output</h2>
+        <h2>18. Non-Reliance on AI Output</h2>
         <p>
           You acknowledge and agree that:
         </p>
@@ -324,7 +395,7 @@ export default function TermsOfServicePage() {
       </section>
 
       <section>
-        <h2>17. Acceptable Use Policy</h2>
+        <h2>19. Acceptable Use Policy</h2>
         <p>You agree not to:</p>
         <ul className="list-disc pl-6 space-y-1 text-sm">
           <li>Upload documents you do not have the right to process (copyright, privacy, or other legal restrictions);</li>
@@ -357,13 +428,14 @@ export default function TermsOfServicePage() {
       </section>
 
       <section>
-        <h2>18. Contact</h2>
+        <h2>20. Contact</h2>
         <p>For questions about these Terms: <strong>damr58h@gmail.com</strong></p>
       </section>
 
       <p className="text-xs mt-8">
-        Compliant with EU Directive 93/13/EEC (unfair contract terms), EU Regulation 524/2013 (ODR),
-        Czech Act No. 89/2012 Sb. (Civil Code), and Czech Act No. 634/1992 Sb. (Consumer Protection).
+        Compliant with EU Directive 93/13/EEC (unfair contract terms), EU Directive 2011/83/EU (consumer rights, including right of withdrawal),
+        EU Regulation 524/2013 (ODR), Czech Act No. 89/2012 Sb. (Civil Code, including §§1733, 1829, 1837, 2913),
+        Czech Act No. 634/1992 Sb. (Consumer Protection, including §§16, 20b–20e), and Czech Act No. 480/2004 Sb. (Electronic Communications).
       </p>
     </LegalLayout>
   );

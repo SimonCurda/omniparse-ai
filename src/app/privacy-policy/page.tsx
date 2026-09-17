@@ -233,7 +233,7 @@ export default function PrivacyPolicyPage() {
         <p className="text-sm">OmniParse implements the following technical and organizational measures:</p>
         <ul className="list-disc pl-6 space-y-1 text-sm mt-2">
           <li>AES-256-GCM encryption for IMAP credentials at rest</li>
-          <li>bcrypt password hashing (10 rounds)</li>
+          <li>bcrypt password hashing (12 rounds)</li>
           <li>TLS 1.2+ for all data in transit</li>
           <li>JWT-based authentication with 7-day expiry</li>
           <li>Per-request user scoping — no query returns cross-user data</li>
