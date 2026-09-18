@@ -101,23 +101,22 @@ export default function PrivacyPolicyPage() {
         </p>
         <ul>
           <li><strong>Vercel Inc.</strong> (United States) — Web hosting and serverless function execution. Processes: IP addresses, request metadata. <a href="https://vercel.com/legal/dpa" target="_blank" rel="noopener">Vercel DPA</a>.</li>
-          <li><strong>Supabase Inc.</strong> (Ireland, EU) — Primary database hosting (PostgreSQL). Processes: all stored account data, invoices, chat messages. <a href="https://supabase.com/legal/dpa" target="_blank" rel="noopener">Supabase DPA</a>.</li>
+          <li><strong>Supabase Inc.</strong> (Ireland, EU) — Primary database hosting (PostgreSQL). Processes: all stored account data, invoices, chat messages. DPA built into Terms of Service (effective August 1, 2026) — automatically applies to all customers. <a href="https://supabase.com/legal/customer-resources/data-processing-addendum" target="_blank" rel="noopener">Supabase DPA</a>.</li>
           <li><strong>Groq Inc.</strong> (United States) — AI inference provider. Processes: uploaded document content (PDF/images, transiently), chat messages (transiently) for AI extraction and chat responses. <a href="https://groq.com/legal/dpa" target="_blank" rel="noopener">Groq DPA</a> (paid tier).</li>
           <li><strong>OpenRouter</strong> (United States) — AI inference aggregator. Used as a fallback when Groq is unavailable. Processes: same as Groq (transient document content and chat messages). <a href="https://openrouter.ai/legal/privacy" target="_blank" rel="noopener">OpenRouter Privacy</a>.</li>
           <li><strong>Stripe Inc.</strong> (United States) — Payment processing for paid plans. Processes: email, billing details. <a href="https://stripe.com/legal/dpa" target="_blank" rel="noopener">Stripe DPA</a>.</li>
         </ul>
         <p>
-          <strong>Important:</strong> Your documents are sent to Groq and/or OpenRouter for AI processing.
-          Both are US-based providers. Under GDPR Chapter V (transfers to third countries), since the US
-          lacks an adequacy decision, we rely on Standard Contractual Clauses (SCCs) for these transfers,
-          consistent with the Schrems II ruling. We are in the process of executing SCCs with each US
-          provider. Until those are signed, transfers to US AI providers are at your own risk — please
-          do not upload documents containing personal data of EU data subjects until SCCs are in place.
-        </p>
-        <p>
-          <strong>Your documents are NOT used to train AI models.</strong> Groq and OpenRouter both
-          have policies against using customer API inputs for model training. Documents are processed
-          in memory only and discarded after the response is generated.
+          <strong>DPA Status:</strong>
+          <ul className="list-disc pl-6 space-y-1 mt-2 text-sm">
+            <li><strong>Supabase Inc.</strong> (Ireland, EU) — DPA built into Terms of Service (effective August 1, 2026). Automatically applies to all customers. EU-based — no SCC required.</li>
+            <li><strong>Vercel Inc.</strong> (United States) — DPA available at vercel.com/legal/dpa.</li>
+            <li><strong>Groq Inc.</strong> (United States) — SCCs confirmed in effect (September 12, 2026).</li>
+            <li><strong>Stripe Inc.</strong> (United States) — DPA available at stripe.com/legal/dpa.</li>
+            <li><strong>Mistral AI</strong> (Paris, France — EU) — EU-based, no SCC required.</li>
+            <li><strong>OpenRouter</strong> (United States) — SCC status: pending verification.</li>
+            <li><strong>Google LLC</strong> (United States) — SCC status: pending verification.</li>
+          </ul>
         </p>
       </section>
 
