@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getUserFromRequest, hasFeature } from '@/lib/auth';
+import { checkMonthlyParseLimit, incrementMonthlyParseCount } from '@/lib/parse-limit';
 
 // POST /api/pending-review/[id]/approve — approve a pending item, run full
 // extraction, create an Invoice record, and clear the pending item.
@@ -27,19 +28,24 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Pending item not found or already processed' }, { status: 404 });
   }
 
-  // Check user's plan limit before creating a new invoice
-  const user = await db.user.findUnique({ where: { id: auth.userId }, select: { plan: true } });
+  // Check user's plan limit — HARD monthly counter (not affected by deletion)
+  const user = await db.user.findUnique({ where: { id: auth.userId }, select: { plan: true, active: true, frozenReason: true } });
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
-  const PLAN_LIMITS: Record<string, number> = {
-    free: 15, pro: 500, plus: 2000, business: 10000, enterprise: Infinity,
-  };
-  const limit = PLAN_LIMITS[user.plan] ?? PLAN_LIMITS.free;
-  const currentInvoiceCount = await db.invoice.count({ where: { userId: auth.userId } });
-  if (currentInvoiceCount >= limit) {
+  // Frozen account check
+  if (!user.active) {
     return NextResponse.json(
-      { error: `You've reached your plan limit of ${limit} invoices. Upgrade to import more.` },
+      { error: user.frozenReason || 'Your account has been frozen. Please contact support.', code: 'ACCOUNT_FROZEN' },
       { status: 403 },
+    );
+  }
+
+  // Hard monthly parse limit — same counter as /api/parse
+  const parseLimit = await checkMonthlyParseLimit(auth.userId, user.plan);
+  if (!parseLimit.allowed) {
+    return NextResponse.json(
+      { error: parseLimit.message || `Monthly limit reached (${parseLimit.count}/${parseLimit.limit}). Resets on the 1st of next month.`, code: 'MONTHLY_LIMIT_REACHED' },
+      { status: 429 },
     );
   }
 

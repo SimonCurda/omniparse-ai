@@ -20,7 +20,7 @@ const SECURITY_HEADERS: Record<string, string> = {
   // connect-src includes Groq + OpenRouter as defense-in-depth in case
   // client-side calls are added later (currently all AI calls are server-side).
   'Content-Security-Policy':
-    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://api.groq.com https://openrouter.ai; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://api.groq.com https://openrouter.ai; object-src 'self' data: blob:; frame-src 'self' data: blob:; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
 }
 
 /** General API rate limit: 60 requests per minute per IP */

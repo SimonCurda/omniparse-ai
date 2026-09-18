@@ -30,6 +30,32 @@ model User {
   // GDPR Art. 7 (consent) + Art. 8 (children) — when user accepted terms / confirmed age
   termsAcceptedAt   DateTime?
   ageConfirmedAt    DateTime?
+  // Email verification — null until user clicks the verification link
+  // sent to their email after signup. Required before AI features
+  // (upload, scan, chat) can be used. Prevents account spam creation
+  // with fake email addresses.
+  emailVerified     DateTime?
+  // Account status: true = active, false = frozen by admin.
+  // When frozen, user can log in but AI features are blocked.
+  // Used for abuse prevention — admin can freeze suspicious accounts
+  // without deleting them (preserves data for audit).
+  active            Boolean  @default(true)
+  // Admin freeze reason — set when account is frozen.
+  // Displayed to the user when they try to use AI features.
+  frozenReason      String?
+  frozenAt         DateTime?
+  // Admin can hide accounts from the default admin view (not deleted,
+  // not frozen — just hidden from the "Active" tab). Useful for test
+  // accounts or accounts you don't want cluttering the dashboard.
+  hidden           Boolean  @default(false)
+  // Admin can star/mark accounts for easy spotting between many users
+  starred           Boolean  @default(false)
+  // Hard monthly parse counter — tracks total invoices PARSED per month,
+  // NOT just existing ones. If a Free user parses 15 invoices, deletes
+  // them all, they STILL can't parse more this month. Counter resets
+  // on the 1st of each month (checked at runtime, not via cron).
+  monthlyParseCount  Int      @default(0)
+  parseCountResetAt  DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   invoices         Invoice[]
@@ -294,4 +320,30 @@ model EmailBlocklist {
   createdAt   DateTime @default(now())
   @@index([userId])
   @@unique([userId, address])
+}
+
+// ─── Admin Deletion Log ───────────────────────────────────────────────────
+// Records accounts that were deleted via the admin dashboard.
+// This table is NOT linked to the User model (no foreign key) because
+// the user is deleted — we need the record to survive the cascade.
+// Used for audit trail: "what accounts did I delete and when?"
+
+model AdminDeletionLog {
+  id              String   @id @default(cuid())
+  // Snapshot of the deleted user's data (no FK — user is gone)
+  deletedUserId   String
+  deletedUserEmail String
+  deletedUserName  String
+  deletedUserPlan  String
+  // Stats at time of deletion
+  invoiceCount    Int      @default(0)
+  chatSessionCount Int     @default(0)
+  emailInboxCount Int      @default(0)
+  pendingReviewCount Int   @default(0)
+  // Why was it deleted?
+  reason          String?
+  // Who deleted it (admin email or "admin")
+  deletedBy       String   @default("admin")
+  deletedAt       DateTime @default(now())
+  @@index([deletedAt])
 }

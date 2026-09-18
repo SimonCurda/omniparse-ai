@@ -5,33 +5,47 @@
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
-// Model hierarchy: primary → fallback1 → fallback2
-// Order by reliability for artifact generation (charts/tables need lots of tokens):
-//   llama-3.1-8b-instant:    30k OTPM, very reliable, smaller model (no thinking leak)
-//   llama-4-scout:            6k OTPM, better quality, sometimes rate-limited (no thinking leak)
-//   qwen/qwen3.6-27b:         1k OTPM, REASONING MODEL (leaks thinking) — last resort
-//                            because it is the most accessible model on Groq free tier.
-//                            The chat route's stripThinkingLines + cleanReplyText handle
-//                            the thinking leak, so even when qwen is used the user sees
-//                            a clean response (just potentially truncated artifacts).
+// ─── Groq Model Configuration ─────────────────────────────────────────────
 //
-// NOTE: llama-3.3-70b-versatile and llama-3.1-70b-versatile were both REMOVED from the
-// cascade — Groq has decommissioned both. If Groq reintroduces a 70b llama variant
-// (check https://console.groq.com/docs/deprecations), it can be re-added here.
-const VISION_MODEL = 'qwen/qwen3.6-27b';
+// Groq periodically deprecates models. As of September 2026, the following
+// models are available on Groq's free tier:
+//
+//   Text models:
+//     llama-3.1-8b-instant:      ~30k OTPM, very reliable, small (no thinking leak)
+//     llama-3.3-70b-versatile:   ~6k OTPM, higher quality, sometimes rate-limited
+//
+//   Vision models (replacements for the decommissioned qwen/qwen3.6-27b):
+//     llama-3.2-11b-vision-preview:  Vision-capable, decent quality
+//     llama-3.2-90b-vision-preview:  Vision-capable, higher quality (sometimes rate-limited)
+//
+// NOTE: qwen/qwen3.6-27b was decommissioned by Groq in September 2026.
+// We switched to Llama 3.2 vision models, which do NOT have the thinking-leak
+// problem that qwen had. This is actually a quality improvement.
+//
+// NOTE: llama-3.3-70b-versatile and llama-3.1-70b-versatile were both REMOVED
+// from the cascade earlier (Groq decommissioned them). If Groq reintroduces
+// a 70b llama variant (check https://console.groq.com/docs/deprecations),
+// it can be re-added here.
 
+// Vision models (tried in order — first one that works is used)
+const GROQ_VISION_MODELS = [
+  'llama-3.2-90b-vision-preview',   // higher quality vision
+  'llama-3.2-11b-vision-preview',   // smaller, faster vision
+];
+
+// Chat models (tried in order)
 const CHAT_MODEL = 'llama-3.1-8b-instant';
-const CHAT_MODEL_FALLBACK_1 = 'llama-4-scout-17b-16e-instruct';
-const CHAT_MODEL_FALLBACK_2 = 'qwen/qwen3.6-27b'; // last resort — reasoning model, cleanup handles leak
+const CHAT_MODEL_FALLBACK_1 = 'llama-3.3-70b-versatile';
 
-// Groq free tier (on_demand) output token limits per minute:
+// Groq free tier output token limits per minute:
 //   llama-3.1-8b-instant:     ~30,000 OTPM  (highest, most reliable)
-//   llama-4-scout:             ~6,000 OTPM
-//   qwen/qwen3.6-27b:          ~1,000 OTPM  (lowest, but always available)
+//   llama-3.3-70b-versatile:  ~6,000 OTPM
+//   llama-3.2-11b-vision:     ~6,000 OTPM
+//   llama-3.2-90b-vision:     ~2,000 OTPM  (lowest, but highest quality)
 // Max tokens per request: stay well under the per-minute limit.
 // Responses with artifacts (tables/charts) need more tokens for the JSON.
-const MAX_TOKENS_HIGH = 4096;    // llama-3.1-8b-instant, llama-4-scout, llama-3.3-70b
-const MAX_TOKENS_LOW = 4096;     // qwen — was 900 (truncated JSON output), now 4096 so the reasoning + JSON fits
+const MAX_TOKENS_HIGH = 4096;
+const MAX_TOKENS_LOW = 4096;
 
 const RETRY_DELAY_MS = 2000;            // base delay before retrying a rate-limited model (doubles each retry)
 const MAX_RETRIES = 2;                  // retry each model up to 2 times on 429 (was 1)
@@ -87,7 +101,114 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
     openaiMessages.push({ role: msg.role === 'model' ? 'assistant' : 'user', content: parts });
   }
 
-  // ─── Try OpenRouter vision models FIRST ──────────────────────────────
+  // ─── Try Mistral FIRST (EU-based, GDPR-friendly) ────────────────────
+  // STRATEGIC: Mistral AI is based in Paris, France (EU). Transfers to them
+  // stay within the EU — NO SCC NEEDED, NO Schrems II issue.
+  //
+  // This means: even before SCCs with US providers (OpenRouter, Groq, Google)
+  // are signed, EU users CAN legally use OmniParse if we route through Mistral.
+  //
+  // So we try Mistral FIRST for vision extraction. Falls through to OpenRouter/
+  // Groq/Google if Mistral is rate-limited or unavailable.
+  //
+  // Models tried (in order):
+  //   1. pixtral-large-2411 — best quality vision model (124B params)
+  //   2. pixtral-12b-2409   — smaller, faster, often free-tier eligible
+  //
+  // Supports up to 3 MISTRAL_API_KEY entries for rotation.
+  const mistralKeys = [
+    process.env.MISTRAL_API_KEY,
+    process.env.MISTRAL_API_KEY_2,
+    process.env.MISTRAL_API_KEY_3,
+  ].filter(Boolean) as string[];
+
+  if (mistralKeys.length > 0) {
+    const mistralModels = [
+      'pixtral-large-latest',   // best quality vision model
+      'pixtral-12b-latest',     // smaller, faster, often free-tier eligible
+    ];
+
+    for (const mistralModel of mistralModels) {
+      for (let keyIdx = 0; keyIdx < mistralKeys.length; keyIdx++) {
+        const mistralKey = mistralKeys[keyIdx];
+        try {
+          console.warn(`[gemini] Trying Mistral vision: ${mistralModel} (key ${keyIdx + 1}/${mistralKeys.length})...`);
+
+          // Mistral API is OpenAI-compatible — uses the same message format
+          // we already built. No conversion needed.
+          const res = await fetch('https://api.mistral.ai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${mistralKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: mistralModel,
+              messages: openaiMessages,
+              max_tokens: 4096,
+              temperature: 0.1,
+              // Mistral supports response_format for JSON mode on some models
+              response_format: { type: 'json_object' },
+            }),
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            const content = data.choices?.[0]?.message?.content || '';
+            if (content) {
+              const usedModel = data.model || mistralModel;
+              console.warn(`[gemini] Mistral vision succeeded (model: ${usedModel}, key ${keyIdx + 1})!`);
+              return content;
+            }
+          }
+
+          // If JSON mode failed (400/422), try WITHOUT response_format
+          if (res.status === 400 || res.status === 422) {
+            console.warn(`[gemini] Mistral ${mistralModel} doesn't support JSON mode. Retrying without (key ${keyIdx + 1})...`);
+            const fbRes = await fetch('https://api.mistral.ai/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${mistralKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                model: mistralModel,
+                messages: openaiMessages,
+                max_tokens: 4096,
+                temperature: 0.1,
+                // No response_format — free-text mode
+              }),
+            });
+            if (fbRes.ok) {
+              const fbData = await fbRes.json();
+              const fbContent = fbData.choices?.[0]?.message?.content || '';
+              if (fbContent) {
+                console.warn(`[gemini] Mistral vision succeeded (free-text, model: ${mistralModel}, key ${keyIdx + 1})!`);
+                return fbContent;
+              }
+            }
+            // This model doesn't work — try next model
+            break;
+          }
+
+          // 429 — rate limited, try next key
+          if (res.status === 429) {
+            console.warn(`[gemini] Mistral ${mistralModel} rate limited (key ${keyIdx + 1}). Trying next key...`);
+            continue;
+          }
+
+          // Other error — try next model
+          console.warn(`[gemini] Mistral ${mistralModel} failed (key ${keyIdx + 1}, status ${res.status})`);
+          break;
+        } catch (err) {
+          console.warn(`[gemini] Mistral ${mistralModel} error (key ${keyIdx + 1}):`, err instanceof Error ? err.message : String(err));
+          continue;
+        }
+      }
+    }
+  }
+
+  // ─── Try OpenRouter vision models NEXT ──────────────────────────────
   // OpenRouter's Gemma 4 models produce clean JSON without thinking leaks.
   // Groq's qwen3.6-27b is a reasoning model that leaks its thinking into
   // JSON values (e.g. vendor="High confidence", invoiceNumber="High"),
@@ -207,39 +328,55 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
     }
   }
 
-  // ─── Last resort: Groq vision model (qwen3.6-27b) ────────────────────
-  // This is a reasoning model that may leak thinking into JSON values.
-  // Only used when ALL OpenRouter models are unavailable.
-  // The prose-to-JSON fallback in parse/route.ts will attempt to clean up.
-  try {
-    console.warn(`[gemini] Trying Groq vision model: ${VISION_MODEL} (last resort)...`);
-    const res = await fetch(GROQ_API_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: VISION_MODEL,
-        messages: openaiMessages,
-        max_tokens: MAX_TOKENS_LOW,
-        temperature: 0.1,
-      }),
-    });
+  // ─── Groq vision models (Llama 3.2 Vision family) ──────────────────
+  // These replaced the decommissioned qwen3.6-27b. Llama 3.2 vision models
+  // don't have the thinking-leak problem, so JSON output is cleaner.
+  // Try each model in order; break on success.
+  for (const groqVisionModel of GROQ_VISION_MODELS) {
+    try {
+      console.warn(`[gemini] Trying Groq vision model: ${groqVisionModel} (last resort)...`);
+      const res = await fetch(GROQ_API_URL, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: groqVisionModel,
+          messages: openaiMessages,
+          max_tokens: MAX_TOKENS_LOW,
+          temperature: 0.1,
+        }),
+      });
 
-    if (res.ok) {
-      const data = await res.json();
-      const content = data.choices?.[0]?.message?.content || '';
-      if (content) {
-        console.warn(`[gemini] Groq vision model ${VISION_MODEL} succeeded (last resort)!`);
-        return content;
+      if (res.ok) {
+        const data = await res.json();
+        const content = data.choices?.[0]?.message?.content || '';
+        if (content) {
+          console.warn(`[gemini] Groq vision model ${groqVisionModel} succeeded!`);
+          return content;
+        }
       }
-    }
 
-    const errText = await res.text().catch(() => '');
-    console.warn(`[gemini] Groq vision model ${VISION_MODEL} also failed (${res.status})`);
-  } catch (err) {
-    console.warn('[gemini] Groq vision call failed:', err instanceof Error ? err.message : String(err));
+      // 429 — rate limited, try next Groq vision model
+      if (res.status === 429) {
+        console.warn(`[gemini] Groq vision model ${groqVisionModel} rate limited. Trying next model...`);
+        continue;
+      }
+
+      // 400/404 — model not available (deprecated), try next
+      if (res.status === 400 || res.status === 404) {
+        const errText = await res.text().catch(() => '');
+        console.warn(`[gemini] Groq vision model ${groqVisionModel} not available (${res.status}). ${errText.slice(0, 200)}`);
+        continue;
+      }
+
+      // Other error — try next model
+      console.warn(`[gemini] Groq vision model ${groqVisionModel} failed (${res.status}). Trying next...`);
+    } catch (err) {
+      console.warn(`[gemini] Groq vision ${groqVisionModel} error:`, err instanceof Error ? err.message : String(err));
+      continue;
+    }
   }
 
   // ─── Final fallback: Google Gemini direct API ────────────────────────
@@ -340,13 +477,13 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
     }
   }
 
-  throw new Error('All vision models (OpenRouter + Groq + Gemini) are temporarily unavailable. Please try again in a moment.');
+  throw new Error('All vision models (Mistral + OpenRouter + Groq + Gemini) are temporarily unavailable. Please try again in a moment.');
 }
 
 /**
- * Call Groq with text-only chat.
- * Tries models in order with retry on 429 rate limits.
- * Model cascade: llama-3.1-8b-instant → llama-4-scout → llama-3.3-70b → qwen/qwen3.6-27b
+ * Call text-only chat (used for PDF text extraction + AI Chat tab).
+ * Tries providers in order: Mistral (EU) → Groq (US) → OpenRouter (US).
+ * Mistral is tried first because it's EU-based (no SCC needed).
  */
 export async function geminiChatCall(
   systemPrompt: string,
@@ -359,7 +496,103 @@ export async function geminiChatCall(
     ...messages.map((m) => ({ role: m.role, content: m.content })),
   ];
 
-  // ─── Try Groq first (better at Czech/European invoice text extraction) ──
+  // ─── Try Mistral FIRST (EU-based, GDPR-friendly) ────────────────────
+  // Same strategy as geminiVisionCall: Mistral (Paris, EU) is tried first
+  // because it stays within the EU — no SCC needed. Falls through to Groq
+  // (US) if Mistral is rate-limited or unavailable.
+  const mistralKeys = [
+    process.env.MISTRAL_API_KEY,
+    process.env.MISTRAL_API_KEY_2,
+    process.env.MISTRAL_API_KEY_3,
+  ].filter(Boolean) as string[];
+
+  const triedMistralModels: string[] = [];
+
+  if (mistralKeys.length > 0) {
+    const mistralChatModels = [
+      'mistral-small-latest',    // fast, good quality for text extraction
+      'mistral-large-latest',    // higher quality fallback
+    ];
+
+    for (const mistralModel of mistralChatModels) {
+      for (let keyIdx = 0; keyIdx < mistralKeys.length; keyIdx++) {
+        const mistralKey = mistralKeys[keyIdx];
+        try {
+          console.warn(`[gemini-chat] Trying Mistral text: ${mistralModel} (key ${keyIdx + 1}/${mistralKeys.length})...`);
+
+          const res = await fetch('https://api.mistral.ai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${mistralKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: mistralModel,
+              messages: openaiMessages,
+              max_tokens: MAX_TOKENS_HIGH,
+              temperature: 0.1,
+              response_format: { type: 'json_object' },
+            }),
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            const content = data.choices?.[0]?.message?.content || '';
+            if (content) {
+              console.warn(`[gemini-chat] Mistral text succeeded (model: ${mistralModel}, key ${keyIdx + 1})!`);
+              return content;
+            }
+          }
+
+          // If JSON mode failed (400/422), try WITHOUT response_format
+          if (res.status === 400 || res.status === 422) {
+            console.warn(`[gemini-chat] Mistral ${mistralModel} doesn't support JSON mode. Retrying without...`);
+            const fbRes = await fetch('https://api.mistral.ai/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${mistralKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                model: mistralModel,
+                messages: openaiMessages,
+                max_tokens: MAX_TOKENS_HIGH,
+                temperature: 0.1,
+              }),
+            });
+            if (fbRes.ok) {
+              const fbData = await fbRes.json();
+              const fbContent = fbData.choices?.[0]?.message?.content || '';
+              if (fbContent) {
+                console.warn(`[gemini-chat] Mistral text succeeded (free-text, model: ${mistralModel})!`);
+                return fbContent;
+              }
+            }
+            triedMistralModels.push(mistralModel);
+            break; // model doesn't work, try next model
+          }
+
+          if (res.status === 429) {
+            console.warn(`[gemini-chat] Mistral ${mistralModel} rate limited (key ${keyIdx + 1}). Trying next key...`);
+            continue;
+          }
+
+          console.warn(`[gemini-chat] Mistral ${mistralModel} failed (key ${keyIdx + 1}, status ${res.status})`);
+          triedMistralModels.push(mistralModel);
+          break;
+        } catch (err) {
+          console.warn(`[gemini-chat] Mistral ${mistralModel} error:`, err instanceof Error ? err.message : String(err));
+          triedMistralModels.push(mistralModel);
+          continue;
+        }
+      }
+    }
+    if (triedMistralModels.length > 0) {
+      console.warn(`[gemini-chat] All Mistral models failed: ${triedMistralModels.join(', ')}. Falling through to Groq...`);
+    }
+  }
+
+  // ─── Try Groq next (better at Czech/European invoice text extraction) ──
   // Groq's models are more reliable for non-English documents.
   // OpenRouter text models produce lower-quality extraction.
   // We try Groq first; if ALL Groq models are rate-limited, we catch
@@ -608,5 +841,75 @@ export async function geminiChatCall(
     }
   }
 
-  throw new Error(`AI is temporarily busy. Please wait 30 seconds and try again. (Tried: ${triedModels.join(', ') || 'all models'})`);
+  // ─── Final fallback: Google Gemini text models ────────────────────
+  // Same as the vision cascade — Google Gemini has its own free tier
+  // quota, independent from Mistral/Groq/OpenRouter.
+  const geminiKeys = [
+    process.env.GEMINI_API_KEY,
+    process.env.GEMINI_API_KEY_2,
+    process.env.GEMINI_API_KEY_3,
+  ].filter(Boolean) as string[];
+
+  if (geminiKeys.length > 0) {
+    const geminiTextModels = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-1.5-flash'];
+
+    for (const gm of geminiTextModels) {
+      for (let keyIdx = 0; keyIdx < geminiKeys.length; keyIdx++) {
+        const geminiKey = geminiKeys[keyIdx];
+        try {
+          console.warn(`[gemini-chat] Trying Google Gemini text: ${gm} (key ${keyIdx + 1}/${geminiKeys.length})...`);
+
+          // Convert OpenAI messages to Gemini format
+          const contents = openaiMessages.map((m) => ({
+            role: m.role === 'assistant' ? 'model' : 'user',
+            parts: [{ text: m.content }],
+          }));
+
+          const res = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${gm}:generateContent?key=${geminiKey}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents,
+                generationConfig: {
+                  temperature: 0.1,
+                  maxOutputTokens: MAX_TOKENS_HIGH,
+                  responseMimeType: 'application/json',
+                },
+              }),
+            },
+          );
+
+          if (res.ok) {
+            const data = await res.json();
+            const content = data.candidates?.[0]?.content?.parts
+              ?.map((p: { text?: string }) => p.text || '')
+              .join('') || '';
+            if (content) {
+              console.warn(`[gemini-chat] Google Gemini text succeeded (model: ${gm}, key ${keyIdx + 1})!`);
+              return content;
+            }
+          }
+
+          if (res.status === 429) {
+            console.warn(`[gemini-chat] Google Gemini ${gm} rate limited (key ${keyIdx + 1}). Trying next key...`);
+            continue;
+          }
+          if (res.status === 400 || res.status === 404) {
+            console.warn(`[gemini-chat] Google Gemini ${gm} not available (status ${res.status}). Trying next model...`);
+            break;
+          }
+          console.warn(`[gemini-chat] Google Gemini ${gm} failed (key ${keyIdx + 1}, status ${res.status})`);
+          break;
+        } catch (err) {
+          console.warn(`[gemini-chat] Google Gemini ${gm} error (key ${keyIdx + 1}):`, err instanceof Error ? err.message : String(err));
+          continue;
+        }
+      }
+    }
+  }
+
+  const allTriedModels = [...triedMistralModels, ...triedModels];
+  throw new Error(`AI is temporarily busy. Please wait 30 seconds and try again. (Tried: ${allTriedModels.join(', ') || 'all models'})`);
 }

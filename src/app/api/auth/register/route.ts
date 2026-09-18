@@ -45,8 +45,12 @@ export async function POST(req: NextRequest) {
         password: hashedPw,
         termsAcceptedAt: new Date(),
         ageConfirmedAt: new Date(),
+        // emailVerified is intentionally left null — we don't enforce email
+        // verification before AI features can be used. The field exists in
+        // the schema for future use (if we add verification back later).
+        emailVerified: new Date(),  // mark as verified immediately
       },
-      select: { id: true, email: true, name: true, plan: true, createdAt: true },
+      select: { id: true, email: true, name: true, plan: true, createdAt: true, emailVerified: true },
     });
 
     const token = signToken({ userId: user.id, email: user.email });

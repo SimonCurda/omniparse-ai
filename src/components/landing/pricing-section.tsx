@@ -40,7 +40,7 @@ const PLANS: Plan[] = [
     description: 'Get started with AI-powered invoice parsing.',
     features: [
       { text: '15 invoices / month (hard limit)', isLimit: true },
-      { text: '25 AI chat messages / month', isLimit: true },
+      { text: '10 AI chat messages / month', isLimit: true },
       { text: '8 built-in validation rules', isLimit: true },
       { text: 'AI extraction with confidence scores' },
       { text: '3-layer tampering detection (metadata, heuristics, VLM)' },

@@ -1106,6 +1106,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized. Please sign in.' }, { status: 401 });
     }
 
+    // Frozen account check
+    const chatUser = await db.user.findUnique({
+      where: { id: auth.userId },
+      select: { id: true, active: true, frozenReason: true, plan: true, createdAt: true },
+    });
+    if (!chatUser) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+    if (!chatUser.active) {
+      return NextResponse.json(
+        { error: chatUser.frozenReason || 'Your account has been frozen. Please contact support.', code: 'ACCOUNT_FROZEN' },
+        { status: 403 },
+      );
+    }
+
     // Validate request body with Zod
     const body = await req.json();
     const parsed = chatSchema.safeParse(body);

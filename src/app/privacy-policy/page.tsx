@@ -4,12 +4,12 @@ export const dynamic = 'force-static';
 
 export default function PrivacyPolicyPage() {
   return (
-    <LegalLayout title="Privacy Policy" lastUpdated="September 9, 2026">
+    <LegalLayout title="Privacy Policy" lastUpdated="September 12, 2026">
       <section>
         <h2>1. Data Controller</h2>
         <p>
           The data controller for personal data processed through this Service is
-          <strong> Simon Curda</strong> (natural person, sole trader registration pending), based in the
+          <strong> Simon Curda</strong> (natural person), based in the
           Czech Republic. For GDPR purposes (EU Regulation 2016/679), the Controller is responsible for
           ensuring compliance with data protection law.
         </p>
@@ -30,12 +30,12 @@ export default function PrivacyPolicyPage() {
           <strong>Documents you upload:</strong> When you use the document parsing feature, your files
           (PDF, JPEG, PNG, WebP) are sent to AI processing providers (see Section 6 for the full list).
           The original file is stored in your account database (base64-encoded) for 30 days so you can
-          preview it in the dashboard, then automatically deleted. The extracted data is stored
-          indefinitely in your account until you delete it.
+          preview it in the dashboard, then deleted from the active environment after 30 days. The extracted data is stored
+          in your account until you delete it or terminate your account.
         </p>
         <p>
           <strong>Chat history:</strong> Messages you send to the AI chat assistant and the responses
-          returned are stored in your account database indefinitely until you delete them via the
+          returned are stored in your account database until you delete them via the
           dashboard&apos;s Clear button or by deleting your account.
         </p>
         <p>
@@ -55,8 +55,8 @@ export default function PrivacyPolicyPage() {
           <li><strong>Account creation and authentication:</strong> Contractual necessity (Art. 6(1)(b)) — necessary to provide the Service you requested.</li>
           <li><strong>Document parsing:</strong> Consent (Art. 6(1)(a)) — you actively upload documents for processing. You can withdraw this consent by deleting your invoices.</li>
           <li><strong>Chat interactions:</strong> Consent (Art. 6(1)(a)) — you actively send messages to the AI chat.</li>
-          <li><strong>Terms acceptance and age confirmation:</strong> Consent (Art. 6(1)(a)) — recorded at signup with timestamps.</li>
-          <li><strong>Security and service stability:</strong> Legitimate interest (Art. 6(1)(f)) — server logs for abuse prevention, rate limiting, and fraud detection.</li>
+          <li><strong>Terms acceptance:</strong> Consent (Art. 6(1)(a)) — recorded at signup with timestamps. We do not collect or verify age at signup.</li>
+          <li><strong>Security, service stability, and abuse prevention:</strong> Legitimate interest (Art. 6(1)(f)) — server logs for abuse prevention, rate limiting, fraud detection, and account monitoring. We monitor account activity patterns (invoice volume, chat usage, email scanning frequency, account age) to detect potential abuse. Accounts suspected of abuse may be frozen (AI features blocked) or deleted in accordance with our Terms of Service.</li>
           <li><strong>Local storage preferences:</strong> Consent via cookie banner (Art. 6(1)(a) + ePrivacy Directive).</li>
         </ul>
       </section>
@@ -64,8 +64,8 @@ export default function PrivacyPolicyPage() {
       <section>
         <h2>4. Data Retention</h2>
         <ul>
-          <li><strong>Uploaded document files:</strong> Stored for 30 days for preview, then automatically purged by a scheduled job. Extraction results remain.</li>
-          <li><strong>Extracted invoice data:</strong> Stored in your account for as long as your account exists. Delete individual invoices from the dashboard to remove this data.</li>
+          <li><strong>Uploaded document files:</strong> We retain uploaded documents for up to 30 days in the active application environment. Backup copies, security logs and data processed by third-party providers may be retained for different periods where necessary for security, legal or operational purposes. Extraction results remain in your account until you delete them.</li>
+          <li><strong>Extracted invoice data:</strong> Stored in your account for as long as your account is active. Upon account termination, extracted data and audit logs are deleted within 90 days. You can also delete individual invoices from the dashboard at any time.</li>
           <li><strong>Chat history:</strong> Stored in your account until you clear it from the dashboard chat tab or delete your account.</li>
           <li><strong>Server logs:</strong> Retained for 30 days by the hosting provider (Vercel), then automatically deleted.</li>
           <li><strong>Account data:</strong> Stored for the duration of your account. You can delete your account and all associated data at any time from Settings. Account deletion also cancels any active Stripe subscription.</li>
@@ -96,27 +96,59 @@ export default function PrivacyPolicyPage() {
         <h2>6. Subprocessors and AI Providers</h2>
         <p>
           We use the following third-party services to provide the Service. Each processes personal data
-          on our behalf as a subprocessor under GDPR Art. 28. We have signed or are in the process of
-          signing Data Processing Agreements (DPAs) with each provider.
+          on our behalf as a subprocessor under GDPR Art. 28. Data Processing Agreements (DPAs) and
+          Standard Contractual Clauses (SCCs) are in place with all confirmed providers (see per-provider
+          status below).
+        </p>
+        <p className="mt-3 p-3 bg-emerald-500/5 border-l-4 border-emerald-500 rounded-r">
+          <strong className="text-emerald-700 dark:text-emerald-500">EU-based AI provider available.</strong>{' '}
+          Mistral AI (Paris, France) processes documents entirely within the EU. Transfers to Mistral
+          are not subject to GDPR Chapter V restrictions (no SCC needed). We prioritize Mistral for
+          vision extraction when available.
         </p>
         <ul>
           <li><strong>Vercel Inc.</strong> (United States) — Web hosting and serverless function execution. Processes: IP addresses, request metadata. <a href="https://vercel.com/legal/dpa" target="_blank" rel="noopener">Vercel DPA</a>.</li>
-          <li><strong>Supabase Inc.</strong> (Ireland, EU) — Primary database hosting (PostgreSQL). Processes: all stored account data, invoices, chat messages. DPA built into Terms of Service (effective August 1, 2026) — automatically applies to all customers. <a href="https://supabase.com/legal/customer-resources/data-processing-addendum" target="_blank" rel="noopener">Supabase DPA</a>.</li>
-          <li><strong>Groq Inc.</strong> (United States) — AI inference provider. Processes: uploaded document content (PDF/images, transiently), chat messages (transiently) for AI extraction and chat responses. <a href="https://groq.com/legal/dpa" target="_blank" rel="noopener">Groq DPA</a> (paid tier).</li>
-          <li><strong>OpenRouter</strong> (United States) — AI inference aggregator. Used as a fallback when Groq is unavailable. Processes: same as Groq (transient document content and chat messages). <a href="https://openrouter.ai/legal/privacy" target="_blank" rel="noopener">OpenRouter Privacy</a>.</li>
+          <li><strong>Supabase Inc.</strong> (Ireland, EU) — Primary database hosting (PostgreSQL). Processes: all stored account data, invoices, chat messages. DPA built into Terms of Service (effective August 1, 2026) — automatically applies to all customers, no separate signature required. <a href="https://supabase.com/legal/customer-resources/data-processing-addendum" target="_blank" rel="noopener">Supabase DPA</a>. Subprocessor change notifications: <a href="https://supabase.com/legal/customer-resources/subprocessor-list" target="_blank" rel="noopener">supabase.com/legal/customer-resources/subprocessor-list</a>.</li>
+          <li><strong>Mistral AI</strong> (Paris, France — EU) — Primary AI inference provider. Processes: uploaded document content (transiently) for vision extraction. <strong>EU-based — no SCC required.</strong> <a href="https://mistral.ai/legal/privacy-policy" target="_blank" rel="noopener">Mistral Privacy Policy</a>.</li>
+          <li><strong>OpenRouter</strong> (United States) — AI inference aggregator. Fallback when Mistral is unavailable. Processes: transient document content and chat messages. <a href="https://openrouter.ai/legal/privacy" target="_blank" rel="noopener">OpenRouter Privacy</a>.</li>
+          <li><strong>Groq Inc.</strong> (United States) — AI inference provider. Secondary fallback. Processes: uploaded document content (transiently), chat messages (transiently) for AI extraction and chat responses. <a href="https://groq.com/legal/dpa" target="_blank" rel="noopener">Groq DPA</a> (paid tier).</li>
+          <li><strong>Google LLC</strong> (United States) — Final fallback AI inference provider. Models used: Gemini 2.0 Flash, Gemini 2.5 Flash, Gemini 1.5 Flash.</li>
           <li><strong>Stripe Inc.</strong> (United States) — Payment processing for paid plans. Processes: email, billing details. <a href="https://stripe.com/legal/dpa" target="_blank" rel="noopener">Stripe DPA</a>.</li>
         </ul>
         <p>
-          <strong>DPA Status:</strong>
+          <strong>AI vision cascade:</strong> Mistral (EU, primary) → OpenRouter (US, fallback) → Groq (US, secondary fallback) → Google Gemini (US, final fallback).
+          For EU users concerned about US transfers, ensuring Mistral is configured means vision extraction stays within the EU.
+        </p>
+        <p>
+          <strong>SCC Status (as of September 18, 2026):</strong>
           <ul className="list-disc pl-6 space-y-1 mt-2 text-sm">
             <li><strong>Supabase Inc.</strong> (Ireland, EU) — DPA built into Terms of Service (effective August 1, 2026). Automatically applies to all customers. EU-based — no SCC required.</li>
             <li><strong>Vercel Inc.</strong> (United States) — DPA available at vercel.com/legal/dpa.</li>
-            <li><strong>Groq Inc.</strong> (United States) — SCCs confirmed in effect (September 12, 2026).</li>
+            <li><strong>Groq Inc.</strong> — ✅ SCCs confirmed in effect (DPA effective October 15, 2025; EU SCC Module 2 self-executing upon acceptance of Groq Services Agreement). Confirmed September 12, 2026. Governing law: Ireland. <a href="https://groq.com/legal/dpa" target="_blank" rel="noopener">Groq DPA</a>.</li>
+            <li><strong>Mistral AI</strong> — EU-based (Paris, France). As an EU-established provider, transfers to Mistral are expected to remain within the EEA, subject to Mistral&apos;s applicable terms and data-processing agreements.</li>
+            <li><strong>OpenRouter</strong> — ⏳ SCC status: pending verification. DPA request sent December 2026.</li>
+            <li><strong>Google LLC (Gemini)</strong> — ⏳ SCC status: pending verification. Google Cloud DPA available at <a href="https://cloud.google.com/terms/data-processing-addendum" target="_blank" rel="noopener">cloud.google.com/terms/data-processing-addendum</a> (self-executing upon acceptance of Google Cloud Terms).</li>
             <li><strong>Stripe Inc.</strong> (United States) — DPA available at stripe.com/legal/dpa.</li>
-            <li><strong>Mistral AI</strong> (Paris, France — EU) — EU-based, no SCC required.</li>
-            <li><strong>OpenRouter</strong> (United States) — SCC status: pending verification.</li>
-            <li><strong>Google LLC</strong> (United States) — SCC status: pending verification.</li>
           </ul>
+        </p>
+        <p>
+          <strong>EU users:</strong> AI processing via Mistral (EU-based) and Groq (US-based, SCCs confirmed)
+          has appropriate safeguards in place under GDPR. However, users should note that documents uploaded
+          to the Service may contain personal data of multiple data subjects (e.g. vendor names, employee
+          names, email addresses, bank details). The user uploading such documents is responsible for
+          ensuring they have a valid legal basis under GDPR Art. 6 for processing that data, and that the
+          transfer to AI providers is lawful under Chapter V.
+        </p>
+        <p>
+          <strong>Important — fallback providers:</strong> OpenRouter and Google remain as fallback providers
+          pending SCC verification. Processing of personal data of EU data subjects through these providers
+          may not have appropriate safeguards in place under GDPR Chapter V until SCCs are confirmed. EU users
+          processing personal data of EU data subjects should be aware that if processing falls through to
+          OpenRouter or Google, the transfer may not be fully GDPR-compliant. We are working to verify SCCs
+          with these providers and will update this notice once confirmed.
+        </p>
+        <p>
+          <strong>Model training:</strong> We do not intentionally use customer documents or conversations to train or fine-tune AI models. Processing by third-party AI providers is governed by the applicable provider terms and data-processing agreements. The specific terms vary by provider, service tier (paid vs. unpaid), and product configuration. Data may be temporarily processed, cached, or retained by AI providers for security, abuse prevention, monitoring, billing, debugging, or other purposes specified in their applicable terms.
         </p>
       </section>
 
@@ -139,10 +171,16 @@ export default function PrivacyPolicyPage() {
       <section>
         <h2>8. Children&apos;s Data (GDPR Art. 8)</h2>
         <p>
-          The Service is not directed at children under 15. At signup, we require users to confirm they
-          are at least 15 years old. If we learn that we have collected personal data from a child under
-          15 without parental consent, we will delete that data promptly. Contact us at
-          <strong> damr58h@gmail.com</strong> if you believe a child has provided us with personal data.
+          The Service is not directed at children under 13. We do not perform age verification at signup.
+          If you are under 18, you confirm that you have obtained parental or guardian consent to use this
+          Service. Parental consent requirements vary by jurisdiction — in the EU, the age of digital
+          consent is between 13 and 16 depending on the Member State (in Czech Republic, it is 15).
+        </p>
+        <p>
+          If we learn that we have collected personal data from a child under the applicable age of
+          digital consent without verifiable parental consent, we will delete that data promptly.
+          Contact us at <strong>damr58h@gmail.com</strong> if you believe a child has
+          provided us with personal data.
         </p>
       </section>
 
@@ -171,7 +209,101 @@ export default function PrivacyPolicyPage() {
       </section>
 
       <section>
-        <h2>11. Changes to This Policy</h2>
+        <h2>11. Data Processing Addendum (DPA)</h2>
+        <p>
+          This Data Processing Addendum (&quot;DPA&quot;) applies when you (the &quot;Customer&quot;) act as a data
+          controller and use the Service to process personal data on behalf of data subjects. This DPA
+          reflects the parties&apos; agreement with respect to the processing of personal data under
+          GDPR Art. 28.
+        </p>
+        <h3 className="text-base font-semibold mt-4 mb-2">11.1 Roles and Scope</h3>
+        <ul className="list-disc pl-6 space-y-1 text-sm">
+          <li><strong>Customer</strong> is the data controller. Customer determines the purposes and means of processing.</li>
+          <li><strong>OmniParse</strong> (operated by Simon Curda) is the data processor. We process personal data only on documented instructions from Customer.</li>
+          <li>We process documents and extracted data per your instructions (via the Service&apos;s UI and API). We do not use your data for any purpose other than providing the Service.</li>
+        </ul>
+        <h3 className="text-base font-semibold mt-4 mb-2">11.2 Subprocessors</h3>
+        <p className="text-sm">OmniParse engages the following subprocessors. Customer grants general written authorization for OmniParse to engage these subprocessors; the current list is maintained in this Privacy Policy and material changes will be notified 30 days in advance:</p>
+        <ul className="list-disc pl-6 space-y-1 text-sm mt-2">
+          <li><strong>Vercel Inc.</strong> (United States) — Web hosting and serverless function execution</li>
+          <li><strong>Supabase Inc.</strong> (Ireland, EU) — Primary database hosting (PostgreSQL)</li>
+          <li><strong>OpenRouter</strong> (United States) — AI inference (primary vision + text)</li>
+          <li><strong>Groq Inc.</strong> (United States) — AI inference (fallback vision + text)</li>
+          <li><strong>Google LLC</strong> (United States) — AI inference (final fallback vision)</li>
+          <li><strong>Stripe Inc.</strong> (United States) — Payment processing (paid plans only)</li>
+        </ul>
+        <h3 className="text-base font-semibold mt-4 mb-2">11.3 Data Subject Rights</h3>
+        <p className="text-sm">
+          Customer is responsible for responding to data subject rights requests (access, rectification,
+          erasure, portability, objection). OmniParse will assist Customer with such requests, including
+          by exporting or deleting personal data upon Customer&apos;s written request. Contact
+          <strong> damr58h@gmail.com</strong> with the subject &quot;DPA — Data Subject Request&quot;.
+        </p>
+        <h3 className="text-base font-semibold mt-4 mb-2">11.4 Security Measures (GDPR Art. 32)</h3>
+        <p className="text-sm">OmniParse implements the following technical and organizational measures:</p>
+        <ul className="list-disc pl-6 space-y-1 text-sm mt-2">
+          <li>AES-256-GCM encryption for IMAP credentials at rest</li>
+          <li>bcrypt password hashing (12 rounds)</li>
+          <li>TLS 1.2+ for all data in transit</li>
+          <li>JWT-based authentication with 7-day expiry</li>
+          <li>Per-request user scoping — no query returns cross-user data</li>
+          <li>File data auto-purge after 30 days (configurable)</li>
+          <li>Account deletion with cascade (full erasure)</li>
+          <li>Audit log of significant actions (invoice create/approve/delete)</li>
+        </ul>
+        <h3 className="text-base font-semibold mt-4 mb-2">11.5 International Transfers (GDPR Chapter V)</h3>
+        <p className="text-sm">
+          Personal data may be transferred to the United States for AI processing by Groq, OpenRouter, and
+          Google. The US does not have an adequacy decision. We rely on Standard Contractual Clauses
+          (SCCs) consistent with the Schrems II ruling. <strong>SCC status by provider (as of September 12, 2026):</strong>
+        </p>
+        <ul className="list-disc pl-6 space-y-1 text-sm mt-2">
+          <li><strong>Groq Inc.</strong> — ✅ SCCs confirmed in effect (September 12, 2026). DPA with EU SCC Module 2 is self-executing upon acceptance of Groq Services Agreement. Governing law: Ireland. Competent authority: Irish Data Protection Commission. 72-hour breach notification.</li>
+          <li><strong>Mistral AI</strong> — EU-based (Paris, France). As an EU-established provider, transfers are expected to remain within the EEA, subject to Mistral&apos;s applicable terms.</li>
+          <li><strong>OpenRouter</strong> — ⏳ SCC status: pending verification. DPA request sent December 2026.</li>
+          <li><strong>Google LLC</strong> — ⏳ SCC status: pending verification. Google Cloud DPA available at cloud.google.com/terms/data-processing-addendum (self-executing upon acceptance of Google Cloud Terms).</li>
+        </ul>
+        <p className="text-sm mt-2">
+          OmniParse has confirmed SCCs with Groq (US-based) and uses Mistral (EU-based). However,
+          users should be aware that documents may contain personal data of multiple data subjects.
+          The user is responsible for ensuring they have a valid legal basis for processing and
+          transferring such data. The platform's cascade prioritizes Mistral first, then Groq —
+          both have appropriate safeguards. OpenRouter and Google are additional fallbacks pending
+          SCC verification.
+        </p>
+        <h3 className="text-base font-semibold mt-4 mb-2">11.6 Duration and Deletion</h3>
+        <p className="text-sm">
+          This DPA continues for the duration of your subscription. Upon account termination, all personal
+          data is deleted within 30 days (file binaries) and 90 days (extracted data, audit logs), except
+          where longer retention is required by law.
+        </p>
+        <h3 className="text-base font-semibold mt-4 mb-2">11.7 Subprocessor Authorization</h3>
+        <p className="text-sm">
+          Customer grants general written authorization for OmniParse to engage the subprocessors listed in
+          Section 11.2. OmniParse will notify Customer of any planned changes to the subprocessor list at
+          least 30 days in advance via the Service or by email. Customer may object to a new subprocessor
+          in writing within 30 days of notification. In the event of a reasonable objection, OmniParse will
+          use commercially reasonable efforts to make available an alternative or recommend a change to
+          Customer&apos;s use of the Service to avoid processing by the objected-to subprocessor. If OmniParse
+          is unable to provide a reasonable alternative, Customer may suspend or terminate the affected
+          Service.
+        </p>
+        <h3 className="text-base font-semibold mt-4 mb-2">11.8 Acceptance</h3>
+        <p className="text-sm">
+          For B2B customers (businesses, organizations, accounting firms): this DPA takes effect upon
+          acceptance of the Terms of Service and the first use of the Service. For B2B customers who
+          require a signed DPA, contact <strong>damr58h@gmail.com</strong> to execute a standalone
+          Data Processing Agreement.
+        </p>
+        <p className="text-sm">
+          For individual users: by uploading documents to the Service and checking the data transfer
+          consent box in the Upload tab, you acknowledge that this DPA applies to the extent you act as
+          a data controller processing personal data through the Service.
+        </p>
+      </section>
+
+      <section>
+        <h2>12. Changes to This Policy</h2>
         <p>
           We may update this Privacy Policy from time to time. Material changes will be notified via
           the Service or by email. The &quot;Last updated&quot; date at the top of this page indicates
@@ -181,7 +313,7 @@ export default function PrivacyPolicyPage() {
       </section>
 
       <section>
-        <h2>12. Contact</h2>
+        <h2>13. Contact</h2>
         <ul>
           <li><strong>Data controller:</strong> Simon Curda, Czech Republic</li>
           <li><strong>General contact &amp; all GDPR requests:</strong> damr58h@gmail.com</li>

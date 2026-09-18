@@ -50,6 +50,8 @@ export interface UserProfile {
   hasPassword?: boolean;
   googleId?: boolean;
   githubId?: boolean;
+  emailVerified?: string | null;
+  emailVerifiedRequired?: boolean;
 }
 
 export type ArtifactType = "table" | "chart-bar" | "chart-line" | "chart-pie" | "summary";

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
 import { db } from '@/lib/db';
 import { getUserFromRequest, hasFeature, PLAN_LIMITS } from '@/lib/auth';
+import { checkMonthlyParseLimit, incrementMonthlyParseCount } from '@/lib/parse-limit';
 import {
   runValidationRules,
   runVarianceChecks,
@@ -20,6 +21,57 @@ import { extractPdfText as extractPdfContent } from '@/lib/pdf-extractor';
 
 const ALLOWED_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/webp']);
 const MAX_SIZE = 10 * 1024 * 1024;
+
+/**
+ * Detect the actual file type by inspecting magic bytes (file signature).
+ *
+ * The Content-Type header set by the browser can be spoofed — a malicious
+ * user could upload an executable or a polyglot file with a .pdf extension
+ * and Content-Type: application/pdf. This function inspects the actual bytes
+ * to verify the file is what it claims to be.
+ *
+ * Returns one of the ALLOWED_TYPES, or 'unknown' if the signature doesn't
+ * match any known type.
+ *
+ * Signature reference: https://en.wikipedia.org/wiki/List_of_file_signatures
+ */
+function detectFileTypeFromMagicBytes(buf: Buffer): string {
+  if (buf.length < 12) return 'unknown';
+
+  // PDF: starts with %PDF- (hex: 25 50 44 46 2D)
+  if (
+    buf[0] === 0x25 && buf[1] === 0x50 && buf[2] === 0x44 &&
+    buf[3] === 0x46 && buf[4] === 0x2D
+  ) {
+    return 'application/pdf';
+  }
+
+  // JPEG: starts with \xFF\xD8\xFF
+  if (buf[0] === 0xFF && buf[1] === 0xD8 && buf[2] === 0xFF) {
+    return 'image/jpeg';
+  }
+
+  // PNG: starts with \x89PNG\r\n\x1A\n (8 bytes)
+  if (
+    buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47 &&
+    buf[4] === 0x0D && buf[5] === 0x0A && buf[6] === 0x1A && buf[7] === 0x0A
+  ) {
+    return 'image/png';
+  }
+
+  // WebP: RIFF....WEBP
+  // Bytes 0-3: "RIFF" (52 49 46 46)
+  // Bytes 4-7: file size (any)
+  // Bytes 8-11: "WEBP" (57 45 42 50)
+  if (
+    buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46 &&
+    buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50
+  ) {
+    return 'image/webp';
+  }
+
+  return 'unknown';
+}
 
 /**
  * Extract invoice fields from prose text (last resort when the AI model
@@ -348,15 +400,26 @@ function buildVlmPrompt(customFieldsPart: string): string {
   return `You are an invoice parser. Extract ALL visible fields from the document image.
 
 IMPORTANT: The invoice may be in ANY language (English, Czech, German, French, Spanish, etc.). Extract the fields regardless of the document language. Map foreign-language labels to their English equivalents:
-- Czech: Dodavatel/Prodávající = vendor, Číslo dokladu/č. faktury = invoice number, Datum vystavení = invoice date, Datum splatnosti = due date, Celkem/Celkem uhradit = total, DPH = VAT, Kč = CZK, Sazba DPH = VAT rate, Základ = amount (net), Položka = line item
-- German: Lieferant/Verkäufer = vendor, Rechnungsnummer = invoice number, Rechnungsdatum = invoice date, Fälligkeitsdatum = due date, Gesamtbetrag = total, MwSt/USt = VAT, € = EUR
+- Czech: Dodavatel/Prodávající = vendor, Číslo dokladu/č. faktury = invoice number, Datum vystavení = invoice date, Datum splatnosti = due date, Celkem/Celkem uhradit/K úhradě = total, DPH = VAT, Kč = CZK, Sazba DPH = VAT rate, Základ = amount (net), Položka = line item
+- German: Lieferant/Verkäufer = vendor, Rechnungsnummer = invoice number, Rechnungsdatum = invoice date, Fälligkeitsdatum = due date, Gesamtbetrag/Gesamt = total, MwSt/USt = VAT, € = EUR
 - French: Fournisseur/Vendeur = vendor, Numéro de facture = invoice number, Date de facture = invoice date, Date d'échéance = due date, Total/Montant TTC = total, TVA = VAT
+
+CRITICAL: TOTAL FIELD
+- "total" is the FINAL AMOUNT TO PAY — the grand total including VAT/tax
+- Look for labels like: "Total", "Grand Total", "Amount Due", "Balance Due", "Total TTC", "Celkem", "K úhradě", "Gesamtbetrag", "Total a pagar", "Totale"
+- ALWAYS return "total" as a NUMBER (not a string). Example: 1234.56, NOT "1,234.56"
+- If the total is written as "1.234,56" (European), convert to 1234.56
+- If the total is written as "1,234.56" (US), convert to 1234.56
+- If you cannot find a total, look for "amount due", "balance", "to pay", "k úhradě", "zu zahlen"
+- If there is NO total visible, compute it: total = amount (net) + vatAmount (tax). Set total to this computed value.
 
 CRITICAL NUMBER PARSING RULES:
 - European number format: "12 705,00" or "12.705,00" means 12705.00 (space/dot = thousands separator, comma = decimal)
+- US number format: "12,705.00" means 12705.00 (comma = thousands separator, dot = decimal)
 - Always convert to standard float: "12 705,00 Kč" → 12705.00
 - "7 000,00" → 7000.00 (NOT 7.00 — the space means thousands, not decimal)
 - If a number has a space followed by 3 digits and then a comma, it's thousands: "15 300,50" → 15300.50
+- ALL numeric fields (amount, vatAmount, total) MUST be returned as numbers, not strings.
 
 CRITICAL: Output ONLY the JSON object. Do NOT explain, do NOT analyze, do NOT write any text before or after the JSON. Do NOT include confidence labels or field names as values — only actual data from the document.
 
@@ -435,13 +498,24 @@ export async function POST(req: NextRequest) {
     const user = await db.user.findUnique({ where: { id: auth.userId } });
     if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
-    // Count invoices this month only (hard wall per month)
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-    const invoiceCount = await db.invoice.count({ where: { userId: auth.userId, createdAt: { gte: new Date(startOfMonth) } } });
-    const limit = PLAN_LIMITS[user.plan] || PLAN_LIMITS.free;
-    if (invoiceCount >= limit) {
-      return NextResponse.json({ error: `Plan limit reached (${limit} invoices). Upgrade to process more.` }, { status: 429 });
+    // Frozen account check — admin can freeze accounts for abuse prevention
+    if (!user.active) {
+      return NextResponse.json(
+        { error: user.frozenReason || 'Your account has been frozen. Please contact support.', code: 'ACCOUNT_FROZEN' },
+        { status: 403 },
+      );
+    }
+
+    // ─── Hard monthly parse limit ────────────────────────────────────
+    // Uses a persistent counter on the User model — if a Free user parses
+    // 15 invoices, deletes them all, they STILL can't parse more this month.
+    // Counter resets on the 1st of each month (checked at runtime).
+    const parseLimit = await checkMonthlyParseLimit(auth.userId, user.plan);
+    if (!parseLimit.allowed) {
+      return NextResponse.json(
+        { error: parseLimit.message || `Monthly limit reached (${parseLimit.count}/${parseLimit.limit}). Resets on the 1st of next month.`, code: 'MONTHLY_LIMIT_REACHED' },
+        { status: 429 },
+      );
     }
 
     // Load user settings for custom fields and validation rules
@@ -487,6 +561,28 @@ export async function POST(req: NextRequest) {
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const base64 = buffer.toString('base64');
+
+    // ─── Magic byte validation ────────────────────────────────────────
+    // The Content-Type header is set by the browser and can be spoofed.
+    // Verify the actual file content matches the claimed MIME type by
+    // inspecting the first few bytes (file signature).
+    //
+    // Signatures:
+    //   PDF:   %PDF- (25 50 44 46 2D)
+    //   JPEG:  \xFF\xD8\xFF
+    //   PNG:   \x89PNG\r\n\x1A\n (89 50 4E 47 0D 0A 1A 0A)
+    //   WebP:  RIFF....WEBP (52 49 46 46 ?? ?? ?? ?? 57 45 42 50)
+    //
+    // Rejects polyglot files, MIME-type spoofing, and corrupted uploads
+    // that could crash pdfjs-dist or the image parser.
+    const detectedType = detectFileTypeFromMagicBytes(buffer);
+    if (detectedType !== file.type) {
+      console.warn(`[parse] Magic byte mismatch: claimed=${file.type} detected=${detectedType}`);
+      return NextResponse.json(
+        { error: `File content does not match its claimed type. Claimed ${file.type}, but file signature indicates ${detectedType}. Upload rejected for security.` },
+        { status: 400 },
+      );
+    }
     const dataUri = `data:${file.type};base64,${base64}`;
 
     // ── Metadata extraction for tampering detection ──
@@ -497,111 +593,70 @@ export async function POST(req: NextRequest) {
       fileMetadata = await extractImageMetadata(buffer, file.type);
     }
 
-    // ── AI extraction: PDFs need text/image extraction first, images go straight to vision ──
+    // ── AI extraction: PDFs and images both go to vision model ──────
+    // Previously, text-based PDFs used geminiChatCall (text cascade) which
+    // has fewer providers and fails more often. Now ALL files go through
+    // geminiVisionCall (4-provider vision cascade) for reliability.
+    // Text extraction is only used as a fallback if vision also fails.
     let responseText: string;
 
     if (file.type === 'application/pdf') {
       const pdfResult = await extractPdfContent(buffer);
 
+      // ── Path A: PDF has extractable images (scanned PDFs) ────────
+      // Send images directly to vision model.
       if (pdfResult.source === 'image' && pdfResult.images && pdfResult.images.length > 0) {
-        // Scanned PDF: send extracted page images (JPEG) to vision model
         const visionContent: Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }> = [
           { type: 'text', text: VLM_PROMPT },
         ];
-        const MAX_IMG_RAW_BYTES = 3 * 1024 * 1024; // 3MB per image raw limit for Groq
+        const MAX_IMG_RAW_BYTES = 3 * 1024 * 1024;
         for (const imgBuf of pdfResult.images.slice(0, 3)) {
-          // Validate image has proper JPEG magic bytes
           const isJpeg = imgBuf.length >= 3 && imgBuf[0] === 0xFF && imgBuf[1] === 0xD8 && imgBuf[2] === 0xFF;
           const isPng = imgBuf.length >= 8 && imgBuf[0] === 0x89 && imgBuf[1] === 0x50 && imgBuf[2] === 0x4E && imgBuf[3] === 0x47;
-          if (!isJpeg && !isPng) continue; // skip invalid image data
-          // Skip images larger than 3MB raw (~4MB base64)
+          if (!isJpeg && !isPng) continue;
           if (imgBuf.length > MAX_IMG_RAW_BYTES) continue;
           const imgMime = isJpeg ? 'image/jpeg' : 'image/png';
-          const imgB64 = imgBuf.toString('base64');
           visionContent.push({
             type: 'image_url' as const,
-            image_url: { url: `data:${imgMime};base64,${imgB64}` },
+            image_url: { url: `data:${imgMime};base64,${imgBuf.toString('base64')}` },
           });
         }
-        if (visionContent.length <= 1) {
-          // No valid images could be prepared
-          return NextResponse.json(
-            {
-              error: 'Extracted images from PDF were invalid or too large for the AI vision model.',
-              hint: 'Try uploading a photo/screenshot of the invoice instead (JPG or PNG).',
-              diagnostics: pdfResult.errors,
-              imageInfo: pdfResult.images?.map((img) => ({
-                size: img.length,
-                firstBytes: Array.from(img.slice(0, 4)).map((b) => b.toString(16).padStart(2, '0')).join(' '),
-              })),
-            },
-            { status: 400 },
-          );
+        if (visionContent.length > 1) {
+          responseText = await geminiVisionCall([{ role: 'user', content: visionContent }]);
+        } else {
+          // Images were invalid — try text path as fallback
+          if (pdfResult.text.trim()) {
+            responseText = await geminiChatCall('You are an invoice parser. Extract all fields and return ONLY valid JSON.', [{ role: 'user', content: pdfResult.text }]);
+          } else {
+            return NextResponse.json({ error: 'Could not extract usable content from this PDF.', diagnostics: pdfResult.errors }, { status: 400 });
+          }
         }
-        responseText = await geminiVisionCall([{ role: 'user', content: visionContent }]);
-      } else {
-        // Text-based PDF: send extracted text to chat model
-        const pdfText = pdfResult.text.trim();
-        if (!pdfText) {
-          // All extraction paths failed — build a detailed error
-          const diagStr = pdfResult.errors?.join('; ') || 'no diagnostics available';
-          console.error(`[parse] PDF extraction failed for ${file.name}: ${diagStr}`);
-          return NextResponse.json(
-            {
-              error: 'Could not extract any text or images from this PDF.',
-              hint: 'If this is a scanned document, take a screenshot or export as PNG/JPG and upload that instead. If it is a generated PDF, the file may be corrupted or use an unsupported encoding.',
-              diagnostics: pdfResult.errors,
-            },
-            { status: 400 },
-          );
-        }
-        const textHint = pdfText.length < 30
-          ? '\n\nNOTE: The extracted text is very short. Do your best to extract any useful information from it.'
-          : '';
-
-        // Pre-process: convert European number formats to standard format
-        // so the AI doesn't misparse "12 705,00" as "7.00"
-        // Pattern: digits, space/dot, 3 digits, comma, 2 digits → standard float
-        // Example: "12 705,00" → "12705.00", "1.234,56" → "1234.56"
-        const normalizedText = pdfText
-          // Replace "12 705,00" → "12705.00" (space as thousands separator)
+      }
+      // ── Path B: PDF has extractable text (text-based PDFs) ───────
+      // Send the text to the VISION model cascade (same 4 providers as
+      // images: Mistral → OpenRouter → Groq → Gemini). Vision models are
+      // multimodal — they can read text too. This gives PDFs the same
+      // reliability as image uploads.
+      else if (pdfResult.text.trim()) {
+        const normalizedText = pdfResult.text
           .replace(/(\d)\s(\d{3}),(\d{2})/g, '$1$2.$3')
-          // Replace "12.705,00" → "12705.00" (dot as thousands separator)
           .replace(/(\d)\.(\d{3}),(\d{2})/g, '$1$2.$3')
-          // Replace remaining "1234,56" → "1234.56" (comma as decimal separator)
           .replace(/(\d),(\d{2})\b/g, '$1.$2');
 
-        const textPrompt = `You are an expert invoice parser. I will give you the extracted text from a PDF invoice. Parse it and return ONLY valid JSON.
-
-The invoice may be in ANY language. Map foreign labels:
-- Czech: Dodavatel=vendor, Číslo dokladu=invoice number, Datum vystavení=invoice date, Datum splatnosti=due date, Celkem/Celkem uhradit=total, DPH=VAT, Kč=CZK, Základ=amount(net)
-- German: Lieferant=vendor, Rechnungsnummer=invoice number, Rechnungsdatum=invoice date, Fälligkeitsdatum=due date, Gesamtbetrag=total, MwSt=VAT
-- French: Fournisseur=vendor, Numéro de facture=invoice number, Date d'échéance=due date, Montant TTC=total, TVA=VAT
-
-EUROPEAN NUMBER FORMAT: "12 705,00" or "12.705,00" = 12705.00 (space/dot=thousands, comma=decimal). "7 000,00" = 7000.00 NOT 7.00.
-
-NEVER put confidence labels ("High", "Low") as field values. Only extract actual data.
-
-Return ONLY valid JSON with no markdown, no code fences, no explanation. Use this EXACT schema:
-{
-  "vendor": "company name or null",
-  "invoiceNumber": "invoice number string or null",
-  "invoiceDate": "YYYY-MM-DD or null",
-  "dueDate": "YYYY-MM-DD or null",
-  "amount": 1234.56 or null,
-  "vatAmount": 234.56 or null,
-  "total": 1468.12 or null,
-  "currency": "USD or EUR or GBP or CZK etc. or null",
-  "lineItems": [{"description": "item", "quantity": 1, "unitPrice": 10.00}],
-  "fieldConfidence": {
-    "vendor": 0.95, "invoiceNumber": 0.99, "invoiceDate": 0.90, "dueDate": 0.90,
-    "amount": 0.98, "vatAmount": 0.95, "total": 0.99, "currency": 1.0
-  },
-  "confidence": 0.93${customFieldPrompt ? ',\n  ...customFieldsHere' : ''}
-}
-
-IMPORTANT: For each field, estimate your extraction confidence (0.0 to 1.0). If a field is not found, use null. Extract all line items if present. Be precise with numbers — parse European number formats correctly.${customFieldPrompt}${textHint}`;
-        responseText = await geminiChatCall(textPrompt, [{ role: 'user', content: `Here is the invoice text (numbers normalized to standard format):\n\n${normalizedText}` }]);
+        // Send text to vision model as a text-only message
+        // (vision models accept text — they're multimodal LLMs)
+        responseText = await geminiVisionCall([{
+          role: 'user',
+          content: [
+            { type: 'text', text: VLM_PROMPT + '\n\n--- EXTRACTED PDF TEXT ---\n' + normalizedText },
+          ],
+        }]);
+      } else {
+        // No text and no images — can't process
+        return NextResponse.json(
+          { error: 'Could not extract any text or images from this PDF.', hint: 'Try uploading a photo/screenshot (JPG or PNG) instead.', diagnostics: pdfResult.errors },
+          { status: 400 },
+        );
       }
     } else {
       // Image files: send to vision model
@@ -714,6 +769,30 @@ IMPORTANT: For each field, estimate your extraction confidence (0.0 to 1.0). If 
       }
     }
 
+    // ─── Coerce non-string fields to strings (defensive) ──────────────
+    // Vision models sometimes return string fields as arrays or objects
+    // (e.g. vendor: ["Acme Ltd"] or vendor: {name: "Acme Ltd"}).
+    // Coerce them to strings so downstream code that calls .trim() doesn't crash.
+    for (const field of stringFields) {
+      const val = parsed[field];
+      if (val === null || val === undefined) continue;
+      if (typeof val === 'string') continue;
+      if (Array.isArray(val)) {
+        // Take first element if it's a string, else stringify
+        parsed[field] = typeof val[0] === 'string' ? val[0] : String(val[0] ?? '');
+        console.warn(`[parse] Coerced ${field} from array to string: ${JSON.stringify(val)} → ${parsed[field]}`);
+      } else if (typeof val === 'object') {
+        // Try common keys: name, vendor, company
+        const v = val as Record<string, unknown>;
+        const candidate = v.name ?? v.vendor ?? v.company ?? v.value ?? '';
+        parsed[field] = typeof candidate === 'string' ? candidate : String(candidate ?? '');
+        console.warn(`[parse] Coerced ${field} from object to string: ${JSON.stringify(val)} → ${parsed[field]}`);
+      } else {
+        parsed[field] = String(val);
+        console.warn(`[parse] Coerced ${field} from ${typeof val} to string: ${val} → ${parsed[field]}`);
+      }
+    }
+
     // ─── Post-parse cleanup: fix European number format in numeric fields ──
     // The AI might return numbers as strings with European format
     // (e.g. "12 705,00" or "12705,00"). Convert to proper float.
@@ -721,15 +800,75 @@ IMPORTANT: For each field, estimate your extraction confidence (0.0 to 1.0). If 
     for (const field of numericFields) {
       if (typeof parsed[field] === 'string') {
         const strVal = parsed[field] as string;
-        // Remove currency symbols, spaces, and convert comma to dot
-        const cleaned = strVal
-          .replace(/[€$£¥Kč\sczk]/gi, '')
-          .replace(/(\d)\.(\d{3})/g, '$1$2')  // remove dot-separated thousands
-          .replace(/,/g, '.');                   // comma → dot
+        // Parse number from string — handle both European and US formats.
+        //
+        // European: "1.234,56" or "1 234,56" (dot/space = thousands, comma = decimal)
+        // US:       "1,234.56"              (comma = thousands, dot = decimal)
+        //
+        // Strategy: detect which format by checking if there's a comma AFTER
+        // the last dot (European) or a dot AFTER the last comma (US).
+        let cleaned = strVal;
+
+        // Step 1: Remove currency symbols and labels
+        cleaned = cleaned
+          .replace(/[€$£¥Kč\sczk]/gi, '')  // remove currency chars + spaces
+          .trim();
+
+        // Step 2: Detect format
+        const lastComma = cleaned.lastIndexOf(',');
+        const lastDot = cleaned.lastIndexOf('.');
+
+        if (lastComma > lastDot) {
+          // European format: comma is decimal separator
+          // Remove dots (thousands separator): "1.234,56" → "1234,56"
+          cleaned = cleaned.replace(/\./g, '');
+          // Replace comma with dot: "1234,56" → "1234.56"
+          cleaned = cleaned.replace(/,/g, '.');
+        } else if (lastDot > lastComma) {
+          // US format: dot is decimal separator
+          // Remove commas (thousands separator): "1,234.56" → "1234.56"
+          cleaned = cleaned.replace(/,/g, '');
+        }
+        // If neither comma nor dot, just parse as-is
+
         const num = parseFloat(cleaned);
         if (!isNaN(num)) {
           parsed[field] = num;
-          console.warn(`[parse] Converted field "${field}" from string "${strVal}" to number ${num}`);
+          console.warn(`[parse] Converted field "${field}" from string "${strVal}" to number ${num} (cleaned: ${cleaned})`);
+        } else {
+          console.warn(`[parse] Could not parse number from "${strVal}" (cleaned: ${cleaned})`);
+        }
+      }
+    }
+
+    // ─── Fallback: compute total from amount + VAT if total is missing ──
+    // If the AI couldn't extract total but did extract amount (net) and
+    // vatAmount, compute total = amount + vatAmount.
+    if (typeof parsed.total !== 'number' || parsed.total === null) {
+      const amt = typeof parsed.amount === 'number' ? parsed.amount : null;
+      const vat = typeof parsed.vatAmount === 'number' ? parsed.vatAmount : null;
+      if (amt !== null && vat !== null) {
+        const computedTotal = Math.round((amt + vat) * 100) / 100;
+        parsed.total = computedTotal;
+        console.warn(`[parse] Total was missing — computed from amount(${amt}) + vat(${vat}) = ${computedTotal}`);
+      } else if (amt !== null && vat === null) {
+        // If we have amount but no VAT, assume amount IS the total
+        parsed.total = amt;
+        console.warn(`[parse] Total was missing — using amount(${amt}) as total (no VAT extracted)`);
+      }
+    }
+
+    // ─── Fallback: compute total from line items if still missing ──────
+    if (typeof parsed.total !== 'number' || parsed.total === null) {
+      if (Array.isArray(parsed.lineItems) && parsed.lineItems.length > 0) {
+        const lineTotal = parsed.lineItems.reduce((sum: number, item: Record<string, unknown>) => {
+          const qty = typeof item.quantity === 'number' ? item.quantity : 1;
+          const price = typeof item.unitPrice === 'number' ? item.unitPrice : 0;
+          return sum + (qty * price);
+        }, 0);
+        if (lineTotal > 0) {
+          parsed.total = Math.round(lineTotal * 100) / 100;
+          console.warn(`[parse] Total was missing — computed from ${parsed.lineItems.length} line items = ${parsed.total}`);
         }
       }
     }
@@ -902,6 +1041,12 @@ IMPORTANT: For each field, estimate your extraction confidence (0.0 to 1.0). If 
         fileDataExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       },
     });
+
+    // ─── Increment the hard monthly parse counter ─────────────────────
+    // This counter is NOT affected by invoice deletion — once you've
+    // parsed 15 invoices this month, you can't parse more even if you
+    // delete them all. Resets on the 1st of each month.
+    await incrementMonthlyParseCount(auth.userId);
 
     // ---- Duplicate Detection ----
     let duplicateCheckResult: { isDuplicate: boolean; duplicateCount: number } | null = null;
