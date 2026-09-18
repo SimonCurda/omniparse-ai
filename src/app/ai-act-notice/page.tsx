@@ -128,7 +128,7 @@ export default function AIActNoticePage() {
         <ul>
           <li><strong>Processing by AI providers:</strong> Documents and chat messages are sent to AI providers for inference. Data may be temporarily processed, cached, or retained by AI providers for security, abuse prevention, monitoring, billing, debugging, or other purposes specified in their applicable terms and data-processing agreements. Retention periods and processing locations vary by provider and service configuration.</li>
           <li><strong>Stored on our side:</strong> We retain uploaded documents for up to 30 days in the active application environment. Backup copies, security logs and data processed by third-party providers may be retained for different periods where necessary for security, legal or operational purposes, as described in our Privacy Policy.</li>
-          <li><strong>Model training:</strong> We do not intentionally use customer documents or conversations to train or fine-tune AI models. Processing by third-party AI providers is governed by the applicable provider terms and data-processing agreements. The specific terms vary by provider, service tier (paid vs. unpaid), and product configuration.</li>
+          <li><strong>Model training — production configuration:</strong> <strong>OmniParse itself does not route customer content through AI API tiers that permit provider training on customer content</strong> when the default configuration is in effect. Specifically: (a) we send <code>usage_options=&#123;&quot;enable_training&quot;: false&#125;</code> on every Mistral API call (effective on paid Mistral tier; on free tier, Mistral may ignore or reject this parameter); (b) OpenRouter (whose free-tier models typically permit training on prompt content) is <strong>disabled by default</strong>; (c) Groq&apos;s data-handling terms are governed by the Groq DPA and SCCs; (d) Google Gemini (AI Studio free tier) data-handling is governed by Google&apos;s AI Studio terms — for stronger guarantees, operators may migrate to Vertex AI (out of scope for this deployment). Operators who change this configuration must update the Privacy Policy and this AI Transparency Notice accordingly.</li>
           <li><strong>Important note on free-tier AI APIs:</strong> Some AI providers may have different data handling terms for free/unpaid API tiers compared to paid tiers. We recommend reviewing the applicable provider terms for details. For production use involving personal data, paid API tiers may provide stronger data protection guarantees.</li>
           <li><strong>Metadata logging:</strong> We log API request metadata (timestamps, success/failure, provider used) for operational purposes. We do not log the content of your documents to server logs.</li>
         </ul>
@@ -137,16 +137,22 @@ export default function AIActNoticePage() {
       <section>
         <h2>8. Model and Provider Changes</h2>
         <p>
-          AI models, providers and processing methods may be changed, updated, replaced or discontinued
-          at any time without notice. Changes in models may affect extraction results, classifications,
-          calculations and chat responses. The same input document may produce different results when
-          processed by different models or at different times.
+          AI models, providers and processing methods may be changed, updated, replaced or discontinued.
+          Material changes to AI providers (e.g., switching the primary vision-extraction provider)
+          will be announced in the Service or by email at least 7 days in advance, except where the
+          change is urgently required for security or availability reasons. Changes in models may
+          affect extraction results, classifications, calculations and chat responses. The same input
+          document may produce different results when processed by different models or at different
+          times.
         </p>
         <p>
           The Service is provided on an &quot;as is&quot; and &quot;as available&quot; basis. We do not
           guarantee uninterrupted, error-free or continuously available operation of the Service or any
           AI provider. AI models and third-party providers may change, become unavailable, impose rate
-          limits, discontinue models or modify their capabilities without notice.
+          limits, discontinue models or modify their capabilities. Material changes will be notified
+          per the above; immaterial changes (e.g., model version bumps within the same family) may
+          happen without separate notice but will be reflected in the &quot;Last updated&quot; date of
+          this Notice.
         </p>
       </section>
 
@@ -166,27 +172,28 @@ export default function AIActNoticePage() {
         <h2>10. International Transfers</h2>
         <p>
           AI processing is performed by Mistral AI (EU-based, Paris, France), Groq Inc. (US — SCCs confirmed),
-          OpenRouter (US — pending), and Google LLC (US — DPF-certified). Under GDPR Chapter V, transfers
-          to the US require appropriate safeguards. We rely on the EU-US Data Privacy Framework (DPF)
-          adequacy decision (10 July 2023, currently subject to CJEU appeal in &quot;Schrems III&quot;) for
-          DPF-certified recipients, and on Standard Contractual Clauses (SCCs) consistent with the
-          Schrems II ruling for non-DPF-certified recipients, together with Transfer Impact
-          Assessments (TIAs) where required.
+          and Google LLC (US — DPF-certified). <strong>OpenRouter (US) is disabled by default</strong> and
+          not used unless the operator explicitly enables it after completing DPA/SCC review. Under GDPR
+          Chapter V, transfers to the US require appropriate safeguards. We rely on the EU-US Data Privacy
+          Framework (DPF) adequacy decision (10 July 2023, currently subject to CJEU appeal in
+          &quot;Schrems III&quot;) for DPF-certified recipients, and on Standard Contractual Clauses (SCCs)
+          consistent with the Schrems II ruling for non-DPF-certified recipients, together with Transfer
+          Impact Assessments (TIAs) where required.
         </p>
         <div className="border-l-4 border-emerald-500 bg-emerald-500/5 p-3 my-3 rounded-r">
           <p className="text-sm">
             <strong className="text-emerald-700 dark:text-emerald-500">SCC Status by provider (as of September 18, 2026):</strong>
           </p>
           <ul className="list-disc pl-5 mt-2 text-sm space-y-1">
-            <li><strong>Groq Inc.</strong> — SCCs confirmed in effect (DPA dated October 15, 2025; EU SCC Module 2 is self-executing upon acceptance of Groq Services Agreement). DPA accessible at <a href="https://console.groq.com" target="_blank" rel="noopener">console.groq.com</a>. Governing law: Ireland. Competent authority: Irish DPC. 72-hour breach notification. DPF certification status pending verification.</li>
-            <li><strong>Mistral AI</strong> — EU-based (Paris, France). As an EU-established provider, transfers are expected to remain within the EEA, subject to Mistral&apos;s applicable terms and data-processing agreements.</li>
-            <li><strong>OpenRouter</strong> — SCC status: pending verification. DPA request sent August 2026.</li>
-            <li><strong>Google LLC (Gemini)</strong> — Google Cloud DPA self-executing upon acceptance of Google Cloud Terms; available at <a href="https://cloud.google.com/terms/data-processing-addendum" target="_blank" rel="noopener">cloud.google.com/terms/data-processing-addendum</a>. Google LLC is DPF-certified.</li>
+            <li><strong>Mistral AI</strong> — EU-based (Paris, France). Transfers are expected to remain within the EEA, subject to Mistral&apos;s applicable terms. No SCC required. Training opt-out (<code>usage_options.enable_training=false</code>) sent on every request when MISTRAL_DISABLE_TRAINING=true (default).</li>
+            <li><strong>Groq Inc.</strong> — SCCs confirmed in effect (DPA dated October 15, 2025; EU SCC Module 2 self-executing upon acceptance of Groq Services Agreement). DPA accessible at <a href="https://console.groq.com" target="_blank" rel="noopener">console.groq.com</a>. Governing law: Ireland. Competent authority: Irish DPC. 72-hour breach notification. DPF certification status pending verification; SCCs remain in place as a safeguard.</li>
+            <li><strong>Google LLC (Gemini)</strong> — Google Cloud DPA self-executing upon acceptance of Google Cloud Terms; available at <a href="https://cloud.google.com/terms/data-processing-addendum" target="_blank" rel="noopener">cloud.google.com/terms/data-processing-addendum</a>. Google LLC is DPF-certified. Note: uses AI Studio free-tier endpoint; for stronger guarantees, operators may migrate to Vertex AI.</li>
             <li><strong>Vercel Inc.</strong> — DPF-certified. DPA available at <a href="https://vercel.com/legal/dpa" target="_blank" rel="noopener">vercel.com/legal/dpa</a>.</li>
             <li><strong>Stripe Inc.</strong> — DPF-certified. DPA available at <a href="https://stripe.com/legal/dpa" target="_blank" rel="noopener">stripe.com/legal/dpa</a>.</li>
+            <li><strong>OpenRouter</strong> — <strong>DISABLED BY DEFAULT</strong>. No personal data is transferred to OpenRouter unless the operator explicitly sets ENABLE_OPENROUTER=true. Before enabling, the operator must complete a DPA with OpenRouter, verify SCCs or DPF certification, switch to paid-tier models (to disable training), and update this notice.</li>
           </ul>
           <p className="text-sm mt-2">
-            <strong className="text-emerald-700 dark:text-emerald-500">Summary:</strong> AI processing via Mistral (EU) and Groq (US, SCCs confirmed) has appropriate safeguards in place. Google is DPF-certified. OpenRouter remains pending SCC verification. Users should note that documents may contain personal data of multiple data subjects — the user is responsible for ensuring a valid legal basis for processing and transferring such data.
+            <strong className="text-emerald-700 dark:text-emerald-500">Summary:</strong> AI processing via Mistral (EU) and Groq (US, SCCs confirmed) has appropriate safeguards in place. Google is DPF-certified. OpenRouter is disabled by default and not used unless the operator explicitly enables it. Users should note that documents may contain personal data of multiple data subjects — the user is responsible for ensuring a valid legal basis for processing and transferring such data.
           </p>
         </div>
         <p>

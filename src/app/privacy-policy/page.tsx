@@ -78,20 +78,81 @@ export default function PrivacyPolicyPage() {
           We retain personal data only for as long as necessary for the purposes described in this Policy,
           or as required by applicable law. The following retention periods apply:
         </p>
-        <ul>
-          <li><strong>Uploaded document files (file binaries):</strong> Up to 30 days in the active application environment (base64-encoded in the primary database). After 30 days, file binaries are automatically purged from the active environment. Extraction results remain in your account until you delete them or terminate your account.</li>
-          <li><strong>Extracted invoice data:</strong> Stored in your account for as long as your account is active. Upon account termination, extracted data and audit logs are deleted within 90 days. You can also delete individual invoices from the dashboard at any time.</li>
-          <li><strong>Chat history:</strong> Stored in your account until you clear it from the dashboard chat tab or until account deletion. Account-deletion cascade removes all chat history within seconds.</li>
-          <li><strong>Server logs (Vercel):</strong> Retained by Vercel for up to 30 days (Hobby/Pro plans) for operational and security purposes, then automatically deleted. Vercel&apos;s DPA is available at <a href="https://vercel.com/legal/dpa" target="_blank" rel="noopener">vercel.com/legal/dpa</a>.</li>
-          <li><strong>Account data:</strong> Stored for the duration of your account. You can delete your account and all associated data at any time from Settings. Account deletion also cancels any active Stripe subscription.</li>
-          <li><strong>Audit logs:</strong> Records of actions taken on your invoices (edits, status changes, approvals) are stored in your account and are deleted when your account is deleted (cascade delete).</li>
-          <li><strong>Backup copies (Supabase):</strong> Supabase maintains point-in-time recovery backups for up to 7 days. These backups are solely for disaster recovery; they are not used for any other purpose and are overwritten on a rolling basis.</li>
-          <li><strong>Stripe billing records:</strong> Retained by Stripe in accordance with Stripe&apos;s own retention policy and applicable financial regulations (typically 10 years for tax/AML purposes). See <a href="https://stripe.com/legal/privacy" target="_blank" rel="noopener">Stripe&apos;s Privacy Policy</a>.</li>
-        </ul>
+        <div className="my-4 overflow-x-auto">
+          <table className="w-full text-sm border border-border rounded">
+            <thead className="bg-muted/30">
+              <tr>
+                <th className="text-left p-2 border-b border-border font-semibold">Data category</th>
+                <th className="text-left p-2 border-b border-border font-semibold">Retention period</th>
+                <th className="text-left p-2 border-b border-border font-semibold">Basis / exception</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-b border-border/50">
+                <td className="p-2 align-top"><strong>Uploaded document files</strong> (PDFs, images, base64-encoded in primary DB)</td>
+                <td className="p-2 align-top">30 days in active environment</td>
+                <td className="p-2 align-top">Auto-purged after 30 days. Extraction results remain in account.</td>
+              </tr>
+              <tr className="border-b border-border/50">
+                <td className="p-2 align-top"><strong>Extracted invoice data</strong></td>
+                <td className="p-2 align-top">Until account deletion (or user deletes individual invoice)</td>
+                <td className="p-2 align-top">Deleted within 90 days of account termination.</td>
+              </tr>
+              <tr className="border-b border-border/50">
+                <td className="p-2 align-top"><strong>Chat history</strong></td>
+                <td className="p-2 align-top">Until cleared by user or account deletion</td>
+                <td className="p-2 align-top">Cascade-deleted with account.</td>
+              </tr>
+              <tr className="border-b border-border/50">
+                <td className="p-2 align-top"><strong>Audit logs</strong> (invoice edits, approvals, deletions)</td>
+                <td className="p-2 align-top">Lifetime of account</td>
+                <td className="p-2 align-top">Cascade-deleted with account.</td>
+              </tr>
+              <tr className="border-b border-border/50">
+                <td className="p-2 align-top"><strong>Account data</strong> (email, name, hashed password, settings)</td>
+                <td className="p-2 align-top">Until account deletion</td>
+                <td className="p-2 align-top">User can delete at any time from Settings.</td>
+              </tr>
+              <tr className="border-b border-border/50">
+                <td className="p-2 align-top"><strong>Server logs</strong> (Vercel — IP, browser, timestamps)</td>
+                <td className="p-2 align-top">30 days</td>
+                <td className="p-2 align-top">Vercel Hobby/Pro plans auto-delete after 30 days.</td>
+              </tr>
+              <tr className="border-b border-border/50">
+                <td className="p-2 align-top"><strong>Database backups</strong> (Supabase PITR)</td>
+                <td className="p-2 align-top">7 days (rolling)</td>
+                <td className="p-2 align-top">Disaster recovery only; overwritten on rolling basis.</td>
+              </tr>
+              <tr className="border-b border-border/50">
+                <td className="p-2 align-top"><strong>Stripe billing records</strong></td>
+                <td className="p-2 align-top">Per Stripe policy (~10 years)</td>
+                <td className="p-2 align-top">Required by financial/tax regulations. Governed by Stripe&apos;s privacy policy.</td>
+              </tr>
+              <tr className="border-b border-border/50">
+                <td className="p-2 align-top"><strong>Incident logs</strong> (security incidents involving AI systems)</td>
+                <td className="p-2 align-top">2 years</td>
+                <td className="p-2 align-top">Best practice for regulatory audit purposes (AI Act Art. 12).</td>
+              </tr>
+              <tr>
+                <td className="p-2 align-top"><strong>Withdrawal / consent records</strong> (termsAcceptedAt, withdrawalAcknowledgedAt, withdrawnAt, lastTosEmailSentAt)</td>
+                <td className="p-2 align-top">Lifetime of account + 90 days</td>
+                <td className="p-2 align-top">Evidence of consent for regulatory audit; cascade-deleted with account.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
         <p>
           <strong>No indefinite retention.</strong> We do not retain personal data indefinitely. Where
           longer retention is required by law (e.g., financial records under Czech accounting regulations),
           retention is limited to the statutory period and data is then deleted.
+        </p>
+        <p>
+          <strong>Relationship between 30-day and 90-day periods:</strong> Uploaded document <em>files</em>
+          (the binary PDF/image) are purged after 30 days. <em>Extracted data</em> (the structured JSON —
+          vendor, invoice number, line items) remains in your account for as long as your account is
+          active, and is deleted within 90 days of account termination. These are different data
+          categories with different retention needs; the 30-day period applies to file binaries, the
+          90-day period applies to post-termination cleanup of all remaining personal data.
         </p>
       </section>
 
@@ -121,58 +182,81 @@ export default function PrivacyPolicyPage() {
         <p>
           We use the following third-party services to provide the Service. Each processes personal data
           on our behalf as a subprocessor under GDPR Art. 28. Data Processing Agreements (DPAs) and
-          Standard Contractual Clauses (SCCs) are in place with all confirmed providers (see per-provider
-          status below).
+          Standard Contractual Clauses (SCCs) are in place with all <em>active</em> providers (see
+          per-provider status below).
         </p>
         <p className="mt-3 p-3 bg-emerald-500/5 border-l-4 border-emerald-500 rounded-r">
           <strong className="text-emerald-700 dark:text-emerald-500">EU-based AI provider available.</strong>{' '}
-          Mistral AI (Paris, France) processes documents entirely within the EU. Transfers to Mistral
-          are not subject to GDPR Chapter V restrictions (no SCC needed). We prioritize Mistral for
-          vision extraction when available.
+          Mistral AI (Paris, France) processes documents within the EU. Transfers to Mistral
+          are expected to remain within the EEA, subject to Mistral&apos;s applicable terms. We prioritize Mistral for
+          vision extraction and chat when available. When <code>MISTRAL_DISABLE_TRAINING=true</code> is
+          set in our server configuration (default), we send <code>usage_options=&#123;&quot;enable_training&quot;: false&#125;</code> on
+          every Mistral API call to disable training on prompt content (effective on paid Mistral tier;
+          on free tier, Mistral may ignore or reject this parameter).
         </p>
         <ul>
-          <li><strong>Vercel Inc.</strong> (United States) — Web hosting and serverless function execution. Processes: IP addresses, request metadata. <a href="https://vercel.com/legal/dpa" target="_blank" rel="noopener">Vercel DPA</a>.</li>
+          <li><strong>Vercel Inc.</strong> (United States, DPF-certified) — Web hosting and serverless function execution. Processes: IP addresses, request metadata. <a href="https://vercel.com/legal/dpa" target="_blank" rel="noopener">Vercel DPA</a>.</li>
           <li><strong>Supabase Inc.</strong> (Ireland, EU) — Primary database hosting (PostgreSQL). Processes: all stored account data, invoices, chat messages. DPA built into Terms of Service (effective August 1, 2026) — automatically applies to all customers, no separate signature required. <a href="https://supabase.com/legal/customer-resources/data-processing-addendum" target="_blank" rel="noopener">Supabase DPA</a>. Subprocessor change notifications: <a href="https://supabase.com/legal/customer-resources/subprocessor-list" target="_blank" rel="noopener">supabase.com/legal/customer-resources/subprocessor-list</a>.</li>
-          <li><strong>Mistral AI</strong> (Paris, France — EU) — Primary AI inference provider. Processes: uploaded document content (transiently) for vision extraction. <strong>EU-based — no SCC required.</strong> <a href="https://mistral.ai/legal/privacy-policy" target="_blank" rel="noopener">Mistral Privacy Policy</a>.</li>
-          <li><strong>OpenRouter</strong> (United States) — AI inference aggregator. Fallback when Mistral is unavailable. Processes: transient document content and chat messages. <a href="https://openrouter.ai/legal/privacy" target="_blank" rel="noopener">OpenRouter Privacy</a>.</li>
-          <li><strong>Groq Inc.</strong> (United States) — AI inference provider. Secondary fallback. Processes: uploaded document content (transiently), chat messages (transiently) for AI extraction and chat responses. <a href="https://groq.com/legal/dpa" target="_blank" rel="noopener">Groq DPA</a> (paid tier).</li>
-          <li><strong>Google LLC</strong> (United States) — Final fallback AI inference provider. Models used: Gemini 2.0 Flash, Gemini 2.5 Flash, Gemini 1.5 Flash.</li>
-          <li><strong>Stripe Inc.</strong> (United States) — Payment processing for paid plans. Processes: email, billing details. <a href="https://stripe.com/legal/dpa" target="_blank" rel="noopener">Stripe DPA</a>.</li>
+          <li><strong>Mistral AI</strong> (Paris, France — EU) — Primary AI inference provider. Processes: uploaded document content (transiently) for vision extraction, chat messages (transiently). <strong>EU-based — no SCC required.</strong> Training opt-out (<code>usage_options.enable_training=false</code>) is sent on every request when <code>MISTRAL_DISABLE_TRAINING=true</code> (default). <a href="https://mistral.ai/legal/privacy-policy" target="_blank" rel="noopener">Mistral Privacy Policy</a>.</li>
+          <li><strong>Groq Inc.</strong> (United States) — Secondary AI inference provider (after Mistral). Processes: uploaded document content (transiently), chat messages (transiently). <strong>SCCs confirmed</strong> (EU SCC Module 2, self-executing upon acceptance of Groq Services Agreement; DPA dated October 15, 2025). DPA accessible at <a href="https://console.groq.com" target="_blank" rel="noopener">console.groq.com</a>. Governing law: Ireland. <em>Note: Groq is optional in our configuration — operators may deploy in EU-only mode (Mistral only) by leaving GROQ_API_KEY unset.</em></li>
+          <li><strong>Google LLC</strong> (United States, DPF-certified) — Final fallback AI inference provider. Models used: Gemini 2.0 Flash, Gemini 2.5 Flash, Gemini 1.5 Flash. <strong>DPF-certified</strong> — no SCC required while DPF remains valid. Google Cloud DPA self-executing upon acceptance of Google Cloud Terms; available at <a href="https://cloud.google.com/terms/data-processing-addendum" target="_blank" rel="noopener">cloud.google.com/terms/data-processing-addendum</a>. <em>Note: This uses Google&apos;s AI Studio free-tier endpoint. For production with EU personal data, consider migrating to Vertex AI.</em></li>
+          <li><strong>Stripe Inc.</strong> (United States, DPF-certified) — Payment processing for paid plans. Processes: email, billing details. <a href="https://stripe.com/legal/dpa" target="_blank" rel="noopener">Stripe DPA</a>.</li>
         </ul>
         <p>
-          <strong>AI vision cascade:</strong> Mistral (EU, primary) → OpenRouter (US, fallback) → Groq (US, secondary fallback) → Google Gemini (US, final fallback).
-          For EU users concerned about US transfers, ensuring Mistral is configured means vision extraction stays within the EU.
+          <strong>OpenRouter — DISABLED by default.</strong> OpenRouter is an AI inference aggregator
+          that routes requests to underlying model providers (Meta, Nvidia, Google, etc.). OpenRouter&apos;s
+          free-tier models (all model IDs ending in <code>:free</code>) typically permit training on
+          prompt content, and there is no DPA or SCC in place with OpenRouter as of September 2026.
+          <strong>OpenRouter is therefore disabled by default in our production configuration</strong>
+          (the <code>ENABLE_OPENROUTER</code> environment variable must be explicitly set to
+          <code>true</code> by the operator after completing their own DPA/SCC review). When disabled,
+          OpenRouter is never called — document content and chat messages are never transmitted to
+          OpenRouter or its underlying providers.
+        </p>
+        <p>
+          <strong>AI vision cascade (production default):</strong> Mistral (EU, primary) → Groq (US, SCCs confirmed, secondary) → Google Gemini (US, DPF-certified, final fallback). OpenRouter is skipped unless explicitly enabled by the operator.
         </p>
         <p>
           <strong>SCC Status (as of September 18, 2026):</strong>
           <ul className="list-disc pl-6 space-y-1 mt-2 text-sm">
             <li><strong>Supabase Inc.</strong> (Ireland, EU) — DPA built into Terms of Service (effective August 1, 2026). Automatically applies to all customers. EU-based — no SCC required.</li>
-            <li><strong>Vercel Inc.</strong> (United States) — DPA available at vercel.com/legal/dpa.</li>
-            <li><strong>Groq Inc.</strong> — ✅ SCCs confirmed in effect (DPA effective October 15, 2025; EU SCC Module 2 self-executing upon acceptance of Groq Services Agreement). Confirmed September 12, 2026. Governing law: Ireland. <a href="https://groq.com/legal/dpa" target="_blank" rel="noopener">Groq DPA</a>.</li>
-            <li><strong>Mistral AI</strong> — EU-based (Paris, France). As an EU-established provider, transfers to Mistral are expected to remain within the EEA, subject to Mistral&apos;s applicable terms and data-processing agreements.</li>
-            <li><strong>OpenRouter</strong> — ⏳ SCC status: pending verification. DPA request sent August 2026; awaiting confirmation.</li>
-            <li><strong>Google LLC (Gemini)</strong> — ⏳ SCC status: pending verification. Google Cloud DPA available at <a href="https://cloud.google.com/terms/data-processing-addendum" target="_blank" rel="noopener">cloud.google.com/terms/data-processing-addendum</a> (self-executing upon acceptance of Google Cloud Terms).</li>
-            <li><strong>Stripe Inc.</strong> (United States) — DPA available at stripe.com/legal/dpa.</li>
+            <li><strong>Vercel Inc.</strong> (United States) — DPF-certified. DPA available at vercel.com/legal/dpa.</li>
+            <li><strong>Groq Inc.</strong> — SCCs confirmed in effect (DPA dated October 15, 2025; EU SCC Module 2 self-executing upon acceptance of Groq Services Agreement). DPA accessible at <a href="https://console.groq.com" target="_blank" rel="noopener">console.groq.com</a>. Governing law: Ireland. Competent authority: Irish DPC. 72-hour breach notification. DPF certification status pending verification.</li>
+            <li><strong>Mistral AI</strong> — EU-based (Paris, France). No Chapter V transfer issue; no SCC required. Training opt-out sent on every request (MISTRAL_DISABLE_TRAINING=true).</li>
+            <li><strong>Google LLC (Gemini)</strong> — Google Cloud DPA self-executing upon acceptance of Google Cloud Terms. Google LLC is DPF-certified — no SCC required while DPF remains valid.</li>
+            <li><strong>Stripe Inc.</strong> (United States) — DPF-certified. DPA available at stripe.com/legal/dpa.</li>
+            <li><strong>OpenRouter</strong> — <strong>DISABLED by default</strong>. Not used in production unless operator explicitly sets ENABLE_OPENROUTER=true after completing DPA/SCC review. When disabled, no data is transferred to OpenRouter or its underlying providers.</li>
           </ul>
         </p>
         <p>
           <strong>EU users:</strong> AI processing via Mistral (EU-based) and Groq (US-based, SCCs confirmed)
-          has appropriate safeguards in place under GDPR. However, users should note that documents uploaded
-          to the Service may contain personal data of multiple data subjects (e.g. vendor names, employee
-          names, email addresses, bank details). The user uploading such documents is responsible for
-          ensuring they have a valid legal basis under GDPR Art. 6 for processing that data, and that the
-          transfer to AI providers is lawful under Chapter V.
+          has appropriate safeguards in place under GDPR. Google is DPF-certified. OpenRouter is disabled
+          by default. However, users should note that documents uploaded to the Service may contain
+          personal data of multiple data subjects (e.g. vendor names, employee names, email addresses,
+          bank details). The user uploading such documents is responsible for ensuring they have a valid
+          legal basis under GDPR Art. 6 for processing that data, and that the transfer to AI providers
+          is lawful under Chapter V.
         </p>
         <p>
-          <strong>Important — fallback providers:</strong> OpenRouter and Google remain as fallback providers
-          pending SCC verification. Processing of personal data of EU data subjects through these providers
-          may not have appropriate safeguards in place under GDPR Chapter V until SCCs are confirmed. EU users
-          processing personal data of EU data subjects should be aware that if processing falls through to
-          OpenRouter or Google, the transfer may not be fully GDPR-compliant. We are working to verify SCCs
-          with these providers and will update this notice once confirmed.
+          <strong>Model training — production configuration:</strong> OmniParse sends
+          <code> usage_options=&#123;&quot;enable_training&quot;: false&#125;</code> on every Mistral API call
+          (default server configuration) to disable training on prompt content. This opt-out is
+          effective on paid Mistral tier; on free Mistral tier, Mistral may ignore or reject this
+          parameter. OpenRouter (which has no training opt-out on free-tier models) is disabled by
+          default. Groq&apos;s data-handling terms are governed by the Groq DPA and SCCs. Google Gemini
+          (AI Studio free tier) data-handling is governed by Google&apos;s AI Studio terms; for stronger
+          guarantees, operators may migrate to Vertex AI (out of scope for this deployment).
+          <strong>OmniParse itself does not route customer content through AI API tiers that permit
+          provider training on customer content</strong> when the default configuration (Mistral with
+          training opt-out, OpenRouter disabled) is in effect. Operators who change this configuration
+          must update this Policy accordingly.
         </p>
         <p>
-          <strong>Model training:</strong> We do not intentionally use customer documents or conversations to train or fine-tune AI models. Processing by third-party AI providers is governed by the applicable provider terms and data-processing agreements. The specific terms vary by provider, service tier (paid vs. unpaid), and product configuration. Data may be temporarily processed, cached, or retained by AI providers for security, abuse prevention, monitoring, billing, debugging, or other purposes specified in their applicable terms.
+          <strong>Important — Schrems III risk:</strong> The EU-US Data Privacy Framework (DPF) adequacy
+          decision (10 July 2023) is currently subject to a CJEU appeal (&quot;Schrems III&quot;). If the DPF
+          is invalidated, transfers to DPF-certified US recipients (Vercel, Google, Stripe) would need
+          to rely on SCCs + Transfer Impact Assessment (TIA) instead. We maintain SCCs with Groq as a
+          contingency and will execute SCCs with other US providers if the DPF is invalidated.
         </p>
       </section>
 
@@ -286,13 +370,13 @@ export default function PrivacyPolicyPage() {
         <h3 className="text-base font-semibold mt-4 mb-2">11.2 Subprocessors</h3>
         <p className="text-sm">OmniParse engages the following subprocessors. Customer grants general written authorization for OmniParse to engage these subprocessors; the current list is maintained in this Privacy Policy §6 and material changes will be notified 30 days in advance per §11.7:</p>
         <ul className="list-disc pl-6 space-y-1 text-sm mt-2">
-          <li><strong>Vercel Inc.</strong> (United States) — Web hosting and serverless function execution</li>
+          <li><strong>Vercel Inc.</strong> (United States, DPF-certified) — Web hosting and serverless function execution</li>
           <li><strong>Supabase Inc.</strong> (Ireland, EU) — Primary database hosting (PostgreSQL)</li>
-          <li><strong>Mistral AI</strong> (Paris, France — EU) — Primary AI inference (vision + text)</li>
-          <li><strong>OpenRouter</strong> (United States) — AI inference (fallback)</li>
-          <li><strong>Groq Inc.</strong> (United States) — AI inference (secondary fallback)</li>
-          <li><strong>Google LLC</strong> (United States) — AI inference (final fallback, Gemini models)</li>
-          <li><strong>Stripe Inc.</strong> (United States) — Payment processing (paid plans only)</li>
+          <li><strong>Mistral AI</strong> (Paris, France — EU) — Primary AI inference (vision + text). Training opt-out sent on every request.</li>
+          <li><strong>Groq Inc.</strong> (United States, SCCs confirmed) — AI inference (secondary fallback). Optional — operator may disable for EU-only mode.</li>
+          <li><strong>Google LLC</strong> (United States, DPF-certified) — AI inference (final fallback, Gemini models)</li>
+          <li><strong>Stripe Inc.</strong> (United States, DPF-certified) — Payment processing (paid plans only)</li>
+          <li><strong>OpenRouter</strong> (United States) — <strong>DISABLED BY DEFAULT</strong>. Not engaged unless operator explicitly sets ENABLE_OPENROUTER=true after completing DPA/SCC review. When disabled, no data is transferred to OpenRouter.</li>
         </ul>
         <h3 className="text-base font-semibold mt-4 mb-2">11.3 Data Subject Rights</h3>
         <p className="text-sm">
@@ -319,29 +403,32 @@ export default function PrivacyPolicyPage() {
         </ul>
         <h3 className="text-base font-semibold mt-4 mb-2">11.5 International Transfers (GDPR Chapter V)</h3>
         <p className="text-sm">
-          Personal data may be transferred to the United States for AI processing by Groq, OpenRouter, and
-          Google. The EU-US Data Privacy Framework (DPF) adequacy decision of 10 July 2023 remains in
-          force as of the date of this Policy, although it is subject to an ongoing CJEU appeal
-          ("Schrems III"). For US recipients self-certified under the DPF, the DPF alone provides a
-          valid transfer mechanism and SCCs are not additionally required. For US recipients NOT
-          DPF-certified, Standard Contractual Clauses (SCCs) consistent with the Schrems II ruling,
-          together with a Transfer Impact Assessment (TIA), are required. <strong>SCC status by provider (as of September 18, 2026):</strong>
+          Personal data may be transferred to the United States for AI processing by Groq and Google.
+          The EU-US Data Privacy Framework (DPF) adequacy decision of 10 July 2023 remains in force as
+          of the date of this Policy, although it is subject to an ongoing CJEU appeal ("Schrems III").
+          For US recipients self-certified under the DPF, the DPF alone provides a valid transfer
+          mechanism and SCCs are not additionally required. For US recipients NOT DPF-certified,
+          Standard Contractual Clauses (SCCs) consistent with the Schrems II ruling, together with a
+          Transfer Impact Assessment (TIA), are required. <strong>OpenRouter is DISABLED by
+          default</strong> — no personal data is transferred to OpenRouter unless the operator
+          explicitly enables it after completing DPA/SCC review. <strong>SCC status by provider (as of
+          September 18, 2026):</strong>
         </p>
         <ul className="list-disc pl-6 space-y-1 text-sm mt-2">
           <li><strong>Groq Inc.</strong> — SCCs confirmed in effect (DPA dated October 15, 2025; EU SCC Module 2 self-executing upon acceptance of Groq Services Agreement). DPA accessible at <a href="https://console.groq.com" target="_blank" rel="noopener">console.groq.com</a>. Governing law: Ireland. Competent authority: Irish Data Protection Commission. 72-hour breach notification. Groq&apos;s DPF certification status is pending verification at <a href="https://www.dataprivacyframework.gov" target="_blank" rel="noopener">dataprivacyframework.gov</a>; SCCs remain in place as a safeguard.</li>
-          <li><strong>Mistral AI</strong> — EU-based (Paris, France). No Chapter V transfer issue; no SCC required.</li>
-          <li><strong>OpenRouter</strong> — SCC status: pending verification. DPA request sent August 2026; awaiting confirmation.</li>
+          <li><strong>Mistral AI</strong> — EU-based (Paris, France). No Chapter V transfer issue; no SCC required. Training opt-out (<code>usage_options.enable_training=false</code>) sent on every request when MISTRAL_DISABLE_TRAINING=true (default).</li>
           <li><strong>Google LLC</strong> — Google Cloud DPA self-executing upon acceptance of Google Cloud Terms; available at <a href="https://cloud.google.com/terms/data-processing-addendum" target="_blank" rel="noopener">cloud.google.com/terms/data-processing-addendum</a>. Google LLC is DPF-certified (verified September 2026); SCCs serve as fallback should the DPF be invalidated by Schrems III.</li>
           <li><strong>Vercel Inc.</strong> — Vercel is DPF-certified. DPA available at <a href="https://vercel.com/legal/dpa" target="_blank" rel="noopener">vercel.com/legal/dpa</a>.</li>
           <li><strong>Stripe Inc.</strong> — Stripe is DPF-certified. DPA available at <a href="https://stripe.com/legal/dpa" target="_blank" rel="noopener">stripe.com/legal/dpa</a>.</li>
+          <li><strong>OpenRouter</strong> — <strong>DISABLED BY DEFAULT</strong>. No personal data is transferred to OpenRouter unless the operator explicitly sets ENABLE_OPENROUTER=true. Before enabling, the operator must complete a DPA with OpenRouter, verify SCCs or DPF certification, switch to paid-tier models (to disable training), and update this Policy.</li>
         </ul>
         <p className="text-sm mt-2">
-          OmniParse has confirmed SCCs with Groq (US-based) and uses Mistral (EU-based). The cascade
-          prioritizes Mistral first, then Groq — both have appropriate safeguards. OpenRouter remains
-          pending SCC verification; Google is covered by the DPF. Users should be aware that documents
-          may contain personal data of multiple data subjects — the user is responsible for ensuring
-          they have a valid legal basis for processing and transferring such data under GDPR Art. 6
-          and Chapter V.
+          OmniParse has confirmed SCCs with Groq (US-based) and uses Mistral (EU-based) as the primary
+          provider. The cascade prioritizes Mistral first, then Groq — both have appropriate safeguards.
+          Google is covered by the DPF. OpenRouter is disabled by default and not used unless the
+          operator explicitly enables it. Users should be aware that documents may contain personal data
+          of multiple data subjects — the user is responsible for ensuring they have a valid legal basis
+          for processing and transferring such data under GDPR Art. 6 and Chapter V.
         </p>
         <h3 className="text-base font-semibold mt-4 mb-2">11.6 Duration and Deletion</h3>
         <p className="text-sm">
@@ -383,17 +470,37 @@ export default function PrivacyPolicyPage() {
           equivalent documentation in lieu of an on-site audit, which the parties agree is a reasonable
           alternative under GDPR Art. 28(3)(h).
         </p>
-        <h3 className="text-base font-semibold mt-4 mb-2">11.11 Acceptance</h3>
+        <h3 className="text-base font-semibold mt-4 mb-2">11.11 Acceptance and Activation</h3>
         <p className="text-sm">
-          For B2B customers (businesses, organizations, accounting firms): this DPA takes effect upon
-          acceptance of the Terms of Service and the first use of the Service. For B2B customers who
-          require a signed DPA, contact <strong>damr58h@gmail.com</strong> to execute a standalone
-          Data Processing Agreement.
+          <strong>For B2B customers (businesses, organizations, accounting firms):</strong> This DPA
+          takes effect and is binding between OmniParse (as processor) and the B2B Customer (as
+          controller) upon the later of: (a) the Customer&apos;s acceptance of the Terms of Service, and
+          (b) the Customer&apos;s first use of the Service to process personal data. The DPA is incorporated
+          by reference into the Terms of Service; no separate signature is required for it to take
+          effect (per GDPR Art. 28(9) and Recital 81, which permit DPAs to be formed by written
+          agreement including electronic form).
         </p>
         <p className="text-sm">
-          For individual users: by uploading documents to the Service and checking the data transfer
-          consent box in the Upload tab, you acknowledge that this DPA applies to the extent you act as
-          a data controller processing personal data through the Service.
+          <strong>Activation mechanism:</strong> B2B Customers who require a standalone signed DPA
+          (e.g., for their own compliance records, customer-facing DPAs, or large Enterprise contracts)
+          may request one by contacting <strong>damr58h@gmail.com</strong> with the subject line
+          &quot;DPA Activation — [Company Name]&quot;. We will execute a standalone Data Processing Agreement
+          within 10 business days. Until then, this embedded DPA (Privacy Policy §11) governs the
+          processing relationship.
+        </p>
+        <p className="text-sm">
+          <strong>For individual users (consumers):</strong> By uploading documents to the Service and
+          checking the data-transfer consent box in the Upload tab, you acknowledge that this DPA
+          applies to the extent you act as a data controller processing personal data through the
+          Service. For consumers acting in a personal capacity (not processing data on behalf of an
+          organization), the controller-processor relationship under GDPR Art. 28 does not strictly
+          arise — you are the controller and OmniParse is your processor under the Terms of Service.
+        </p>
+        <p className="text-sm">
+          <strong>Version control:</strong> The &quot;Last updated&quot; date at the top of this Privacy
+          Policy reflects the current DPA version. Material changes to this DPA will be notified to
+          B2B Customers at least 30 days in advance per §11.7 (Subprocessor Authorization mechanism).
+          Prior versions are retained and available on request.
         </p>
       </section>
 

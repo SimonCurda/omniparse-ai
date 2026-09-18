@@ -136,7 +136,7 @@ export default function TermsOfServicePage() {
           communications, or tax filings based on them.
         </p>
         <p>
-          <strong>AI providers:</strong> OmniParse uses third-party AI providers for vision extraction and text generation. The primary provider is <strong>Mistral AI</strong> (Paris, France — EU-based, no SCC required for transfers). <strong>Groq Inc.</strong> (US-based) has confirmed Standard Contractual Clauses (SCCs) in effect as of September 12, 2026 (EU SCC Module 2, self-executing under Groq's DPA). Fallback providers OpenRouter and Google Gemini (both US-based) have SCCs pending verification. These providers may experience rate limits, outages, or model deprecations that affect the availability and quality of AI features. We do not control and are not responsible for the behavior of these upstream models beyond our integration layer.
+          <strong>AI providers:</strong> OmniParse uses third-party AI providers for vision extraction and text generation. The primary provider is <strong>Mistral AI</strong> (Paris, France — EU-based; transfers are expected to remain within the EEA, subject to Mistral&apos;s applicable terms). <strong>Groq Inc.</strong> (US-based) has confirmed Standard Contractual Clauses (SCCs) in effect (EU SCC Module 2, self-executing under Groq&apos;s DPA dated October 15, 2025). <strong>Google LLC</strong> (US-based) is DPF-certified. <strong>OpenRouter</strong> (US-based) is <strong>disabled by default</strong> and not used unless the operator explicitly enables it after completing DPA/SCC review. These providers may experience rate limits, outages, or model deprecations that affect the availability and quality of AI features. We do not control and are not responsible for the behavior of these upstream models beyond our integration layer.
         </p>
         <p>
           See our <a href="/ai-act-notice" className="underline">AI Transparency Notice</a> for full
@@ -175,6 +175,32 @@ export default function TermsOfServicePage() {
           affect extraction results, classifications, calculations and chat responses. The same input
           document may produce different results when processed by different models or at different
           times.
+        </p>
+      </section>
+
+      <section>
+        <h2>7c. No Payment Authorization</h2>
+        <p>
+          <strong>OmniParse is an invoice intelligence platform, not a payment system.</strong> Unless
+          explicitly enabled by you through a supported integration (which OmniParse does not currently
+          offer), OmniParse does not initiate, authorize, execute, or otherwise cause any payment,
+          bank transfer, wire transfer, ACH transaction, credit-card charge, or other financial
+          transaction. The Service extracts, organizes, and analyzes invoice data — it does not pay
+          invoices.
+        </p>
+        <p>
+          Any payment you make to a vendor, supplier, or other recipient — even if OmniParse extracted
+          the vendor&apos;s bank details, suggested a payment amount, or displayed a &quot;Pay&quot; button that
+          links to an external site — is solely your responsibility. You must independently verify
+          the payee, amount, bank account, and payment method before initiating any payment. OmniParse
+          is not a party to any payment transaction and bears no liability for payments made, missed,
+          or incorrectly executed based on data extracted or suggested by the Service.
+        </p>
+        <p>
+          If OmniParse adds payment-integration features in the future (e.g., bank integrations,
+          accounting-system integrations, payment links), such features will be governed by separate
+          terms specific to those integrations and will require your explicit opt-in. This section
+          applies to the current Service, which does not include payment-execution capabilities.
         </p>
       </section>
 
@@ -224,30 +250,15 @@ export default function TermsOfServicePage() {
           exclusively on the Service&apos;s auto-capture feature.
         </p>
         <p>
-          <strong>Czech law grounding:</strong> This limitation is consistent with:
-        </p>
-        <ul className="list-disc pl-6 space-y-1 text-sm">
-          <li><strong>Act No. 89/2012 Sb. (Civil Code) § 2913:</strong> Parties may agree to limit
-          contractual liability, except for damage caused intentionally or by gross negligence.
-          Invoice extraction is an auxiliary convenience, not the user&apos;s primary business activity.</li>
-          <li><strong>Act No. 89/2012 Sb. § 2913(2):</strong> In gratuitous (free) contracts,
-          liability for slight negligence is generally excluded unless the damage was caused
-          intentionally or by gross negligence.</li>
-          <li><strong>Directive 93/13/EEC (Unfair Contract Terms) Art. 3 + 4:</strong> This clause
-          is not unfair because (a) the Service is clearly auxiliary, (b) the user has alternative
-          invoice management options, (c) the limitation is transparent and brought to the
-          user&apos;s attention before signup.</li>
-          <li><strong>Act No. 634/1992 Sb. (Consumer Protection) § 16:</strong> This clause does
-          not disproportionately shift risk to the consumer because the user retains control of
-          their email inbox and can always verify capture independently.</li>
-        </ul>
-        <p>
           <strong>For paid users only:</strong> Where OmniParse is found directly at fault for
           damages (e.g., a confirmed bug in our code, not a third-party AI provider issue),
           liability is capped at the amount you paid to OmniParse in the 12 months preceding
           the claim. For Free tier users, liability for slight negligence is excluded to the
-          extent permitted by Czech Civil Code § 2913(2); liability for intentional damage
-          and gross negligence remains unaffected in all cases.
+          extent permitted by applicable law; liability for intentional damage
+          and gross negligence remains unaffected in all cases. Nothing in this section excludes
+          or limits liability that cannot lawfully be excluded or limited under applicable law,
+          including mandatory consumer-protection rights under Czech Act No. 634/1992 Coll.
+          and EU Directive 93/13/EEC.
         </p>
         <p>
           <strong>Notification of issues:</strong> If you become aware that the Service has failed
@@ -268,35 +279,90 @@ export default function TermsOfServicePage() {
         <p>
           We do not warrant that the Service will be uninterrupted, error-free, or free of harmful
           components. We do not warrant that AI extraction results will be accurate or complete.
-          AI providers (Mistral, OpenRouter, Groq, Google Gemini) may experience rate limits, model
+          AI providers (Mistral, Groq, Google Gemini) may experience rate limits, model
           deprecations, or outages that affect availability of AI features. Mistral is EU-based (Paris);
-          OpenRouter, Groq, and Google are US-based.
+          Groq and Google are US-based. OpenRouter is disabled by default and not used unless the
+          operator explicitly enables it.
         </p>
       </section>
 
       <section>
         <h2>10. Limitation of Liability</h2>
         <p>
+          This Section 10 sets out the limitation of liability framework between you and Simon Curda
+          (the operator of OmniParse). It is structured as: (a) direct damages, (b) indirect/consequential
+          damages, (c) aggregate liability cap, (d) exceptions, (e) mandatory statutory rights.
+        </p>
+
+        <h3 className="text-base font-semibold mt-4 mb-2">10.1 Direct Damages</h3>
+        <p>
+          To the maximum extent permitted by applicable law, Simon Curda&apos;s liability for direct
+          damages arising from your use of the Service is capped at the amount you paid to OmniParse
+          in the 12 months preceding the claim. For Free tier users (who paid nothing), liability for
+          direct damages is capped at zero to the extent permitted by applicable law.
+        </p>
+
+        <h3 className="text-base font-semibold mt-4 mb-2">10.2 Indirect and Consequential Damages</h3>
+        <p>
           To the maximum extent permitted by applicable law, Simon Curda shall not be liable for any
           indirect, incidental, special, consequential, or punitive damages, including but not limited
-          to loss of profits, data, or business opportunities, arising from your use of the Service,
-          including losses arising from reliance on AI-generated output that the user failed to
-          independently verify.
+          to loss of profits, loss of data, loss of business opportunities, reputational damage, or
+          costs of substitute services. This includes losses arising from reliance on AI-generated
+          output that you failed to independently verify against source documents.
         </p>
+
+        <h3 className="text-base font-semibold mt-4 mb-2">10.3 Aggregate Liability Cap</h3>
         <p>
-          Our total liability for any claim shall not exceed the amount you paid to us in the 12 months
-          preceding the claim, or zero if you are using the free tier.
+          The aggregate liability of Simon Curda for all claims arising out of or relating to these
+          Terms or the Service (whether in contract, tort, or otherwise) shall not exceed the total
+          amount you paid to OmniParse in the 12 months preceding the claim. For Free tier users,
+          the aggregate liability cap is zero to the extent permitted by applicable law.
         </p>
+
+        <h3 className="text-base font-semibold mt-4 mb-2">10.4 Exceptions (Liability Not Limited)</h3>
         <p>
-          <strong>Nothing in these Terms excludes or limits liability that cannot lawfully be excluded
-          or limited under applicable law.</strong> This includes liability for intentional damage,
-          gross negligence, and statutory consumer protection rights.
+          The limitations in §10.1, §10.2, and §10.3 do <strong>not</strong> apply to liability that
+          cannot lawfully be excluded or limited under applicable law, including:
         </p>
+        <ul className="list-disc pl-6 space-y-1 text-sm">
+          <li>Liability for intentional damage or intentional misconduct;</li>
+          <li>Liability for gross negligence ( Czech Civil Code § 2913(1) );</li>
+          <li>Liability for personal injury or death caused by negligence;</li>
+          <li>Liability arising from breach of statutory duties under mandatory consumer-protection law;</li>
+          <li>Liability under Czech Act No. 89/2012 Coll. (Civil Code) for defects in goods or services that cannot be contractually excluded;</li>
+          <li>Liability under product liability laws;</li>
+          <li>Any other liability that cannot be excluded or limited under applicable mandatory law.</li>
+        </ul>
+
+        <h3 className="text-base font-semibold mt-4 mb-2">10.5 Mandatory Consumer Rights (EU / Czech)</h3>
         <p>
-          <strong>EU consumer note:</strong> Nothing in these Terms limits any statutory consumer rights
-          you may have under EU law, including under Czech Act No. 89/2012 Sb. (Civil Code) and Czech
-          Act No. 634/1992 Sb. (Consumer Protection). Where mandatory consumer protection law applies,
-          it overrides conflicting provisions of these Terms.
+          <strong>EU consumer note:</strong> If you are a consumer within the meaning of Czech Act
+          No. 89/2012 Coll. (Civil Code) § 419, nothing in these Terms limits any statutory consumer
+          rights you may have under EU or Czech law, including under:
+        </p>
+        <ul className="list-disc pl-6 space-y-1 text-sm">
+          <li>Czech Act No. 89/2012 Coll. (Civil Code) — contractual liability, defects, consumer protection;</li>
+          <li>Czech Act No. 634/1992 Coll. (Consumer Protection Act) — out-of-court dispute resolution;</li>
+          <li>EU Directive 93/13/EEC (Unfair Contract Terms) — unfair terms are not binding on consumers;</li>
+          <li>EU Directive 2011/83/EU (Consumer Rights) — right of withdrawal, pre-contractual information;</li>
+          <li>GDPR (EU Regulation 2016/679) — data subject rights, liability under Art. 82.</li>
+        </ul>
+        <p>
+          Where mandatory consumer-protection law applies, it overrides conflicting provisions of
+          these Terms to the extent of the conflict. If any provision of §10.1–10.3 is found
+          unenforceable against a consumer, that provision shall be limited or eliminated to the
+          minimum extent necessary to comply with applicable law, and the remaining provisions shall
+          remain in full force and effect.
+        </p>
+
+        <h3 className="text-base font-semibold mt-4 mb-2">10.6 Basis of Limitation</h3>
+        <p>
+          The limitations in this Section 10 reflect the allocation of risk between the parties and
+          form an essential basis of the bargain. The Service is offered at a price that reflects
+          these limitations, and you acknowledge that the price would be substantially higher absent
+          these limitations. Operators who require higher liability caps (e.g., Enterprise customers
+          with negotiated contracts) may contact <strong>damr58h@gmail.com</strong> to discuss
+          custom terms.
         </p>
       </section>
 
