@@ -4,19 +4,29 @@ export const dynamic = 'force-static';
 
 export default function PrivacyPolicyPage() {
   return (
-    <LegalLayout title="Privacy Policy" lastUpdated="September 12, 2026">
+    <LegalLayout title="Privacy Policy" lastUpdated="September 18, 2026">
       <section>
         <h2>1. Data Controller</h2>
         <p>
           The data controller for personal data processed through this Service is
           <strong> Simon Curda</strong> (natural person), based in the
           Czech Republic. For GDPR purposes (EU Regulation 2016/679), the Controller is responsible for
-          ensuring compliance with data protection law.
+          ensuring compliance with data protection law. The Controller has not appointed a Data Protection
+          Officer (DPO) as none is legally required under GDPR Art. 37 for an operation of this scope and
+          nature; all GDPR-related matters are handled directly by the Controller.
         </p>
         <p>
           Contact: <strong>damr58h@gmail.com</strong> (use this for all GDPR-related requests:
           access, rectification, erasure, restriction, portability, objection, and consent withdrawal).
-          We aim to respond within 30 days as required by GDPR Art. 12(3).
+          We aim to respond within 30 days as required by GDPR Art. 12(3). Where a request is complex
+          or numerous, this period may be extended by a further two months pursuant to GDPR Art. 12(3),
+          in which case we will inform you of the extension and the reasons within the initial 30-day period.
+        </p>
+        <p>
+          <strong>Identity of the Controller and contact details (GDPR Art. 13(1)(a)–(b)):</strong>
+          Simon Curda, natural person, domicile Czech Republic. Email: damr58h@gmail.com.
+          For Data Subject Requests, please use the subject line &quot;DSR — [your name]&quot;.
+          For B2B / DPA matters, please use the subject line &quot;DPA — [company name]&quot;.
         </p>
       </section>
 
@@ -55,22 +65,34 @@ export default function PrivacyPolicyPage() {
           <li><strong>Account creation and authentication:</strong> Contractual necessity (Art. 6(1)(b)) — necessary to provide the Service you requested.</li>
           <li><strong>Document parsing:</strong> Consent (Art. 6(1)(a)) — you actively upload documents for processing. You can withdraw this consent by deleting your invoices.</li>
           <li><strong>Chat interactions:</strong> Consent (Art. 6(1)(a)) — you actively send messages to the AI chat.</li>
-          <li><strong>Terms acceptance:</strong> Consent (Art. 6(1)(a)) — recorded at signup with timestamps. We do not collect or verify age at signup.</li>
-          <li><strong>Security, service stability, and abuse prevention:</strong> Legitimate interest (Art. 6(1)(f)) — server logs for abuse prevention, rate limiting, fraud detection, and account monitoring. We monitor account activity patterns (invoice volume, chat usage, email scanning frequency, account age) to detect potential abuse. Accounts suspected of abuse may be frozen (AI features blocked) or deleted in accordance with our Terms of Service.</li>
-          <li><strong>Local storage preferences:</strong> Consent via cookie banner (Art. 6(1)(a) + ePrivacy Directive).</li>
+          <li><strong>Terms acceptance:</strong> Consent (Art. 6(1)(a)) — recorded at signup with timestamps.</li>
+          <li><strong>Security, service stability, and abuse prevention:</strong> Legitimate interest (Art. 6(1)(f)) — server logs for abuse prevention, rate limiting, fraud detection, and account monitoring. We monitor account activity patterns (invoice volume, chat usage, email scanning frequency, account age) to detect potential abuse. Accounts suspected of abuse may be frozen (AI features blocked) or deleted in accordance with our Terms of Service. A legitimate-interest balancing test has been conducted and is documented in our internal Records of Processing Activities (ROPA); it is available to supervisory authorities on request.</li>
+          <li><strong>Local storage preferences:</strong> Consent via cookie banner (Art. 6(1)(a) + ePrivacy Directive Art. 5(3), implemented in Czech Act No. 127/2005 Coll. § 89).</li>
+          <li><strong>Processing of personal data appearing in customer-uploaded invoices</strong> (e.g., names of vendor employees, contact persons, signatories): Legitimate interest (Art. 6(1)(f)) — necessary to provide the document-extraction Service the customer requested. Where such data reveals special categories (Art. 9), processing is limited to what is strictly necessary for invoice extraction and is not used for any other purpose.</li>
         </ul>
       </section>
 
       <section>
-        <h2>4. Data Retention</h2>
+        <h2>4. Data Retention (GDPR Art. 5(1)(e))</h2>
+        <p>
+          We retain personal data only for as long as necessary for the purposes described in this Policy,
+          or as required by applicable law. The following retention periods apply:
+        </p>
         <ul>
-          <li><strong>Uploaded document files:</strong> We retain uploaded documents for up to 30 days in the active application environment. Backup copies, security logs and data processed by third-party providers may be retained for different periods where necessary for security, legal or operational purposes. Extraction results remain in your account until you delete them.</li>
+          <li><strong>Uploaded document files (file binaries):</strong> Up to 30 days in the active application environment (base64-encoded in the primary database). After 30 days, file binaries are automatically purged from the active environment. Extraction results remain in your account until you delete them or terminate your account.</li>
           <li><strong>Extracted invoice data:</strong> Stored in your account for as long as your account is active. Upon account termination, extracted data and audit logs are deleted within 90 days. You can also delete individual invoices from the dashboard at any time.</li>
-          <li><strong>Chat history:</strong> Stored in your account until you clear it from the dashboard chat tab or delete your account.</li>
-          <li><strong>Server logs:</strong> Retained for 30 days by the hosting provider (Vercel), then automatically deleted.</li>
+          <li><strong>Chat history:</strong> Stored in your account until you clear it from the dashboard chat tab or until account deletion. Account-deletion cascade removes all chat history within seconds.</li>
+          <li><strong>Server logs (Vercel):</strong> Retained by Vercel for up to 30 days (Hobby/Pro plans) for operational and security purposes, then automatically deleted. Vercel&apos;s DPA is available at <a href="https://vercel.com/legal/dpa" target="_blank" rel="noopener">vercel.com/legal/dpa</a>.</li>
           <li><strong>Account data:</strong> Stored for the duration of your account. You can delete your account and all associated data at any time from Settings. Account deletion also cancels any active Stripe subscription.</li>
-          <li><strong>Audit logs:</strong> Records of actions taken on your invoices (edits, status changes, approvals) are stored in your account and are deleted when your account is deleted.</li>
+          <li><strong>Audit logs:</strong> Records of actions taken on your invoices (edits, status changes, approvals) are stored in your account and are deleted when your account is deleted (cascade delete).</li>
+          <li><strong>Backup copies (Supabase):</strong> Supabase maintains point-in-time recovery backups for up to 7 days. These backups are solely for disaster recovery; they are not used for any other purpose and are overwritten on a rolling basis.</li>
+          <li><strong>Stripe billing records:</strong> Retained by Stripe in accordance with Stripe&apos;s own retention policy and applicable financial regulations (typically 10 years for tax/AML purposes). See <a href="https://stripe.com/legal/privacy" target="_blank" rel="noopener">Stripe&apos;s Privacy Policy</a>.</li>
         </ul>
+        <p>
+          <strong>No indefinite retention.</strong> We do not retain personal data indefinitely. Where
+          longer retention is required by law (e.g., financial records under Czech accounting regulations),
+          retention is limited to the statutory period and data is then deleted.
+        </p>
       </section>
 
       <section>
@@ -84,11 +106,13 @@ export default function PrivacyPolicyPage() {
           <li><strong>Right to data portability (Art. 20):</strong> Receive your data in a structured, machine-readable format. Use the &quot;Export my data&quot; feature in Settings.</li>
           <li><strong>Right to object (Art. 21):</strong> Object to processing based on legitimate interests (e.g. server log collection).</li>
           <li><strong>Right to withdraw consent (Art. 7(3)):</strong> Withdraw consent at any time via cookie settings, by deleting your invoices and chat history, or by contacting us.</li>
+          <li><strong>Rights related to automated decision-making and profiling (Art. 22):</strong> OmniParse does <strong>not</strong> engage in solely automated decision-making producing legal or similarly significant effects concerning you. AI extraction and chat responses are tools to assist you; all material decisions (e.g., invoice approval, payment authorization) require your explicit human action. You have the right not to be subject to a decision based solely on automated processing; if you believe any such decision has occurred, contact us immediately.</li>
         </ul>
         <p>
           To exercise any of these rights, contact us at <strong>damr58h@gmail.com</strong>.
           We will respond within 30 days as required by GDPR Art. 12(3).
-          You also have the right to lodge a complaint with a supervisory authority.
+          You also have the right to lodge a complaint with a supervisory authority — in particular
+          the Czech Office for Personal Data Protection (ÚOOÚ) at <a href="https://www.uoou.cz" target="_blank" rel="noopener">uoou.cz</a>, or, if you reside in another EU/EEA Member State, the supervisory authority of your habitual residence.
         </p>
       </section>
 
@@ -126,7 +150,7 @@ export default function PrivacyPolicyPage() {
             <li><strong>Vercel Inc.</strong> (United States) — DPA available at vercel.com/legal/dpa.</li>
             <li><strong>Groq Inc.</strong> — ✅ SCCs confirmed in effect (DPA effective October 15, 2025; EU SCC Module 2 self-executing upon acceptance of Groq Services Agreement). Confirmed September 12, 2026. Governing law: Ireland. <a href="https://groq.com/legal/dpa" target="_blank" rel="noopener">Groq DPA</a>.</li>
             <li><strong>Mistral AI</strong> — EU-based (Paris, France). As an EU-established provider, transfers to Mistral are expected to remain within the EEA, subject to Mistral&apos;s applicable terms and data-processing agreements.</li>
-            <li><strong>OpenRouter</strong> — ⏳ SCC status: pending verification. DPA request sent December 2026.</li>
+            <li><strong>OpenRouter</strong> — ⏳ SCC status: pending verification. DPA request sent August 2026; awaiting confirmation.</li>
             <li><strong>Google LLC (Gemini)</strong> — ⏳ SCC status: pending verification. Google Cloud DPA available at <a href="https://cloud.google.com/terms/data-processing-addendum" target="_blank" rel="noopener">cloud.google.com/terms/data-processing-addendum</a> (self-executing upon acceptance of Google Cloud Terms).</li>
             <li><strong>Stripe Inc.</strong> (United States) — DPA available at stripe.com/legal/dpa.</li>
           </ul>
@@ -154,27 +178,41 @@ export default function PrivacyPolicyPage() {
 
       <section>
         <h2>7. Security Measures (GDPR Art. 32)</h2>
+        <p>
+          OmniParse implements appropriate technical and organizational measures to ensure a level of
+          security appropriate to the risk, taking into account the state of the art and the costs of
+          implementation. Measures include:
+        </p>
         <ul>
-          <li>Encryption in transit (HTTPS/TLS) for all connections</li>
-          <li>Password hashing with bcrypt (12 rounds)</li>
-          <li>JWT authentication with 7-day token expiry</li>
-          <li>Rate limiting on authentication endpoints (5 login attempts / minute per IP)</li>
-          <li>Content-Security-Policy header on all responses to mitigate XSS attacks</li>
-          <li>Strict Transport Security (HSTS) with 2-year max-age and preload</li>
-          <li>X-Frame-Options: DENY to prevent clickjacking</li>
-          <li>Per-user data isolation — every database query includes a userId filter (no IDOR)</li>
-          <li>Prompt injection detection on all chat messages (30+ attack patterns)</li>
-          <li>Account deletion is transactional — database rows are cascade-deleted to ensure full erasure</li>
+          <li><strong>Encryption in transit:</strong> HTTPS/TLS 1.2+ for all connections (Vercel-managed certificates, auto-renewed).</li>
+          <li><strong>Encryption at rest:</strong> Supabase (PostgreSQL) provides transparent disk encryption (TDE) on managed infrastructure. IMAP credentials stored by users are encrypted with AES-256-GCM.</li>
+          <li><strong>Password storage:</strong> Passwords are hashed with bcrypt (12 rounds) and never stored in plaintext or reversible form.</li>
+          <li><strong>Authentication:</strong> JWT-based authentication with 7-day token expiry. Tokens are signed with a server-side secret and rotated periodically.</li>
+          <li><strong>Rate limiting:</strong> 5 login attempts per minute per IP on authentication endpoints; broader rate limits on AI endpoints to prevent abuse.</li>
+          <li><strong>Security headers:</strong> Content-Security-Policy, Strict-Transport-Security (HSTS, 2-year max-age, preload), X-Frame-Options: DENY, X-Content-Type-Options: nosniff, Referrer-Policy: strict-origin-when-cross-origin.</li>
+          <li><strong>Per-user data isolation:</strong> Every database query includes a userId filter — no insecure direct object reference (IDOR) is possible at the query layer.</li>
+          <li><strong>Prompt-injection defense:</strong> All chat messages are screened against 30+ prompt-injection attack patterns before being sent to AI providers.</li>
+          <li><strong>Account deletion:</strong> Transactional cascade delete ensures full erasure of all user-owned rows, including invoices, chat, audit logs, and IMAP credentials.</li>
+          <li><strong>Vendor due diligence:</strong> Subprocessors are assessed before engagement and re-assessed at least annually. DPAs and (where applicable) SCCs are in place (see §6 and §11).</li>
+          <li><strong>Incident response:</strong> A documented incident-response procedure exists. Personal-data breaches are notified to the Czech DPA (ÚOOÚ) within 72 hours of becoming aware, where required by GDPR Art. 33, and to affected data subjects without undue delay where required by GDPR Art. 34.</li>
         </ul>
       </section>
 
       <section>
         <h2>8. Children&apos;s Data (GDPR Art. 8)</h2>
         <p>
-          The Service is not directed at children under 13. We do not perform age verification at signup.
-          If you are under 18, you confirm that you have obtained parental or guardian consent to use this
-          Service. Parental consent requirements vary by jurisdiction — in the EU, the age of digital
-          consent is between 13 and 16 depending on the Member State (in Czech Republic, it is 15).
+          The Service is an invoice-extraction and analytics platform intended for use by adults acting
+          in a professional or business capacity. The Service is <strong>not directed at children</strong>,
+          and we do not knowingly collect personal data from children. In the Czech Republic, the age of
+          digital consent under GDPR Art. 8 (as implemented by Act No. 110/2019 Coll.) is <strong>15</strong>.
+          In other EU/EEA Member States the age ranges from 13 to 16 depending on national law.
+        </p>
+        <p>
+          Users must be at least <strong>15 years old</strong> to register an account. By registering,
+          you confirm that you have reached at least the age of digital consent in your jurisdiction
+          (and where the local age is higher than 15, that you meet that higher age requirement). Users
+          aged between the applicable digital-consent age and 18 must additionally obtain parental or
+          guardian consent to use the Service and to enter into these Terms.
         </p>
         <p>
           If we learn that we have collected personal data from a child under the applicable age of
@@ -190,11 +228,14 @@ export default function PrivacyPolicyPage() {
           For users in the Czech Republic, the following applies in addition to GDPR:
         </p>
         <ul>
-          <li><strong>Act No. 110/2019 Coll.</strong> on the processing of personal data — Czech implementation of GDPR.</li>
-          <li><strong>Act No. 89/2012 Sb.</strong> (Civil Code) — contractual relationships and consumer protection.</li>
-          <li><strong>Act No. 480/2004 Sb.</strong> (Electronic Communications Act) — cookies and similar storage technologies.</li>
-          <li><strong>Act No. 634/1992 Sb.</strong> (Consumer Protection) — out-of-court dispute resolution.</li>
-          <li><strong>Supervisory authority:</strong> Úřad pro ochranu osobních údajů (Office for Personal Data Protection), Pplk. Sochora 27, 170 00 Praha 7, Czech Republic. Website: <a href="https://www.uoou.cz" target="_blank" rel="noopener">uoou.cz</a>.</li>
+          <li><strong>Act No. 110/2019 Coll.</strong> on the processing of personal data — Czech implementation of GDPR. Sets the age of digital consent at 15 (Art. 8 GDPR) and codifies national derogations.</li>
+          <li><strong>Act No. 89/2012 Coll.</strong> (Civil Code) — contractual relationships, consumer protection, liability regime (incl. § 2913 on limitation of liability).</li>
+          <li><strong>Act No. 127/2005 Coll.</strong> (Electronic Communications Act, &quot;Lex Telecom&quot;) § 89 — implements the ePrivacy Directive (2002/58/EC) cookie/storage consent rule, as amended effective 1 January 2022. Requires opt-in consent before storing or accessing information on a user&apos;s terminal equipment, except where strictly necessary (Art. 5(3) exception).</li>
+          <li><strong>Act No. 480/2004 Coll.</strong> (Information Society Services Act) — governs unsolicited commercial communications (spam) and certain information-society-service provider obligations. <em>Note: this Act is not the cookie-consent statute; that role belongs to Act No. 127/2005 Coll. § 89.</em></li>
+          <li><strong>Act No. 634/1992 Coll.</strong> (Consumer Protection Act) §§ 16, 20b–20e — out-of-court dispute resolution (ADR) before Česká obchodní inspekce (ČOI).</li>
+          <li><strong>Digital Services Act (Regulation (EU) 2022/2065):</strong> Directly applicable in the Czech Republic since 17 February 2024. OmniParse operates as a hosting service (within the meaning of Art. 6 DSA) for customer-uploaded documents; it does not qualify as an online platform and is therefore not subject to the additional obligations in Chapter IV DSA.</li>
+          <li><strong>Supervisory authority (data protection):</strong> Úřad pro ochranu osobních údajů (Office for Personal Data Protection), Pplk. Sochora 27, 170 00 Praha 7, Czech Republic. Website: <a href="https://www.uoou.cz" target="_blank" rel="noopener">uoou.cz</a>.</li>
+          <li><strong>Consumer-protection authority:</strong> Česká obchodní inspekce (ČOI), Štěpánská 567, 120 00 Praha 2. Website: <a href="https://coi.gov.cz" target="_blank" rel="noopener">coi.gov.cz</a>.</li>
         </ul>
       </section>
 
@@ -202,9 +243,29 @@ export default function PrivacyPolicyPage() {
         <h2>10. Canadian PIPEDA Compliance</h2>
         <p>
           For users accessing the Service from Canada, OmniParse complies with the Personal Information
-          Protection and Electronic Documents Act (PIPEDA). The 10 fair information principles are
-          respected. Canadian users may file complaints with the Office of the Privacy Commissioner of
-          Canada at <a href="https://www.priv.gc.ca" target="_blank" rel="noopener">priv.gc.ca</a>.
+          Protection and Electronic Documents Act (PIPEDA, R.S.C. 2000, c. P-8.9). Bill C-27
+          (which would have replaced PIPEDA with the Consumer Privacy Protection Act) died on the Order
+          Paper on 6 January 2025 and did not become law; PIPEDA therefore remains in force unamended.
+        </p>
+        <p>The ten fair-information principles in Schedule 1 of PIPEDA are respected, in particular:</p>
+        <ul>
+          <li><strong>Accountability:</strong> Simon Curda (natural person, Czech Republic) is responsible for personal information under PIPEDA and has designated damr58h@gmail.com as the contact for privacy matters.</li>
+          <li><strong>Identifying purposes:</strong> Purposes are described in §2 of this Policy.</li>
+          <li><strong>Consent:</strong> Consent is obtained at signup (Terms acceptance) and via the cookie banner for non-essential storage. Canadian users may withdraw consent at any time by contacting us or by deleting their account.</li>
+          <li><strong>Limiting collection:</strong> We collect only what is necessary for the Service (see §2).</li>
+          <li><strong>Limiting use, disclosure, retention:</strong> Retention periods in §4 apply.</li>
+          <li><strong>Accuracy:</strong> Users can correct their data via Settings; AI-extracted data can be edited in the dashboard.</li>
+          <li><strong>Safeguards:</strong> See §7 (security measures).</li>
+          <li><strong>Openness:</strong> This Policy and the Cookie Policy are publicly available without account.</li>
+          <li><strong>Individual access:</strong> Canadian users may request access to, correction of, or deletion of their personal data by emailing damr58h@gmail.com.</li>
+          <li><strong>Challenging compliance:</strong> Canadian users may challenge our compliance by contacting us or by filing a complaint with the Office of the Privacy Commissioner of Canada at <a href="https://www.priv.gc.ca" target="_blank" rel="noopener">priv.gc.ca</a>.</li>
+        </ul>
+        <p>
+          <strong>Mandatory breach notification (PIPEDA § 10.1 and Breach of Security Safeguards Regulations):</strong>
+          Where a breach of security safeguards involving personal information under our control creates a
+          real risk of significant harm to a Canadian individual, we will notify the affected individual and
+          the Privacy Commissioner of Canada as soon as feasible after determining the breach has occurred,
+          and we will keep a record of the breach for at least 24 months.
         </p>
       </section>
 
@@ -223,13 +284,14 @@ export default function PrivacyPolicyPage() {
           <li>We process documents and extracted data per your instructions (via the Service&apos;s UI and API). We do not use your data for any purpose other than providing the Service.</li>
         </ul>
         <h3 className="text-base font-semibold mt-4 mb-2">11.2 Subprocessors</h3>
-        <p className="text-sm">OmniParse engages the following subprocessors. Customer grants general written authorization for OmniParse to engage these subprocessors; the current list is maintained in this Privacy Policy and material changes will be notified 30 days in advance:</p>
+        <p className="text-sm">OmniParse engages the following subprocessors. Customer grants general written authorization for OmniParse to engage these subprocessors; the current list is maintained in this Privacy Policy §6 and material changes will be notified 30 days in advance per §11.7:</p>
         <ul className="list-disc pl-6 space-y-1 text-sm mt-2">
           <li><strong>Vercel Inc.</strong> (United States) — Web hosting and serverless function execution</li>
           <li><strong>Supabase Inc.</strong> (Ireland, EU) — Primary database hosting (PostgreSQL)</li>
-          <li><strong>OpenRouter</strong> (United States) — AI inference (primary vision + text)</li>
-          <li><strong>Groq Inc.</strong> (United States) — AI inference (fallback vision + text)</li>
-          <li><strong>Google LLC</strong> (United States) — AI inference (final fallback vision)</li>
+          <li><strong>Mistral AI</strong> (Paris, France — EU) — Primary AI inference (vision + text)</li>
+          <li><strong>OpenRouter</strong> (United States) — AI inference (fallback)</li>
+          <li><strong>Groq Inc.</strong> (United States) — AI inference (secondary fallback)</li>
+          <li><strong>Google LLC</strong> (United States) — AI inference (final fallback, Gemini models)</li>
           <li><strong>Stripe Inc.</strong> (United States) — Payment processing (paid plans only)</li>
         </ul>
         <h3 className="text-base font-semibold mt-4 mb-2">11.3 Data Subject Rights</h3>
@@ -240,42 +302,56 @@ export default function PrivacyPolicyPage() {
           <strong> damr58h@gmail.com</strong> with the subject &quot;DPA — Data Subject Request&quot;.
         </p>
         <h3 className="text-base font-semibold mt-4 mb-2">11.4 Security Measures (GDPR Art. 32)</h3>
-        <p className="text-sm">OmniParse implements the following technical and organizational measures:</p>
+        <p className="text-sm">OmniParse implements the following technical and organizational measures (cross-referenced from Privacy Policy §7):</p>
         <ul className="list-disc pl-6 space-y-1 text-sm mt-2">
-          <li>AES-256-GCM encryption for IMAP credentials at rest</li>
+          <li>Encryption in transit (HTTPS/TLS 1.2+) for all connections</li>
+          <li>Encryption at rest: Supabase-managed transparent disk encryption (TDE); AES-256-GCM for IMAP credentials at rest</li>
           <li>bcrypt password hashing (12 rounds)</li>
-          <li>TLS 1.2+ for all data in transit</li>
           <li>JWT-based authentication with 7-day expiry</li>
           <li>Per-request user scoping — no query returns cross-user data</li>
-          <li>File data auto-purge after 30 days (configurable)</li>
+          <li>File data auto-purge after 30 days</li>
           <li>Account deletion with cascade (full erasure)</li>
           <li>Audit log of significant actions (invoice create/approve/delete)</li>
+          <li>Rate limiting on auth endpoints (5 attempts/min/IP)</li>
+          <li>Security headers: CSP, HSTS (2-year preload), X-Frame-Options: DENY, X-Content-Type-Options: nosniff, Referrer-Policy</li>
+          <li>Prompt-injection screening on all chat messages (30+ patterns)</li>
+          <li>Vendor due diligence: subprocessors assessed before engagement and re-assessed at least annually</li>
         </ul>
         <h3 className="text-base font-semibold mt-4 mb-2">11.5 International Transfers (GDPR Chapter V)</h3>
         <p className="text-sm">
           Personal data may be transferred to the United States for AI processing by Groq, OpenRouter, and
-          Google. The US does not have an adequacy decision. We rely on Standard Contractual Clauses
-          (SCCs) consistent with the Schrems II ruling. <strong>SCC status by provider (as of September 12, 2026):</strong>
+          Google. The EU-US Data Privacy Framework (DPF) adequacy decision of 10 July 2023 remains in
+          force as of the date of this Policy, although it is subject to an ongoing CJEU appeal
+          ("Schrems III"). For US recipients self-certified under the DPF, the DPF alone provides a
+          valid transfer mechanism and SCCs are not additionally required. For US recipients NOT
+          DPF-certified, Standard Contractual Clauses (SCCs) consistent with the Schrems II ruling,
+          together with a Transfer Impact Assessment (TIA), are required. <strong>SCC status by provider (as of September 18, 2026):</strong>
         </p>
         <ul className="list-disc pl-6 space-y-1 text-sm mt-2">
-          <li><strong>Groq Inc.</strong> — ✅ SCCs confirmed in effect (September 12, 2026). DPA with EU SCC Module 2 is self-executing upon acceptance of Groq Services Agreement. Governing law: Ireland. Competent authority: Irish Data Protection Commission. 72-hour breach notification.</li>
-          <li><strong>Mistral AI</strong> — EU-based (Paris, France). As an EU-established provider, transfers are expected to remain within the EEA, subject to Mistral&apos;s applicable terms.</li>
-          <li><strong>OpenRouter</strong> — ⏳ SCC status: pending verification. DPA request sent December 2026.</li>
-          <li><strong>Google LLC</strong> — ⏳ SCC status: pending verification. Google Cloud DPA available at cloud.google.com/terms/data-processing-addendum (self-executing upon acceptance of Google Cloud Terms).</li>
+          <li><strong>Groq Inc.</strong> — SCCs confirmed in effect (DPA dated October 15, 2025; EU SCC Module 2 self-executing upon acceptance of Groq Services Agreement). DPA accessible at <a href="https://console.groq.com" target="_blank" rel="noopener">console.groq.com</a>. Governing law: Ireland. Competent authority: Irish Data Protection Commission. 72-hour breach notification. Groq&apos;s DPF certification status is pending verification at <a href="https://www.dataprivacyframework.gov" target="_blank" rel="noopener">dataprivacyframework.gov</a>; SCCs remain in place as a safeguard.</li>
+          <li><strong>Mistral AI</strong> — EU-based (Paris, France). No Chapter V transfer issue; no SCC required.</li>
+          <li><strong>OpenRouter</strong> — SCC status: pending verification. DPA request sent August 2026; awaiting confirmation.</li>
+          <li><strong>Google LLC</strong> — Google Cloud DPA self-executing upon acceptance of Google Cloud Terms; available at <a href="https://cloud.google.com/terms/data-processing-addendum" target="_blank" rel="noopener">cloud.google.com/terms/data-processing-addendum</a>. Google LLC is DPF-certified (verified September 2026); SCCs serve as fallback should the DPF be invalidated by Schrems III.</li>
+          <li><strong>Vercel Inc.</strong> — Vercel is DPF-certified. DPA available at <a href="https://vercel.com/legal/dpa" target="_blank" rel="noopener">vercel.com/legal/dpa</a>.</li>
+          <li><strong>Stripe Inc.</strong> — Stripe is DPF-certified. DPA available at <a href="https://stripe.com/legal/dpa" target="_blank" rel="noopener">stripe.com/legal/dpa</a>.</li>
         </ul>
         <p className="text-sm mt-2">
-          OmniParse has confirmed SCCs with Groq (US-based) and uses Mistral (EU-based). However,
-          users should be aware that documents may contain personal data of multiple data subjects.
-          The user is responsible for ensuring they have a valid legal basis for processing and
-          transferring such data. The platform's cascade prioritizes Mistral first, then Groq —
-          both have appropriate safeguards. OpenRouter and Google are additional fallbacks pending
-          SCC verification.
+          OmniParse has confirmed SCCs with Groq (US-based) and uses Mistral (EU-based). The cascade
+          prioritizes Mistral first, then Groq — both have appropriate safeguards. OpenRouter remains
+          pending SCC verification; Google is covered by the DPF. Users should be aware that documents
+          may contain personal data of multiple data subjects — the user is responsible for ensuring
+          they have a valid legal basis for processing and transferring such data under GDPR Art. 6
+          and Chapter V.
         </p>
         <h3 className="text-base font-semibold mt-4 mb-2">11.6 Duration and Deletion</h3>
         <p className="text-sm">
-          This DPA continues for the duration of your subscription. Upon account termination, all personal
-          data is deleted within 30 days (file binaries) and 90 days (extracted data, audit logs), except
-          where longer retention is required by law.
+          This DPA continues for the duration of the Customer&apos;s use of the Service. Upon account
+          termination, file binaries are deleted within 30 days, and all other personal data (extracted
+          data, audit logs, chat history, IMAP credentials) is deleted within 90 days, except where
+          longer retention is required by law (e.g., financial records under Czech accounting
+          regulations). Backup copies maintained by Supabase for disaster recovery are deleted within
+          7 days on a rolling basis. This is consistent with the retention schedule in §4 of this
+          Privacy Policy.
         </p>
         <h3 className="text-base font-semibold mt-4 mb-2">11.7 Subprocessor Authorization</h3>
         <p className="text-sm">
@@ -288,7 +364,26 @@ export default function PrivacyPolicyPage() {
           is unable to provide a reasonable alternative, Customer may suspend or terminate the affected
           Service.
         </p>
-        <h3 className="text-base font-semibold mt-4 mb-2">11.8 Acceptance</h3>
+        <h3 className="text-base font-semibold mt-4 mb-2">11.9 Personal Data Breach Notification (GDPR Art. 33-34)</h3>
+        <p className="text-sm">
+          OmniParse will notify Customer without undue delay after becoming aware of a personal-data
+          breach affecting Customer&apos;s personal data. Notification will include (i) a description of
+          the nature of the breach, (ii) the likely consequences, (iii) the measures taken or proposed,
+          and (iv) the contact point for further information. Where the breach is likely to result in a
+          risk to the rights and freedoms of natural persons, OmniParse will assist Customer in
+          fulfilling Customer&apos;s obligation under GDPR Art. 33 to notify the supervisory authority
+          within 72 hours, and under Art. 34 to notify affected data subjects without undue delay.
+        </p>
+        <h3 className="text-base font-semibold mt-4 mb-2">11.10 Audit Rights</h3>
+        <p className="text-sm">
+          Customer may audit OmniParse&apos;s compliance with this DPA, upon reasonable prior written
+          notice (at least 30 days) and not more than once per calendar year, during normal business
+          hours and in a manner that does not interfere with OmniParse&apos;s operations. Alternatively,
+          OmniParse may provide a current third-party audit report (e.g., SOC 2 Type II, ISO 27001) or
+          equivalent documentation in lieu of an on-site audit, which the parties agree is a reasonable
+          alternative under GDPR Art. 28(3)(h).
+        </p>
+        <h3 className="text-base font-semibold mt-4 mb-2">11.11 Acceptance</h3>
         <p className="text-sm">
           For B2B customers (businesses, organizations, accounting firms): this DPA takes effect upon
           acceptance of the Terms of Service and the first use of the Service. For B2B customers who
@@ -303,20 +398,52 @@ export default function PrivacyPolicyPage() {
       </section>
 
       <section>
-        <h2>12. Changes to This Policy</h2>
+        <h2>12. Privacy Notice for Invoice Data Subjects (GDPR Art. 14)</h2>
+        <p>
+          Where customers upload documents (e.g., invoices) that contain personal data of individuals
+          other than themselves — for example, contact persons at vendor companies, employee names,
+          signatories, or bank-account holders — that personal data is processed by OmniParse on the
+          customer&apos;s instructions. The customer is the controller with respect to that data;
+          OmniParse acts as a processor on the customer&apos;s behalf.
+        </p>
+        <p>
+          Pursuant to GDPR Art. 14, and in reliance on the Art. 14(5)(b) exemption (providing the
+          information would involve a disproportionate effort because OmniParse has no direct
+          relationship with those data subjects and they may be numerous), this public Privacy Notice
+          serves as the transparency mechanism. We ask our customers to inform their data subjects of
+          the use of OmniParse where feasible and to direct them to this Notice.
+        </p>
+        <p>
+          <strong>If your personal data appears in a document processed by OmniParse:</strong>
+        </p>
+        <ul>
+          <li><strong>Who is processing your data:</strong> The OmniParse customer who uploaded the document is the data controller. OmniParse (Simon Curda, natural person, Czech Republic) acts as a processor on their behalf.</li>
+          <li><strong>Purposes:</strong> Extraction of structured data from invoices for accounting, accounts-payable, and vendor-management purposes.</li>
+          <li><strong>Legal basis:</strong> Legitimate interest of the customer in efficient invoice processing (GDPR Art. 6(1)(f)).</li>
+          <li><strong>Recipients:</strong> AI inference providers (Mistral, Groq, OpenRouter, Google) and infrastructure providers (Vercel, Supabase, Stripe) — see §6 above.</li>
+          <li><strong>Retention:</strong> Personal data is deleted within 90 days of the customer&apos;s account termination, or earlier if the customer deletes the document.</li>
+          <li><strong>Your rights:</strong> You have rights of access, rectification, erasure, restriction, portability, and objection. To exercise these rights, contact the customer (the controller) directly; if you cannot reach them, contact us at <strong>damr58h@gmail.com</strong> and we will route your request.</li>
+          <li><strong>Right to complain:</strong> You may lodge a complaint with the Czech DPA (ÚOOÚ) or with the supervisory authority of your habitual residence.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>13. Changes to This Policy</h2>
         <p>
           We may update this Privacy Policy from time to time. Material changes will be notified via
-          the Service or by email. The &quot;Last updated&quot; date at the top of this page indicates
-          when this Policy was last revised. Continued use of the Service after changes constitutes
-          acceptance of the updated Policy.
+          the Service or by email at least 30 days before taking effect. The &quot;Last updated&quot; date
+          at the top of this page indicates when this Policy was last revised. Continued use of the
+          Service after changes constitutes acceptance of the updated Policy.
         </p>
       </section>
 
       <section>
-        <h2>13. Contact</h2>
+        <h2>14. Contact</h2>
         <ul>
-          <li><strong>Data controller:</strong> Simon Curda, Czech Republic</li>
+          <li><strong>Data controller:</strong> Simon Curda, natural person, Czech Republic</li>
           <li><strong>General contact &amp; all GDPR requests:</strong> damr58h@gmail.com</li>
+          <li><strong>B2B / DPA matters:</strong> damr58h@gmail.com (subject line &quot;DPA — [company name]&quot;)</li>
+          <li><strong>Data Subject Requests (Art. 15-22):</strong> damr58h@gmail.com (subject line &quot;DSR — [your name]&quot;)</li>
           <li><strong>Czech supervisory authority:</strong> <a href="https://www.uoou.cz" target="_blank" rel="noopener">uoou.cz</a></li>
           <li><strong>Canadian Commissioner:</strong> <a href="https://www.priv.gc.ca" target="_blank" rel="noopener">priv.gc.ca</a></li>
         </ul>

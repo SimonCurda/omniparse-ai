@@ -4,13 +4,16 @@ export const dynamic = 'force-static';
 
 export default function AIActNoticePage() {
   return (
-    <LegalLayout title="AI Transparency Notice" lastUpdated="September 12, 2026">
+    <LegalLayout title="AI Transparency Notice" lastUpdated="September 18, 2026">
       <section>
         <h2>EU AI Act Compliance (Regulation EU 2024/1689)</h2>
         <p>
-          Per Article 50 of the EU AI Act (effective August 2, 2026), deployers of AI systems must inform natural persons
-          that they are interacting with an artificial intelligence system. This notice fulfills that
-          obligation.
+          Per Article 50 of the EU AI Act (applicable since <strong>2 August 2026</strong>), deployers of
+          AI systems must inform natural persons that they are interacting with an artificial intelligence
+          system. This notice fulfills that obligation. Article 5 prohibitions on certain AI practices
+          have been applicable since <strong>2 February 2025</strong>; OmniParse confirms that none of
+          its processing falls within any Article 5 prohibited category (social scoring, manipulative AI,
+          untargeted facial scraping, emotion recognition in workplaces/schools, etc.).
         </p>
       </section>
 
@@ -33,16 +36,32 @@ export default function AIActNoticePage() {
       <section>
         <h2>2. System Classification</h2>
         <p>
-          Based on the intended purposes and functionality of the Service, we currently do not intend
-          the Service to perform any of the high-risk functions listed in Annex III of the EU AI Act.
+          Based on the intended purposes and functionality of the Service, we have assessed OmniParse
+          against the high-risk use cases listed in Annex III of the EU AI Act. <strong>OmniParse is not
+          a high-risk AI system</strong> under Annex III, because invoice OCR/extraction and
+          conversational analytics do not fall within any of the high-risk categories listed (which
+          include biometric identification, critical infrastructure management, education/employment
+          decisions, essential private/public services, law enforcement, migration/border control, and
+          justice/democratic processes).
+        </p>
+        <p>
           The Service is nevertheless subject to applicable transparency requirements under Article 50,
-          including those applicable to AI systems that directly interact with users.
+          including those applicable to AI systems that directly interact with users (Art. 50(1)) and to
+          AI-generated or manipulated content (Art. 50(4)).
         </p>
         <p>
           As the provider of the Service under our own name and brand, we acknowledge our
           responsibilities under the EU AI Act. This assessment may change if the Service is used in
           high-risk contexts. We will update this notice accordingly and implement the required
           obligations if reclassification occurs.
+        </p>
+        <p>
+          <strong>General-Purpose AI (GPAI) classification:</strong> The AI models used by OmniParse
+          (e.g., Gemini, Pixtral, Llama) are developed by upstream providers (Google, Mistral, Meta,
+          etc.) and may qualify as GPAI models under Art. 3(63). OmniParse is a <strong>deployer</strong>
+          of these models, not a GPAI provider. Transparency obligations applicable to GPAI providers
+          under Art. 53 rest with the upstream model providers. OmniParse relies on the technical
+          documentation and information provided by those upstream providers.
         </p>
       </section>
 
@@ -94,12 +113,13 @@ export default function AIActNoticePage() {
 
       <section>
         <h2>6. Human Oversight</h2>
-        <p>OmniParse provides the following human oversight mechanisms:</p>
+        <p>OmniParse provides the following human oversight mechanisms (consistent with AI Act Art. 14 best practices, even though the Service is not high-risk):</p>
         <ul>
           <li><strong>Confidence indicators:</strong> Extractions include heuristic confidence indicators to help prioritize manual review. These are not statistical probabilities.</li>
           <li><strong>Manual review:</strong> Users can review, edit, or delete any extracted data at any time.</li>
-          <li><strong>No autonomous decisions:</strong> The AI does not make decisions, categorize individuals, or take actions on its own. It only extracts and presents data for human review.</li>
+          <li><strong>No autonomous decisions:</strong> The AI does not make decisions, categorize individuals, or take actions on its own. It only extracts and presents data for human review. Invoice approvals, payment authorizations, and vendor categorizations require explicit user action.</li>
           <li><strong>Feedback loop:</strong> Users can re-upload documents, correct results, and delete inaccurate data.</li>
+          <li><strong>Audit trail:</strong> All user actions (edits, approvals, deletions) are logged in the user&apos;s account audit log for traceability.</li>
         </ul>
       </section>
 
@@ -146,26 +166,27 @@ export default function AIActNoticePage() {
         <h2>10. International Transfers</h2>
         <p>
           AI processing is performed by Mistral AI (EU-based, Paris, France), Groq Inc. (US — SCCs confirmed),
-          OpenRouter (US — pending), and Google LLC (US — pending). Under GDPR Chapter V, transfers to the US require
-          appropriate safeguards. We rely on Standard Contractual Clauses (SCCs) consistent with the Schrems II ruling.
+          OpenRouter (US — pending), and Google LLC (US — DPF-certified). Under GDPR Chapter V, transfers
+          to the US require appropriate safeguards. We rely on the EU-US Data Privacy Framework (DPF)
+          adequacy decision (10 July 2023, currently subject to CJEU appeal in &quot;Schrems III&quot;) for
+          DPF-certified recipients, and on Standard Contractual Clauses (SCCs) consistent with the
+          Schrems II ruling for non-DPF-certified recipients, together with Transfer Impact
+          Assessments (TIAs) where required.
         </p>
         <div className="border-l-4 border-emerald-500 bg-emerald-500/5 p-3 my-3 rounded-r">
           <p className="text-sm">
-            <strong className="text-emerald-700 dark:text-emerald-500">SCC Status by provider (as of September 12, 2026):</strong>
+            <strong className="text-emerald-700 dark:text-emerald-500">SCC Status by provider (as of September 18, 2026):</strong>
           </p>
           <ul className="list-disc pl-5 mt-2 text-sm space-y-1">
-            <li><strong>Groq Inc.</strong> — SCCs confirmed in effect (September 12, 2026). DPA with EU SCC Module 2 is self-executing upon acceptance of Groq Services Agreement. Governing law: Ireland. Competent authority: Irish DPC. 72-hour breach notification.</li>
+            <li><strong>Groq Inc.</strong> — SCCs confirmed in effect (DPA dated October 15, 2025; EU SCC Module 2 is self-executing upon acceptance of Groq Services Agreement). DPA accessible at <a href="https://console.groq.com" target="_blank" rel="noopener">console.groq.com</a>. Governing law: Ireland. Competent authority: Irish DPC. 72-hour breach notification. DPF certification status pending verification.</li>
             <li><strong>Mistral AI</strong> — EU-based (Paris, France). As an EU-established provider, transfers are expected to remain within the EEA, subject to Mistral&apos;s applicable terms and data-processing agreements.</li>
-            <li><strong>OpenRouter</strong> — SCC status: pending verification.</li>
-            <li><strong>Google LLC (Gemini)</strong> — SCC status: pending verification. Google Cloud DPA available at cloud.google.com/terms/data-processing-addendum.</li>
+            <li><strong>OpenRouter</strong> — SCC status: pending verification. DPA request sent August 2026.</li>
+            <li><strong>Google LLC (Gemini)</strong> — Google Cloud DPA self-executing upon acceptance of Google Cloud Terms; available at <a href="https://cloud.google.com/terms/data-processing-addendum" target="_blank" rel="noopener">cloud.google.com/terms/data-processing-addendum</a>. Google LLC is DPF-certified.</li>
+            <li><strong>Vercel Inc.</strong> — DPF-certified. DPA available at <a href="https://vercel.com/legal/dpa" target="_blank" rel="noopener">vercel.com/legal/dpa</a>.</li>
+            <li><strong>Stripe Inc.</strong> — DPF-certified. DPA available at <a href="https://stripe.com/legal/dpa" target="_blank" rel="noopener">stripe.com/legal/dpa</a>.</li>
           </ul>
           <p className="text-sm mt-2">
-            <strong className="text-emerald-700 dark:text-emerald-500">SCCs confirmed with Groq; Mistral is EU-based.</strong>{' '}
-            AI processing via Mistral (EU) and Groq (US, SCCs confirmed) has appropriate safeguards
-            in place. However, users should note that documents may contain personal data of multiple
-            data subjects — the user is responsible for ensuring a valid legal basis for processing
-            and transferring such data. OpenRouter and Google remain as fallbacks pending SCC
-            verification.
+            <strong className="text-emerald-700 dark:text-emerald-500">Summary:</strong> AI processing via Mistral (EU) and Groq (US, SCCs confirmed) has appropriate safeguards in place. Google is DPF-certified. OpenRouter remains pending SCC verification. Users should note that documents may contain personal data of multiple data subjects — the user is responsible for ensuring a valid legal basis for processing and transferring such data.
           </p>
         </div>
         <p>
@@ -175,11 +196,40 @@ export default function AIActNoticePage() {
       </section>
 
       <section>
-        <h2>11. Contact</h2>
+        <h2>11a. AI Literacy (AI Act Art. 4)</h2>
+        <p>
+          Pursuant to Article 4 of the EU AI Act (applicable since 2 February 2025), providers and
+          deployers of AI systems shall take measures to ensure, to their best extent, a sufficient
+          level of AI literacy in their staff and persons dealing with the operation and use of AI
+          systems on their behalf. OmniParse acknowledges this obligation and provides this Notice
+          (plus the in-Service AI disclaimers) as part of user-facing AI literacy. Internal staff
+          training on AI capabilities, limitations, and risks is documented in our internal records
+          and updated at least annually, or when significant changes to AI features occur.
+        </p>
+      </section>
+
+      <section>
+        <h2>11b. Logging and Monitoring</h2>
+        <p>
+          Although OmniParse is not classified as a high-risk AI system (and therefore Article 12
+          logging requirements do not strictly apply), we maintain the following logging practices as
+          best practice:
+        </p>
         <ul>
-          <li><strong>AI ethics concerns:</strong> damr58h@gmail.com</li>
-          <li><strong>Data protection / GDPR:</strong> damr58h@gmail.com</li>
+          <li><strong>Application-level audit log:</strong> User actions (invoice create/edit/approve/delete, chat send) are logged in the user&apos;s account and retained for the lifetime of the account.</li>
+          <li><strong>Server-side operational logs:</strong> Vercel function logs retained for 30 days for debugging and incident investigation.</li>
+          <li><strong>AI request metadata:</strong> Timestamps, provider used, success/failure status, and request duration are logged for operational monitoring. The <strong>content</strong> of documents and chat messages is not logged to server logs.</li>
+          <li><strong>Incident logs:</strong> Security incidents involving AI systems are documented and retained for at least 2 years for regulatory audit purposes.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>12. Contact</h2>
+        <ul>
+          <li><strong>AI ethics concerns:</strong> damr58h@gmail.com (subject line &quot;AI Ethics&quot;)</li>
+          <li><strong>Data protection / GDPR:</strong> damr58h@gmail.com (subject line &quot;DSR&quot; or &quot;DPA&quot;)</li>
           <li><strong>Legal:</strong> damr58h@gmail.com</li>
+          <li><strong>Czech DPA (ÚOOÚ):</strong> <a href="https://www.uoou.cz" target="_blank" rel="noopener">uoou.cz</a></li>
         </ul>
       </section>
 

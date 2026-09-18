@@ -4,7 +4,7 @@ export const dynamic = 'force-static';
 
 export default function CookiePolicyPage() {
   return (
-    <LegalLayout title="Cookie Policy" lastUpdated="September 12, 2026">
+    <LegalLayout title="Cookie Policy" lastUpdated="September 18, 2026">
       <section>
         <h2>1. What Are Cookies and Local Storage</h2>
         <p>
@@ -18,26 +18,30 @@ export default function CookiePolicyPage() {
 
       <section>
         <h2>2. What We Store and Why</h2>
-        <p><strong>Essential storage (always active — exempt from consent per ePrivacy Art. 5(3)):</strong></p>
+        <p><strong>Essential storage (always active — exempt from consent per ePrivacy Art. 5(3), as implemented by Czech Act No. 127/2005 Coll. § 89):</strong></p>
         <ul>
-          <li><strong>Authentication token (op_token):</strong> Stores your JWT session token in Local Storage so you stay signed in across page refreshes. Required for the Service to function.</li>
-          <li><strong>Cookie consent record (omniparse_cookie_consent):</strong> Stores your consent choice and timestamp. Purpose: prevents re-showing the consent banner. Required to respect your consent decision.</li>
+          <li><strong>Authentication token (op_token):</strong> Stores your JWT session token in Local Storage so you stay signed in across page refreshes. <em>Retention:</em> 7 days (matching JWT expiry), then auto-cleared on next page load. <em>Purpose:</em> Strictly necessary for the Service to function.</li>
+          <li><strong>Cookie consent record (omniparse_cookie_consent):</strong> Stores your consent choice and timestamp. <em>Retention:</em> 12 months from last update, then re-prompted. <em>Purpose:</em> Prevents re-showing the consent banner and records your consent decision for accountability.</li>
         </ul>
         <p><strong>Non-essential storage (requires consent — only set after you accept via the cookie banner):</strong></p>
         <ul>
-          <li><strong>Theme preference (theme):</strong> Stores your light/dark mode choice. Purpose: user preference.</li>
-          <li><strong>Keyboard shortcuts (op_shortcuts):</strong> Stores custom keyboard shortcut assignments. Purpose: user preference.</li>
-          <li><strong>Legal consent (op_legal_consent):</strong> Records GDPR data transfer consent. Purpose: compliance.</li>
-          <li><strong>Crash logs (op_crash_log):</strong> Stores recent client-side errors for debugging. Purpose: service stability. Limited to last 10 errors.</li>
+          <li><strong>Theme preference (theme):</strong> Stores your light/dark mode choice. <em>Retention:</em> Until withdrawn or browser data cleared. <em>Purpose:</em> User preference (UI customization).</li>
+          <li><strong>Keyboard shortcuts (op_shortcuts):</strong> Stores custom keyboard shortcut assignments. <em>Retention:</em> Until withdrawn or browser data cleared. <em>Purpose:</em> User preference (UI customization).</li>
+          <li><strong>Legal consent (op_legal_consent):</strong> Records GDPR data-transfer consent for document uploads. <em>Retention:</em> Duration of account; refreshed on each upload if revoked. <em>Purpose:</em> Compliance (GDPR consent evidence).</li>
+          <li><strong>Crash logs (op_crash_log):</strong> Stores recent client-side errors for debugging. <em>Retention:</em> Rolling window — last 10 errors only, FIFO overwrite. <em>Purpose:</em> Service stability and debugging. No personal data is logged beyond error messages.</li>
         </ul>
         <p><strong>Analytics:</strong></p>
         <ul>
-          <li>Currently, no analytics cookies are active. If we implement analytics in the future, we will update this policy and seek your consent via the cookie banner.</li>
+          <li>Currently, no analytics cookies or storage items are active. If we implement analytics in the future, we will (a) update this Policy with the specific item name, purpose, and retention; (b) seek your explicit consent via the cookie banner; and (c) ensure the analytics provider is GDPR-compliant (e.g., DPF-certified or SCC-backed).</li>
         </ul>
         <p><strong>Third-party cookies:</strong></p>
         <ul>
-          <li>OmniParse does not set third-party cookies. No advertising, tracking, or social media cookies are used.</li>
-          <li><strong>Note about Stripe:</strong> If you upgrade to a paid plan, Stripe&apos;s checkout page may set its own cookies on the Stripe domain (not omniparse-ai.vercel.app). See <a href="https://stripe.com/cookies" target="_blank" rel="noopener">Stripe&apos;s cookie policy</a> for details.</li>
+          <li>OmniParse does not set third-party cookies on the omniparse-ai.vercel.app domain. No advertising, tracking, social-media, or fingerprinting cookies are used.</li>
+          <li><strong>Note about Stripe:</strong> If you upgrade to a paid plan, Stripe&apos;s checkout page (at checkout.stripe.com) may set its own cookies on the Stripe domain (not omniparse-ai.vercel.app). These are governed by <a href="https://stripe.com/cookies" target="_blank" rel="noopener">Stripe&apos;s cookie policy</a> and are necessary for payment security and fraud prevention. OmniParse does not control Stripe&apos;s cookies.</li>
+        </ul>
+        <p><strong>Session-only cookies (Next.js framework):</strong></p>
+        <ul>
+          <li>The Next.js framework may use short-lived session cookies (e.g., for CSRF protection) that are deleted when you close your browser. These are strictly necessary for security and are exempt from consent under ePrivacy Art. 5(3).</li>
         </ul>
       </section>
 
@@ -47,27 +51,34 @@ export default function CookiePolicyPage() {
           Under the EU ePrivacy Directive (2002/58/EC), as amended by Directive 2009/136/EC, and GDPR:
         </p>
         <ul>
-          <li><strong>Essential storage (op_token, omniparse_cookie_consent):</strong> Exempt from consent requirements as strictly necessary for the provision of the Service explicitly requested by the user (ePrivacy Art. 5(3) exception).</li>
-          <li><strong>Non-essential storage (theme, op_shortcuts, op_legal_consent, op_crash_log):</strong> Requires your explicit, informed, prior consent via the cookie banner. You may withdraw consent at any time by clearing your browser&apos;s Local Storage or by using the &quot;Essential only&quot; button.</li>
-          <li>You may withdraw consent at any time by clearing your browser&apos;s Local Storage.</li>
+          <li><strong>Essential storage (op_token, omniparse_cookie_consent, Next.js session cookies):</strong> Exempt from consent requirements as strictly necessary for the provision of the Service explicitly requested by the user (ePrivacy Art. 5(3) exception, as implemented by Czech Act No. 127/2005 Coll. § 89).</li>
+          <li><strong>Non-essential storage (theme, op_shortcuts, op_legal_consent, op_crash_log):</strong> Requires your explicit, informed, prior consent via the cookie banner (GDPR Art. 6(1)(a) + ePrivacy Art. 5(3)). Consent must be as easy to withdraw as to give. You may withdraw consent at any time by (a) clicking the &quot;Essential only&quot; button in the cookie banner re-openable via Settings → Privacy, or (b) clearing your browser&apos;s Local Storage.</li>
           <li>You have the right to be informed about what data is collected and for what purpose (this section).</li>
+          <li>You have the right to lodge a complaint with the Czech DPA (ÚOOÚ) if you believe our cookie practices violate applicable law.</li>
         </ul>
       </section>
 
       <section>
-        <h2>4. Cookie Banner</h2>
+        <h2>4. Cookie Banner and Granular Consent</h2>
         <p>
-          On your first visit to the Service, a cookie banner appears at the bottom of the screen. You
-          have two options:
+          On your first visit to the Service, a cookie banner appears at the bottom of the screen.
+          You have the following options:
         </p>
         <ul>
-          <li><strong>&quot;Accept all&quot;:</strong> Records consent for both essential and (future) analytics storage.</li>
-          <li><strong>&quot;Essential only&quot;:</strong> Records consent for essential storage only; no analytics storage will be set.</li>
+          <li><strong>&quot;Accept all&quot;:</strong> Records consent for both essential and all non-essential storage (theme, shortcuts, legal consent, crash logs).</li>
+          <li><strong>&quot;Essential only&quot;:</strong> Records consent for essential storage only; non-essential items are not set, and any previously set non-essential items are cleared.</li>
+          <li><strong>&quot;Manage preferences&quot; (planned):</strong> Granular per-category toggles for theme, shortcuts, legal consent, and crash logs. Each category can be accepted or declined independently, in line with EDPB Guidelines 03/2022 on dark patterns.</li>
         </ul>
         <p>
-          Your choice is recorded in Local Storage under the key <code>omniparse_cookie_consent</code> and
-          persists across sessions. You can change your choice at any time by clearing this key from your
-          browser&apos;s Local Storage.
+          The banner does not block page load (essential cookies work regardless). Your choice is
+          recorded in Local Storage under the key <code>omniparse_cookie_consent</code> along with a
+          timestamp, and persists for 12 months. After 12 months, or if you clear your Local Storage,
+          the banner will re-appear.
+        </p>
+        <p>
+          You can change your choice at any time by clicking the &quot;Cookie settings&quot; link in the
+          footer, or by clearing the <code>omniparse_cookie_consent</code> key from your browser&apos;s
+          Local Storage.
         </p>
       </section>
 
@@ -90,10 +101,13 @@ export default function CookiePolicyPage() {
       <section>
         <h2>6. Czech Republic</h2>
         <p>
-          Under Czech Act No. 127/2005 Coll. on Electronic Communications and amendments to certain
-          related acts: the processing of Local Storage data requires the user&apos;s consent unless it
-          is strictly necessary for the operation of the service. OmniParse complies with this
-          requirement through the cookie consent banner.
+          Under Czech Act No. 127/2005 Coll. (Electronic Communications Act) § 89, as amended effective
+          1 January 2022 to align with the ePrivacy Directive: the processing of Local Storage data
+          and cookies requires the user&apos;s consent unless it is strictly necessary for the operation
+          of the service requested by the user. OmniParse complies with this requirement through the
+          cookie consent banner (§ 4 above). Act No. 480/2004 Coll. (Information Society Services Act)
+          applies to unsolicited commercial communications and is not relevant to OmniParse&apos;s cookie
+          practices, as OmniParse does not engage in direct marketing.
         </p>
       </section>
 
@@ -103,7 +117,7 @@ export default function CookiePolicyPage() {
       </section>
 
       <p className="text-xs mt-8">
-        Complies with EU ePrivacy Directive 2002/58/EC, GDPR Art. 6(1)(a), and Czech Act No. 127/2005 Coll.
+        Complies with EU ePrivacy Directive 2002/58/EC (as amended by Directive 2009/136/EC), GDPR Art. 6(1)(a) and Art. 7, Czech Act No. 127/2005 Coll. § 89 (Electronic Communications — ePrivacy implementation), and EDPB Guidelines 03/2022 on dark patterns in social media platform interfaces.
       </p>
     </LegalLayout>
   );

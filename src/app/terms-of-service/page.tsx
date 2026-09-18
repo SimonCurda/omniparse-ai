@@ -4,7 +4,7 @@ export const dynamic = 'force-static';
 
 export default function TermsOfServicePage() {
   return (
-    <LegalLayout title="Terms of Service" lastUpdated="September 12, 2026">
+    <LegalLayout title="Terms of Service" lastUpdated="September 18, 2026">
       <section>
         <h2>1. Acceptance of Terms</h2>
         <p>
@@ -42,15 +42,16 @@ export default function TermsOfServicePage() {
       <section>
         <h2>3. Eligibility</h2>
         <p>
-          You must be at least 13 years old to use this Service. The Service is not directed to children
-          under 13, and we do not knowingly collect personal data from children under 13. In jurisdictions
-          where the age of digital consent is higher (e.g., 15 in Czech Republic, 16 in Germany), parental
-          consent may be required — by registering an account, you confirm you have obtained such consent
-          if applicable.
+          You must be at least <strong>15 years old</strong> to use this Service. This age corresponds
+          to the age of digital consent in the Czech Republic under GDPR Art. 8 (as implemented by
+          Czech Act No. 110/2019 Coll.). In other EU/EEA Member States where the age of digital consent
+          is higher (e.g., 16 in Germany), you must meet that higher age requirement. The Service is
+          not directed to children, and we do not knowingly collect personal data from children below
+          the applicable age of digital consent.
         </p>
         <p>
-          If you are under 18, you confirm that you have obtained parental or guardian consent to use this
-          Service and to enter into these Terms.
+          If you are under 18 but above the applicable age of digital consent, you confirm that you
+          have obtained parental or guardian consent to use this Service and to enter into these Terms.
         </p>
         <p>
           If you are registering on behalf of a business entity, you confirm that you have the authority
@@ -81,15 +82,27 @@ export default function TermsOfServicePage() {
       </section>
 
       <section>
-        <h2>5. Intellectual Property</h2>
+        <h2>5. Intellectual Property and License</h2>
         <p>
-          Content you upload remains your property. OmniParse does not claim ownership of your documents
-          or extracted data. The Service itself, including its code, design, and documentation, is the
-          property of Simon Curda.
+          <strong>Your content:</strong> Content you upload (documents, chat messages, extracted data)
+          remains your property. OmniParse does not claim ownership of your documents or extracted data.
+          By uploading content, you grant OmniParse a worldwide, non-exclusive, royalty-free, revocable
+          license to process, transmit, store, and display your content solely for the purpose of
+          operating and providing the Service to you, including the right to transmit content to
+          third-party AI inference providers as described in the Privacy Policy. This license terminates
+          automatically when your content is deleted from the Service or your account is terminated.
         </p>
         <p>
-          You may not copy, modify, distribute, or create derivative works from the Service itself
-          without written permission.
+          <strong>Service IP:</strong> The Service itself, including its source code, design, UI,
+          documentation, brand, and underlying infrastructure, is the property of Simon Curda. You may
+          not copy, modify, distribute, or create derivative works from the Service itself without
+          written permission. The names &quot;OmniParse&quot; and associated logos are trademarks of
+          Simon Curda.
+        </p>
+        <p>
+          <strong>Feedback:</strong> If you provide feedback, suggestions, or ideas about the Service,
+          you grant OmniParse a perpetual, irrevocable, royalty-free license to use and incorporate
+          that feedback into the Service without obligation or compensation to you.
         </p>
       </section>
 
@@ -155,10 +168,13 @@ export default function TermsOfServicePage() {
           relying on them for any purpose.
         </p>
         <p>
-          AI models, providers and processing methods may be changed, updated, replaced or discontinued
-          at any time. Changes in models may affect extraction results, classifications, calculations
-          and chat responses. The same input document may produce different results when processed by
-          different models or at different times.
+          AI models, providers and processing methods may be changed, updated, replaced or discontinued.
+          Material changes to AI providers (e.g., switching the primary vision-extraction provider)
+          will be announced in the Service or by email at least 7 days in advance, except where the
+          change is urgently required for security or availability reasons. Changes in models may
+          affect extraction results, classifications, calculations and chat responses. The same input
+          document may produce different results when processed by different models or at different
+          times.
         </p>
       </section>
 
@@ -229,14 +245,16 @@ export default function TermsOfServicePage() {
           <strong>For paid users only:</strong> Where OmniParse is found directly at fault for
           damages (e.g., a confirmed bug in our code, not a third-party AI provider issue),
           liability is capped at the amount you paid to OmniParse in the 12 months preceding
-          the claim. For Free tier users, liability is capped at zero (Czech Civil Code § 2913).
+          the claim. For Free tier users, liability for slight negligence is excluded to the
+          extent permitted by Czech Civil Code § 2913(2); liability for intentional damage
+          and gross negligence remains unaffected in all cases.
         </p>
         <p>
           <strong>Notification of issues:</strong> If you become aware that the Service has failed
-          to capture an invoice or has extracted incorrect data, you must notify us at
-          <strong> damr58h@gmail.com</strong> within 30 days. We will investigate and, where
-          possible, restore or correct the affected data. Failure to notify within 30 days
-          may limit our ability to provide remedies.
+          to capture an invoice or has extracted incorrect data, please notify us at
+          <strong> damr58h@gmail.com</strong> as soon as practicable. We will investigate and, where
+          possible, restore or correct the affected data. Prompt notification helps us serve you
+          better; this does not shorten any statutory limitation period under applicable law.
         </p>
       </section>
 
@@ -285,10 +303,21 @@ export default function TermsOfServicePage() {
       <section>
         <h2>11. Indemnification</h2>
         <p>
-          You agree to indemnify and hold harmless Simon Curda from and against any claims, damages,
-          losses, or expenses arising from your use of the Service, your violation of these Terms, or
-          your infringement of any third-party rights (including uploading documents you do not have the
-          right to process).
+          To the extent permitted by applicable law, and except where prohibited by mandatory consumer
+          protection law (including EU Directive 93/13/EEC on unfair contract terms and Czech Act
+          No. 634/1992 Coll.), you agree to indemnify and hold harmless Simon Curda from and against
+          any claims, damages, losses, or expenses (including reasonable attorneys&apos; fees) arising
+          from (a) your use of the Service in violation of these Terms or applicable law, (b) your
+          infringement of any third-party rights (including uploading documents you do not have the
+          right to process), or (c) your violation of applicable data-protection law in respect of
+          personal data you upload.
+        </p>
+        <p>
+          <strong>Consumer carve-out:</strong> If you are a consumer within the meaning of Czech Act
+          No. 89/2012 Coll. (Civil Code) § 419, this indemnification clause applies only to the extent
+          that the relevant claim arises from your intentional breach or gross negligence, and in no
+          event shall a consumer be required to indemnify Simon Curda for damages caused by Simon
+          Curda&apos;s own act or omission.
         </p>
       </section>
 
@@ -297,82 +326,135 @@ export default function TermsOfServicePage() {
         <p>
           Paid plans (Pro, Plus, Business, Enterprise) are billed monthly or annually via Stripe. You
           can cancel your subscription at any time from your Stripe customer portal. Cancellation
-          takes effect at the end of the current billing period.
+          takes effect at the end of the current billing period — you retain access to paid features
+          until then, and no further charges are made.
         </p>
         <p>
           When you delete your account, any active Stripe subscription is automatically cancelled to
           prevent ongoing charges.
         </p>
         <p>
-          Refunds are handled on a case-by-case basis. Contact us at <strong>damr58h@gmail.com</strong>
-          to request a refund.
+          <strong>Refund policy:</strong>
+        </p>
+        <ul className="list-disc pl-6 space-y-1 text-sm">
+          <li><strong>Within 14 days of payment, no AI usage:</strong> Full refund on request (see §14 Right of Withdrawal). Contact damr58h@gmail.com.</li>
+          <li><strong>Within 14 days of payment, AI features used:</strong> Right of withdrawal is forfeited under §1837(j) of the Civil Code (digital content with express consent to start). No refund, but you retain access until the end of the billing period.</li>
+          <li><strong>After 14 days, monthly plan:</strong> No refund of the current month&apos;s charge; subscription remains active until end of billing period. No further charges after cancellation.</li>
+          <li><strong>After 14 days, annual plan:</strong> Pro-rata refund of unused full months remaining on the plan, less a reasonable administrative fee of EUR 10. Contact damr58h@gmail.com to request a pro-rata refund.</li>
+          <li><strong>Service-impacting outage:</strong> If OmniParse experiences a verified outage exceeding 24 consecutive hours that prevents you from using paid features, contact us for a service-credit or pro-rata refund for the affected period.</li>
+          <li><strong>Free tier:</strong> No payment is made, so no refund is applicable. Account deletion is available at any time.</li>
+        </ul>
+        <p>
+          Refunds are processed back to the original payment method via Stripe within 14 days of
+          approval, as required by Art. 13(1) of Directive 2011/83/EU.
         </p>
       </section>
 
       <section>
         <h2>13. Modifications to Terms</h2>
         <p>
-          We may update these Terms from time to time. Material changes will be notified via the Service
-          or by email. Continued use of the Service after changes constitutes acceptance of the updated
-          Terms. The &quot;Last updated&quot; date at the top of this page indicates when these Terms
-          were last revised.
+          We may update these Terms from time to time. <strong>Material changes will be notified to
+          you via email (to your account email address) and via an in-Service notice at least 30 days
+          before the change takes effect.</strong> For changes that are not material (e.g., corrections
+          of typos, clarifications, or changes that do not affect your rights or obligations), we may
+          update these Terms without prior notice, with effect from the &quot;Last updated&quot; date.
+        </p>
+        <p>
+          <strong>For consumer users:</strong> Pursuant to § 1752 of the Civil Code (Act No. 89/2012
+          Coll.), material changes to these Terms that would worsen your position as a consumer take
+          effect only if you expressly agree to them. Your continued use of the Service after the
+          30-day notice period constitutes such express agreement unless you terminate your account
+          before the change takes effect (in which case the previous version of the Terms continues
+          to apply for any open billing period).
+        </p>
+        <p>
+          The &quot;Last updated&quot; date at the top of this page indicates when these Terms were
+          last revised. We will retain prior versions of these Terms and provide them on request.
         </p>
       </section>
 
       <section>
         <h2>14. Right of Withdrawal (EU Consumers)</h2>
         <p>
-          Under Czech Civil Code (Act No. 89/2012 Sb.) §1829 and §1837, consumers concluding distance
-          contracts (contracts concluded online) have a 14-day right of withdrawal.
+          Under Czech Civil Code (Act No. 89/2012 Coll.) §§ 1829 and 1837, and Directive 2011/83/EU
+          on consumer rights, consumers concluding distance contracts (contracts concluded online)
+          have a <strong>14-day right of withdrawal</strong>.
         </p>
         <p>
-          <strong>However</strong>, pursuant to §1837(j) of the Civil Code, the right of withdrawal
-          does NOT apply to:
+          <strong>However</strong>, pursuant to § 1837(j) of the Civil Code and Art. 16(m) of
+          Directive 2011/83/EU, the right of withdrawal does <strong>NOT</strong> apply to:
         </p>
         <ul className="list-disc pl-6 space-y-1 text-sm">
           <li>Digital content or services where the consumer has expressly requested that the service
-          begin during the withdrawal period and has acknowledged that by doing so, they lose the
+          begin during the withdrawal period AND has acknowledged that by doing so, they lose the
           right to withdraw;</li>
           <li>Services that have been fully performed with the consumer&apos;s prior express consent
           and acknowledgment.</li>
         </ul>
         <p>
-          <strong>By creating an OmniParse account and using AI features, you expressly agree that:</strong>
+          <strong>For this waiver to be valid under § 1837(j) and Art. 16(m) CRD, the following
+          express acknowledgment is required at signup (separate from the Terms acceptance checkbox):</strong>
+        </p>
+        <p className="p-3 bg-amber-500/5 border-l-4 border-amber-500 rounded-r">
+          <em>&quot;I acknowledge that OmniParse is a digital service that begins immediately upon my
+          first use of AI features (upload, scan, or chat). I expressly consent to OmniParse beginning
+          performance during the 14-day withdrawal period, and I acknowledge that I will lose my
+          right of withdrawal once the service has started, pursuant to § 1837(j) of the Czech Civil
+          Code and Art. 16(m) of Directive 2011/83/EU.&quot;</em>
+        </p>
+        <p>
+          By creating an OmniParse account and checking this separate acknowledgment box, you expressly
+          agree that:
         </p>
         <ul className="list-disc pl-6 space-y-1 text-sm">
           <li>The Service begins immediately upon your first use of AI features (upload, scan, or chat);</li>
-          <li>You acknowledge that you are losing the 14-day right of withdrawal pursuant to §1837(j)
+          <li>You acknowledge that you are losing the 14-day right of withdrawal pursuant to § 1837(j)
           of the Civil Code by requesting the Service to begin during the withdrawal period;</li>
           <li>This waiver applies only to the AI processing features. You may still delete your account
           at any time (Settings → Delete Account) without obligation.</li>
         </ul>
         <p>
-          For Free tier users: since no payment is made, no withdrawal refund is applicable. Account
-          deletion is available at any time.
+          <strong>One-click withdrawal button:</strong> Pursuant to Art. 4(2) of Directive (EU)
+          2023/2673 (effective 19 June 2026), if you have not yet used any AI features, a one-click
+          &quot;Withdraw&quot; button is available in your account Settings that allows you to
+          exercise your right of withdrawal without further formalities. Withdrawal must be confirmed
+          by us within 24 hours.
         </p>
         <p>
-          For paid subscribers: if you cancel your subscription within 14 days of payment AND have not
-          used any AI features in that period, you are entitled to a full refund. Contact
-          <strong> damr58h@gmail.com</strong> to request a refund. If you have used AI features during
-          the 14-day period, the right of withdrawal is forfeited per §1837(j).
+          <strong>For Free tier users:</strong> Since no payment is made, no withdrawal refund is
+          applicable. Account deletion is available at any time.
+        </p>
+        <p>
+          <strong>For paid subscribers:</strong> If you cancel your subscription within 14 days of
+          payment AND have not used any AI features in that period, you are entitled to a full refund
+          (processed within 14 days via Stripe). Contact <strong>damr58h@gmail.com</strong> to request
+          a refund. If you have used AI features during the 14-day period, the right of withdrawal is
+          forfeited per § 1837(j).
         </p>
       </section>
 
       <section>
         <h2>15. Consumer Information and Dispute Resolution</h2>
         <p>
-          Pursuant to §1733 of the Civil Code (Act No. 89/2012 Sb.), the following information is
+          Pursuant to § 1753 of the Civil Code (Act No. 89/2012 Coll.), the following information is
           provided to consumers before concluding a distance contract:
         </p>
         <ul className="list-disc pl-6 space-y-1 text-sm">
           <li><strong>Provider:</strong> Simon Curda (natural person), Czech Republic</li>
           <li><strong>Contact:</strong> damr58h@gmail.com</li>
           <li><strong>Service description:</strong> AI-powered invoice extraction, validation, and analytics platform</li>
-          <li><strong>Price:</strong> Free tier available (no charge). Paid plans from $49/month to $499/month as described on the pricing page</li>
-          <li><strong>Contract duration:</strong> Monthly subscription, cancelable at any time</li>
-          <li><strong>Right of withdrawal:</strong> See Section 14 above</li>
-          <li><strong>Applicable law:</strong> Czech law (see Section 16 below)</li>
-          <li><strong>Language:</strong> These Terms are available in English. Communication with the provider may be conducted in English or Czech</li>
+          <li><strong>Total price (incl. taxes):</strong> Free tier available (no charge). Paid plans from USD 49/month to USD 499/month as described on the pricing page; VAT is reverse-charged for EU B2B customers with a valid VAT ID and included for EU consumers at the applicable Czech VAT rate.</li>
+          <li><strong>Additional fees:</strong> None beyond the subscription price. No delivery costs (digital service delivered online).</li>
+          <li><strong>Contract duration:</strong> Monthly or annual subscription, cancelable at any time (cancellation takes effect at end of billing period).</li>
+          <li><strong>Performance timeframe:</strong> The Service begins immediately upon account creation and first use of AI features.</li>
+          <li><strong>Payment method:</strong> Credit/debit card via Stripe. Invoicing available for Enterprise plans on request.</li>
+          <li><strong>Right of withdrawal:</strong> See § 14 above (limited for digital content under § 1837(j) Civil Code).</li>
+          <li><strong>Applicable law:</strong> Czech law (see § 16 below)</li>
+          <li><strong>Court of jurisdiction:</strong> For consumer disputes, the court of the consumer&apos;s domicile; for B2B disputes, the competent courts of the Czech Republic.</li>
+          <li><strong>Language:</strong> These Terms are available in English. Communication with the provider may be conducted in English or Czech.</li>
+          <li><strong>After-sales obligations:</strong> None beyond the warranties and obligations set out in these Terms.</li>
+          <li><strong>Professional liability insurance:</strong> Not maintained (the operator is a natural person acting in a non-commercial capacity); claims are subject to the liability caps in § 10.</li>
+          <li><strong>Code of conduct:</strong> The provider has not subscribed to any code of conduct under § 1753(1)(i) Civil Code.</li>
         </ul>
         <h3 className="text-base font-semibold mt-4 mb-2">Out-of-Court Dispute Resolution (ADR)</h3>
         <p>
@@ -387,7 +469,7 @@ export default function TermsOfServicePage() {
         <p>
           A proposal for out-of-court dispute resolution must be submitted within 1 year from the date
           the consumer first exercised their right in the matter. The procedure is governed by Act No.
-          634/1992 Sb. (Consumer Protection Act) §§20b–20e.
+          634/1992 Coll. (Consumer Protection Act) §§ 20b–20e.
         </p>
         <p>
           EU consumers may also seek alternative dispute resolution through the European Commission&apos;s
@@ -432,7 +514,7 @@ export default function TermsOfServicePage() {
           <li>(d) If you rely on inaccurate AI output for financial decisions, tax filings, legal actions, vendor payments, or any other purpose, OmniParse is not liable for resulting damages, losses, or penalties;</li>
           <li>(e) The confidence scores provided are model-generated estimates only and do not guarantee accuracy;</li>
           <li>(f) Chat responses may contain errors, hallucinations, or be out of context — always cross-reference against the underlying invoice records before acting on them;</li>
-          <li>(g) OmniParse may modify, suspend, or discontinue AI features or change AI providers at any time without notice.</li>
+          <li>(g) OmniParse may modify, suspend, or discontinue AI features or change AI providers, with reasonable notice for material changes as described in § 7b.</li>
         </ul>
         <p>
           By accepting these Terms, you agree that you will not hold OmniParse, its operator, or its
@@ -441,7 +523,36 @@ export default function TermsOfServicePage() {
       </section>
 
       <section>
-        <h2>19. Acceptable Use Policy</h2>
+        <h2>20. Force Majeure</h2>
+        <p>
+          Neither party shall be liable for any failure or delay in performing its obligations under
+          these Terms (except for payment obligations) to the extent such failure or delay is caused
+          by events beyond its reasonable control, including but not limited to acts of God, natural
+          disasters, war, terrorism, civil unrest, epidemics or pandemics, governmental actions,
+          labor disputes, internet or telecommunications failures, or failures of third-party AI
+          providers, hosting providers, or payment processors. The affected party shall notify the
+          other party without undue delay and shall use commercially reasonable efforts to resume
+          performance as soon as reasonably practicable.
+        </p>
+      </section>
+
+      <section>
+        <h2>21. Notices</h2>
+        <p>
+          <strong>Notices from OmniParse to you:</strong> Will be sent to your account email address
+          or displayed in the Service. Email notices are deemed received 24 hours after sending.
+          In-Service notices are deemed received upon first display.
+        </p>
+        <p>
+          <strong>Notices from you to OmniParse:</strong> Send to damr58h@gmail.com with a clear
+          subject line (e.g., &quot;DSR&quot;, &quot;DPA&quot;, &quot;Refund Request&quot;,
+          &quot;Account Termination&quot;). Legal notices are deemed received on the date we reply
+          acknowledging receipt.
+        </p>
+      </section>
+
+      <section>
+        <h2>22. Acceptable Use Policy</h2>
         <p>You agree not to:</p>
         <ul className="list-disc pl-6 space-y-1 text-sm">
           <li>Upload documents you do not have the right to process (copyright, privacy, or other legal restrictions);</li>
@@ -463,8 +574,8 @@ export default function TermsOfServicePage() {
         </p>
         <ul className="list-disc pl-6 space-y-1 text-sm mt-2">
           <li><strong>Freeze</strong> accounts suspected of abuse — the user can still log in but AI features are blocked;</li>
-          <li><strong>Delete</strong> accounts that violate this Acceptable Use Policy, including all associated data;</li>
-          <li><strong>Suspend</strong> accounts immediately upon any violation, without prior notice;</li>
+          <li><strong>Suspend</strong> accounts suspected of abuse, with prior written notice by email where feasible. For paid accounts, we will provide at least 7 days&apos; notice before suspension unless the violation is urgent (e.g., CSAM, ongoing fraud);</li>
+          <li><strong>Delete</strong> accounts that materially violate this Acceptable Use Policy, including all associated data. For paid accounts, you may appeal a deletion decision within 14 days by emailing damr58h@gmail.com;</li>
           <li><strong>Report</strong> suspected illegal activity to the relevant authorities (Czech Police, ÚOOÚ, Europol).</li>
         </ul>
         <p>
@@ -474,14 +585,18 @@ export default function TermsOfServicePage() {
       </section>
 
       <section>
-        <h2>20. Contact</h2>
+        <h2>23. Contact</h2>
         <p>For questions about these Terms: <strong>damr58h@gmail.com</strong></p>
       </section>
 
       <p className="text-xs mt-8">
         Compliant with EU Directive 93/13/EEC (unfair contract terms), EU Directive 2011/83/EU (consumer rights, including right of withdrawal),
-        Czech Act No. 89/2012 Sb. (Civil Code, including §§1733, 1829, 1837, 2913),
-        Czech Act No. 634/1992 Sb. (Consumer Protection, including §§16, 20b–20e), and Czech Act No. 480/2004 Sb. (Electronic Communications).
+        EU Directive (EU) 2023/2673 (one-click withdrawal button, effective 19 June 2026),
+        Czech Act No. 89/2012 Coll. (Civil Code, including §§ 419, 1752, 1753, 1829, 1837, 2913),
+        Czech Act No. 634/1992 Coll. (Consumer Protection, including §§ 16, 20b–20e),
+        Czech Act No. 110/2019 Coll. (Czech GDPR implementation),
+        Czech Act No. 127/2005 Coll. § 89 (Electronic Communications — ePrivacy implementation), and
+        Czech Act No. 480/2004 Coll. (Information Society Services — unsolicited communications).
       </p>
     </LegalLayout>
   );
