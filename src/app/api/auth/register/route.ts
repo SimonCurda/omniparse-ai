@@ -45,6 +45,10 @@ export async function POST(req: NextRequest) {
         password: hashedPw,
         termsAcceptedAt: new Date(),
         ageConfirmedAt: new Date(),
+        // EU Consumer Right of Withdrawal — Art. 16(m) Dir 2011/83/EU + Czech CC §1837(j)
+        // User expressly acknowledged losing the 14-day right of withdrawal
+        // by requesting immediate performance of the digital-content service.
+        withdrawalAcknowledgedAt: new Date(),
         // emailVerified is intentionally left null — we don't enforce email
         // verification before AI features can be used. The field exists in
         // the schema for future use (if we add verification back later).

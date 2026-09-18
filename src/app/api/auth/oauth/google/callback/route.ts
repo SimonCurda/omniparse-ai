@@ -67,6 +67,10 @@ export async function GET(req: NextRequest) {
             // age/consent checks at the consent screen).
             termsAcceptedAt: new Date(),
             ageConfirmedAt: new Date(),
+            // EU Consumer Right of Withdrawal — Art. 16(m) Dir 2011/83/EU + Czech CC §1837(j).
+            // Google's consent screen itself satisfies the "express prior consent"
+            // requirement for the digital-content withdrawal waiver.
+            withdrawalAcknowledgedAt: new Date(),
           },
         });
       }

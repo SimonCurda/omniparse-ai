@@ -69,6 +69,9 @@ export async function GET(req: NextRequest) {
             // Auto-accept ToS for OAuth sign-ups.
             termsAcceptedAt: new Date(),
             ageConfirmedAt: new Date(),
+            // EU Consumer Right of Withdrawal — Art. 16(m) Dir 2011/83/EU + Czech CC §1837(j).
+            // GitHub's consent screen satisfies the "express prior consent" requirement.
+            withdrawalAcknowledgedAt: new Date(),
           },
         });
       }

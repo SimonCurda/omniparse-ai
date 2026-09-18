@@ -30,11 +30,24 @@ model User {
   // GDPR Art. 7 (consent) + Art. 8 (children) — when user accepted terms / confirmed age
   termsAcceptedAt   DateTime?
   ageConfirmedAt    DateTime?
+  // EU Consumer Right of Withdrawal (Dir 2011/83/EU Art. 16(m), Czech CC §1837(j))
+  // User expressly acknowledged loss of 14-day withdrawal right by requesting
+  // immediate performance of digital-content service. Required at signup
+  // for the waiver to be valid under Czech Civil Code §1837(j).
+  withdrawalAcknowledgedAt DateTime?
   // Email verification — null until user clicks the verification link
   // sent to their email after signup. Required before AI features
   // (upload, scan, chat) can be used. Prevents account spam creation
   // with fake email addresses.
   emailVerified     DateTime?
+  // EU Consumer Right of Withdrawal (Directive (EU) 2023/2673, effective 19 June 2026)
+  // — when user exercised their right of withdrawal via the one-click button in Settings.
+  // Null until withdrawal is exercised. Distinct from account deletion.
+  withdrawnAt       DateTime?
+  // Material ToS change notification tracking (GDPR Art. 12 + Czech CC §1752)
+  // — when user was last emailed about a material ToS change. Used to ensure
+  // each user gets the notification once per change cycle.
+  lastTosEmailSentAt DateTime?
   // Account status: true = active, false = frozen by admin.
   // When frozen, user can log in but AI features are blocked.
   // Used for abuse prevention — admin can freeze suspicious accounts

@@ -19,13 +19,17 @@ export function AuthView({ mode, onSwitch, onBack }: { mode: 'login' | 'signup';
   const [apiError, setApiError] = useState('');
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [ageConfirmed, setAgeConfirmed] = useState(false);
+  const [withdrawalAcknowledged, setWithdrawalAcknowledged] = useState(false);
 
   const setUser = useAppStore((s) => s.setUser);
   const setView = useAppStore((s) => s.setView);
   const setInvoices = useAppStore((s) => s.setInvoices);
 
-  // In signup mode, submit is disabled until both consent checkboxes are checked
-  const submitDisabled = loading || (mode === 'signup' && (!termsAccepted || !ageConfirmed));
+  // In signup mode, submit is disabled until all three consent checkboxes are checked
+  // (Terms + Age + EU Withdrawal acknowledgment per Art. 16(m) Dir 2011/83/EU).
+  const submitDisabled =
+    loading ||
+    (mode === 'signup' && (!termsAccepted || !ageConfirmed || !withdrawalAcknowledged));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,6 +55,12 @@ export function AuthView({ mode, onSwitch, onBack }: { mode: 'login' | 'signup';
       setApiError('You must confirm you are at least 15 years old.');
       return;
     }
+    if (mode === 'signup' && !withdrawalAcknowledged) {
+      setApiError(
+        'You must acknowledge that you lose the 14-day right of withdrawal once the service begins.'
+      );
+      return;
+    }
 
     setLoading(true);
 
@@ -61,6 +71,7 @@ export function AuthView({ mode, onSwitch, onBack }: { mode: 'login' | 'signup';
         body.name = name;
         body.termsAccepted = true;
         body.ageConfirmed = true;
+        body.withdrawalAcknowledged = true;
       }
 
       const res = await fetch(endpoint, {
@@ -324,6 +335,33 @@ export function AuthView({ mode, onSwitch, onBack }: { mode: 'login' | 'signup';
                     className="text-xs text-muted-foreground font-normal leading-relaxed cursor-pointer"
                   >
                     I confirm I am at least 15 years old
+                  </Label>
+                </div>
+                <div className="flex items-start gap-2">
+                  <Checkbox
+                    id="withdrawal"
+                    checked={withdrawalAcknowledged}
+                    onCheckedChange={(checked) => setWithdrawalAcknowledged(checked === true)}
+                    disabled={loading}
+                    className="mt-0.5"
+                  />
+                  <Label
+                    htmlFor="withdrawal"
+                    className="text-xs text-muted-foreground font-normal leading-relaxed cursor-pointer"
+                  >
+                    I acknowledge that OmniParse is a digital service that begins immediately upon my first
+                    use of AI features (upload, scan, or chat). I expressly consent to OmniParse beginning
+                    performance during the 14-day withdrawal period, and I acknowledge that I will lose my
+                    right of withdrawal once the service has started, pursuant to § 1837(j) of the Czech
+                    Civil Code and Art. 16(m) of Directive 2011/83/EU.{' '}
+                    <a
+                      href="/terms-of-service#right-of-withdrawal"
+                      target="_blank"
+                      rel="noopener"
+                      className="text-amber-600 hover:underline"
+                    >
+                      Learn more →
+                    </a>
                   </Label>
                 </div>
               </div>

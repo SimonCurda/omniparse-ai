@@ -373,7 +373,7 @@ export default function TermsOfServicePage() {
         </p>
       </section>
 
-      <section>
+      <section id="right-of-withdrawal">
         <h2>14. Right of Withdrawal (EU Consumers)</h2>
         <p>
           Under Czech Civil Code (Act No. 89/2012 Coll.) §§ 1829 and 1837, and Directive 2011/83/EU

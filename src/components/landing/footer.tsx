@@ -33,6 +33,20 @@ export function Footer() {
               <li><Link href="/terms-of-service" className="hover:text-foreground transition-colors">Terms of Service</Link></li>
               <li><Link href="/cookie-policy" className="hover:text-foreground transition-colors">Cookie Policy</Link></li>
               <li><Link href="/ai-act-notice" className="hover:text-foreground transition-colors">AI Act Notice</Link></li>
+              <li>
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Clear the consent record so the banner re-appears on next page load
+                    try { localStorage.removeItem('omniparse_cookie_consent'); } catch {}
+                    // Reload to re-trigger the banner
+                    window.location.reload();
+                  }}
+                  className="hover:text-foreground transition-colors text-left"
+                >
+                  Cookie Settings
+                </button>
+              </li>
             </ul>
           </div>
         </div>

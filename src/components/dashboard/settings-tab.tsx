@@ -22,7 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { CreditCard, Loader2, Download, Trash2, Shield, Eye, EyeOff, Plus, X, Sparkles, Lock, Clock, GripVertical, ArrowUp, ArrowDown, Keyboard } from 'lucide-react';
+import { CreditCard, Loader2, Download, Trash2, Shield, Eye, EyeOff, Plus, X, Sparkles, Lock, Clock, GripVertical, ArrowUp, ArrowDown, Keyboard, LogOut } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAppStore } from '@/stores/app-store';
 import { DEFAULT_SHORTCUTS, saveShortcuts } from '@/lib/shortcuts';
@@ -170,6 +170,10 @@ export function SettingsTab() {
   const [deleteEmail, setDeleteEmail] = useState('');
   const [deletePassword, setDeletePassword] = useState('');
   const [deleting, setDeleting] = useState(false);
+
+  // Withdrawal state (Directive (EU) 2023/2673 — one-click withdrawal button)
+  const [withdrawDialogOpen, setWithdrawDialogOpen] = useState(false);
+  const [withdrawing, setWithdrawing] = useState(false);
 
   // Export templates state
   const [exportTemplates, setExportTemplates] = useState<ExportTemplate[]>([]);
@@ -488,6 +492,43 @@ export function SettingsTab() {
       toast.error('Network error. Please try again.');
     } finally {
       setDeleting(false);
+    }
+  };
+
+  // EU Consumer Right of Withdrawal — Directive (EU) 2023/2673 (effective 19 June 2026)
+  // mandates a one-click withdrawal button for online distance contracts.
+  // Available only if the user has NOT yet used AI features (otherwise the
+  // §1837(j) waiver applies and the right is forfeited). Server validates this.
+  const handleWithdraw = async () => {
+    setWithdrawing(true);
+    try {
+      const headers = getAuthHeaders();
+      if (!headers) {
+        toast.error('Please log in again.');
+        return;
+      }
+      const res = await fetch('/api/auth/withdraw', {
+        method: 'POST',
+        headers,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data.error || 'Withdrawal failed.');
+        return;
+      }
+      toast.success(
+        data.alreadyWithdrawn
+          ? 'You have already withdrawn from the service.'
+          : 'Withdrawal processed. Your subscription has been cancelled and a refund will be issued within 14 days if applicable.'
+      );
+      setWithdrawDialogOpen(false);
+      // Log the user out — withdrawal terminates the contract
+      localStorage.clear();
+      logout();
+    } catch {
+      toast.error('Network error. Please try again.');
+    } finally {
+      setWithdrawing(false);
     }
   };
 
@@ -957,6 +998,38 @@ export function SettingsTab() {
 
           <div className="border-t pt-6 space-y-2">
             <div className="flex items-start gap-3">
+              <LogOut className="h-5 w-5 mt-0.5 text-amber-500 shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-amber-600">
+                  Withdraw from Service (EU Consumers)
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Exercise your 14-day right of withdrawal under Directive 2011/83/EU and Czech Civil
+                  Code § 1829. Available only if you have not used AI features. Cancels your subscription
+                  and refunds within 14 days. Distinct from account deletion.{' '}
+                  <a
+                    href="/terms-of-service#right-of-withdrawal"
+                    target="_blank"
+                    rel="noopener"
+                    className="text-amber-600 hover:underline"
+                  >
+                    Learn more →
+                  </a>
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => setWithdrawDialogOpen(true)}
+              className="w-full sm:w-auto border-amber-500 text-amber-600 hover:bg-amber-500/5"
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              Withdraw from Service
+            </Button>
+          </div>
+
+          <div className="border-t pt-6 space-y-2">
+            <div className="flex items-start gap-3">
               <Trash2 className="h-5 w-5 mt-0.5 text-red-500 shrink-0" />
               <div className="flex-1">
                 <p className="text-sm font-medium text-red-500">Delete Account</p>
@@ -972,6 +1045,64 @@ export function SettingsTab() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Withdrawal Dialog — Directive (EU) 2023/2673 one-click withdrawal */}
+      <Dialog open={withdrawDialogOpen} onOpenChange={setWithdrawDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Withdraw from OmniParse Service</DialogTitle>
+            <DialogDescription>
+              Exercise your 14-day right of withdrawal as an EU consumer.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 text-sm text-muted-foreground">
+            <p>
+              By clicking <strong>Confirm Withdrawal</strong> below, you are exercising your right of
+              withdrawal under <strong>Directive 2011/83/EU</strong> (as implemented in Czech Civil Code
+              §§ 1829 and 1837). The following will happen:
+            </p>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>Your paid subscription (if any) is cancelled immediately.</li>
+              <li>Any payment made within the last 14 days is refunded within 14 days via Stripe.</li>
+              <li>Your account is marked as withdrawn — you can no longer log in.</li>
+              <li>Your personal data is deleted within 90 days (per Privacy Policy §4).</li>
+            </ul>
+            <p className="text-amber-600 dark:text-amber-500">
+              <strong>Note:</strong> If you have already used AI features (upload, scan, or chat), the
+              right of withdrawal was forfeited at signup per § 1837(j) of the Czech Civil Code. In that
+              case, withdrawal will still cancel any future billing, but no refund is owed for the current
+              period.
+            </p>
+            <p>
+              This is distinct from <strong>Delete Account</strong> — withdrawal is a consumer-protection
+              action; if you simply want to remove your data, use Delete Account instead.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setWithdrawDialogOpen(false)}
+              disabled={withdrawing}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleWithdraw}
+              disabled={withdrawing}
+            >
+              {withdrawing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                'Confirm Withdrawal'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Compliance Card */}
       <Card className="border-border/50">

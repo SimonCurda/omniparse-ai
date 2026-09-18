@@ -30,6 +30,10 @@ export const signupSchema = z.object({
       ),
     termsAccepted: z.literal(true, { error: 'You must accept the Terms of Service and Privacy Policy' }),
     ageConfirmed: z.literal(true, { error: 'You must confirm you are at least 15 years old' }),
+    withdrawalAcknowledged: z.literal(true, {
+      error:
+        'You must acknowledge that you lose the 14-day right of withdrawal once the service begins (Czech Civil Code §1837(j), Directive 2011/83/EU Art. 16(m))',
+    }),
   });
 
 export const changePasswordSchema = z
