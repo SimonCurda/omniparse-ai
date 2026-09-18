@@ -199,7 +199,7 @@ export default function PrivacyPolicyPage() {
           <li><strong>Supabase Inc.</strong> (Ireland, EU) — Primary database hosting (PostgreSQL). Processes: all stored account data, invoices, chat messages. DPA built into Terms of Service (effective August 1, 2026) — automatically applies to all customers, no separate signature required. <a href="https://supabase.com/legal/customer-resources/data-processing-addendum" target="_blank" rel="noopener">Supabase DPA</a>. Subprocessor change notifications: <a href="https://supabase.com/legal/customer-resources/subprocessor-list" target="_blank" rel="noopener">supabase.com/legal/customer-resources/subprocessor-list</a>.</li>
           <li><strong>Mistral AI</strong> (Paris, France — EU) — Primary AI inference provider. Processes: uploaded document content (transiently) for vision extraction, chat messages (transiently). <strong>EU-based — no SCC required.</strong> Training opt-out (<code>usage_options.enable_training=false</code>) is sent on every request when <code>MISTRAL_DISABLE_TRAINING=true</code> (default). <a href="https://mistral.ai/legal/privacy-policy" target="_blank" rel="noopener">Mistral Privacy Policy</a>.</li>
           <li><strong>Groq Inc.</strong> (United States) — Secondary AI inference provider (after Mistral). Processes: uploaded document content (transiently), chat messages (transiently). <strong>SCCs confirmed</strong> (EU SCC Module 2, self-executing upon acceptance of Groq Services Agreement; DPA dated October 15, 2025). DPA accessible at <a href="https://console.groq.com" target="_blank" rel="noopener">console.groq.com</a>. Governing law: Ireland. <em>Note: Groq is optional in our configuration — operators may deploy in EU-only mode (Mistral only) by leaving GROQ_API_KEY unset.</em></li>
-          <li><strong>Google LLC</strong> (United States, DPF-certified) — Final fallback AI inference provider. Models used: Gemini 2.0 Flash, Gemini 2.5 Flash, Gemini 1.5 Flash. <strong>DPF-certified</strong> — no SCC required while DPF remains valid. Google Cloud DPA self-executing upon acceptance of Google Cloud Terms; available at <a href="https://cloud.google.com/terms/data-processing-addendum" target="_blank" rel="noopener">cloud.google.com/terms/data-processing-addendum</a>. <em>Note: This uses Google&apos;s AI Studio free-tier endpoint. For production with EU personal data, consider migrating to Vertex AI.</em></li>
+          <li><strong>Google LLC</strong> (United States, DPF-certified) — Final fallback AI inference provider. Models used: Gemini 2.0 Flash, Gemini 2.5 Flash, Gemini 1.5 Flash. <strong>DISABLED BY DEFAULT</strong> — uses Google&apos;s AI Studio free-tier endpoint (<code>generativelanguage.googleapis.com</code>), whose data-handling terms are weaker than Google Cloud Vertex AI (which has a self-executing DPA). Operator must set <code>ENABLE_GOOGLE_GEMINI=true</code> after reviewing Google AI Studio terms. For production with EU personal data, operators are strongly encouraged to migrate to Vertex AI instead. Google LLC itself is DPF-certified. <a href="https://cloud.google.com/terms/data-processing-addendum" target="_blank" rel="noopener">Google Cloud DPA</a> (applies to Vertex AI path, not AI Studio free tier).</li>
           <li><strong>Stripe Inc.</strong> (United States, DPF-certified) — Payment processing for paid plans. Processes: email, billing details. <a href="https://stripe.com/legal/dpa" target="_blank" rel="noopener">Stripe DPA</a>.</li>
         </ul>
         <p>
@@ -214,7 +214,7 @@ export default function PrivacyPolicyPage() {
           OpenRouter or its underlying providers.
         </p>
         <p>
-          <strong>AI vision cascade (production default):</strong> Mistral (EU, primary) → Groq (US, SCCs confirmed, secondary) → Google Gemini (US, DPF-certified, final fallback). OpenRouter is skipped unless explicitly enabled by the operator.
+          <strong>AI vision cascade (production default):</strong> Mistral (EU, primary) → Groq (US, SCCs confirmed, secondary). OpenRouter and Google Gemini are <strong>disabled by default</strong> and only used if the operator explicitly enables them after completing their own DPA/SCC review (OpenRouter) or AI Studio terms review (Google Gemini).
         </p>
         <p>
           <strong>SCC Status (as of September 18, 2026):</strong>
@@ -223,7 +223,7 @@ export default function PrivacyPolicyPage() {
             <li><strong>Vercel Inc.</strong> (United States) — DPF-certified. DPA available at vercel.com/legal/dpa.</li>
             <li><strong>Groq Inc.</strong> — SCCs confirmed in effect (DPA dated October 15, 2025; EU SCC Module 2 self-executing upon acceptance of Groq Services Agreement). DPA accessible at <a href="https://console.groq.com" target="_blank" rel="noopener">console.groq.com</a>. Governing law: Ireland. Competent authority: Irish DPC. 72-hour breach notification. DPF certification status pending verification.</li>
             <li><strong>Mistral AI</strong> — EU-based (Paris, France). No Chapter V transfer issue; no SCC required. Training opt-out sent on every request (MISTRAL_DISABLE_TRAINING=true).</li>
-            <li><strong>Google LLC (Gemini)</strong> — Google Cloud DPA self-executing upon acceptance of Google Cloud Terms. Google LLC is DPF-certified — no SCC required while DPF remains valid.</li>
+            <li><strong>Google LLC (Gemini)</strong> — <strong>DISABLED BY DEFAULT</strong>. Uses AI Studio free-tier endpoint (generativelanguage.googleapis.com). Google Cloud DPA (cloud.google.com/terms/data-processing-addendum) applies to the Vertex AI path, NOT the AI Studio free tier. Google LLC is DPF-certified. Operator must set ENABLE_GOOGLE_GEMINI=true after reviewing AI Studio terms. For EU personal data, migrate to Vertex AI.</li>
             <li><strong>Stripe Inc.</strong> (United States) — DPF-certified. DPA available at stripe.com/legal/dpa.</li>
             <li><strong>OpenRouter</strong> — <strong>DISABLED by default</strong>. Not used in production unless operator explicitly sets ENABLE_OPENROUTER=true after completing DPA/SCC review. When disabled, no data is transferred to OpenRouter or its underlying providers.</li>
           </ul>
@@ -243,13 +243,13 @@ export default function PrivacyPolicyPage() {
           (default server configuration) to disable training on prompt content. This opt-out is
           effective on paid Mistral tier; on free Mistral tier, Mistral may ignore or reject this
           parameter. OpenRouter (which has no training opt-out on free-tier models) is disabled by
-          default. Groq&apos;s data-handling terms are governed by the Groq DPA and SCCs. Google Gemini
-          (AI Studio free tier) data-handling is governed by Google&apos;s AI Studio terms; for stronger
-          guarantees, operators may migrate to Vertex AI (out of scope for this deployment).
+          default. Google Gemini (AI Studio free tier, whose data-handling terms are weaker than
+          Google Cloud Vertex AI) is also disabled by default. Groq&apos;s data-handling terms are
+          governed by the Groq DPA and SCCs.
           <strong>OmniParse itself does not route customer content through AI API tiers that permit
           provider training on customer content</strong> when the default configuration (Mistral with
-          training opt-out, OpenRouter disabled) is in effect. Operators who change this configuration
-          must update this Policy accordingly.
+          training opt-out, OpenRouter disabled, Google Gemini disabled) is in effect. Operators who
+          change this configuration must update this Policy accordingly.
         </p>
         <p>
           <strong>Important — Schrems III risk:</strong> The EU-US Data Privacy Framework (DPF) adequacy

@@ -45,9 +45,13 @@ export default function AIActNoticePage() {
           justice/democratic processes).
         </p>
         <p>
-          The Service is nevertheless subject to applicable transparency requirements under Article 50,
-          including those applicable to AI systems that directly interact with users (Art. 50(1)) and to
-          AI-generated or manipulated content (Art. 50(4)).
+          The Service is subject to applicable transparency requirements under Article 50 of the EU
+          AI Act, in particular Article 50(1) (AI systems that interact with natural persons). The
+          Service may also generate or manipulate content using AI. Where applicable, we will
+          implement the transparency measures required by Article 50 for AI-generated or manipulated
+          content (Article 50(4)). We do not assert that every output of the Service automatically
+          falls within all Article 50(4) sub-categories; the applicability of specific transparency
+          obligations is assessed based on the nature of the output and the context of its use.
         </p>
         <p>
           As the provider of the Service under our own name and brand, we acknowledge our
@@ -58,10 +62,17 @@ export default function AIActNoticePage() {
         <p>
           <strong>General-Purpose AI (GPAI) classification:</strong> The AI models used by OmniParse
           (e.g., Gemini, Pixtral, Llama) are developed by upstream providers (Google, Mistral, Meta,
-          etc.) and may qualify as GPAI models under Art. 3(63). OmniParse is a <strong>deployer</strong>
-          of these models, not a GPAI provider. Transparency obligations applicable to GPAI providers
-          under Art. 53 rest with the upstream model providers. OmniParse relies on the technical
-          documentation and information provided by those upstream providers.
+          etc.) and may qualify as GPAI models under Art. 3(63). OmniParse&apos;s AI Act role depends on
+          the specific component and context: OmniParse may act as a <strong>deployer</strong> of these
+          models (within the meaning of Art. 3(4)) when it uses them under its own name for the
+          invoice-extraction and chat-assistant purposes. For some components — particularly where
+          OmniParse integrates the model into a broader service offered under its own brand and
+          substantially shapes the system&apos;s intended purpose — OmniParse&apos;s role may also be that
+          of a <strong>downstream provider</strong> of an AI system within the meaning of Art. 25.
+          The exact classification of each component is fact-specific and should be confirmed by
+          legal counsel. Transparency obligations applicable to GPAI providers under Art. 53 rest
+          with the upstream model providers (Google, Mistral, Meta, etc.). OmniParse relies on the
+          technical documentation and information provided by those upstream providers.
         </p>
       </section>
 
@@ -171,14 +182,16 @@ export default function AIActNoticePage() {
       <section>
         <h2>10. International Transfers</h2>
         <p>
-          AI processing is performed by Mistral AI (EU-based, Paris, France), Groq Inc. (US — SCCs confirmed),
-          and Google LLC (US — DPF-certified). <strong>OpenRouter (US) is disabled by default</strong> and
-          not used unless the operator explicitly enables it after completing DPA/SCC review. Under GDPR
-          Chapter V, transfers to the US require appropriate safeguards. We rely on the EU-US Data Privacy
-          Framework (DPF) adequacy decision (10 July 2023, currently subject to CJEU appeal in
-          &quot;Schrems III&quot;) for DPF-certified recipients, and on Standard Contractual Clauses (SCCs)
-          consistent with the Schrems II ruling for non-DPF-certified recipients, together with Transfer
-          Impact Assessments (TIAs) where required.
+          AI processing is performed by Mistral AI (EU-based, Paris, France) and Groq Inc. (US — SCCs
+          confirmed). <strong>OpenRouter (US) and Google Gemini (US) are both disabled by default</strong>
+          and are not used unless the operator explicitly enables them after completing their own
+          DPA/SCC review (OpenRouter) or AI Studio terms review (Google Gemini). Under GDPR Chapter V,
+          transfers to the US require appropriate safeguards. We rely on Standard Contractual Clauses
+          (SCCs) consistent with the Schrems II ruling for non-DPF-certified recipients, together with
+          Transfer Impact Assessments (TIAs) where required. The EU-US Data Privacy Framework (DPF)
+          adequacy decision (10 July 2023) covers DPF-certified US recipients — but note that Google&apos;s
+          AI Studio free-tier endpoint is NOT covered by the Google Cloud DPA (which applies to the
+          Vertex AI path only); this is why Google Gemini is disabled by default in our configuration.
         </p>
         <div className="border-l-4 border-emerald-500 bg-emerald-500/5 p-3 my-3 rounded-r">
           <p className="text-sm">
@@ -186,14 +199,14 @@ export default function AIActNoticePage() {
           </p>
           <ul className="list-disc pl-5 mt-2 text-sm space-y-1">
             <li><strong>Mistral AI</strong> — EU-based (Paris, France). Transfers are expected to remain within the EEA, subject to Mistral&apos;s applicable terms. No SCC required. Training opt-out (<code>usage_options.enable_training=false</code>) sent on every request when MISTRAL_DISABLE_TRAINING=true (default).</li>
-            <li><strong>Groq Inc.</strong> — SCCs confirmed in effect (DPA dated October 15, 2025; EU SCC Module 2 self-executing upon acceptance of Groq Services Agreement). DPA accessible at <a href="https://console.groq.com" target="_blank" rel="noopener">console.groq.com</a>. Governing law: Ireland. Competent authority: Irish DPC. 72-hour breach notification. DPF certification status pending verification; SCCs remain in place as a safeguard.</li>
-            <li><strong>Google LLC (Gemini)</strong> — Google Cloud DPA self-executing upon acceptance of Google Cloud Terms; available at <a href="https://cloud.google.com/terms/data-processing-addendum" target="_blank" rel="noopener">cloud.google.com/terms/data-processing-addendum</a>. Google LLC is DPF-certified. Note: uses AI Studio free-tier endpoint; for stronger guarantees, operators may migrate to Vertex AI.</li>
+            <li><strong>Groq Inc.</strong> — SCCs confirmed in effect (DPA dated October 15, 2025; EU SCC Module 2 self-executing upon acceptance of Groq Services Agreement). DPA accessible at <a href="https://console.groq.com" target="_blank" rel="noopener">console.groq.com</a>. Governing law: Ireland. Competent authority: Irish DPC. 72-hour breach notification.</li>
+            <li><strong>Google LLC (Gemini)</strong> — <strong>DISABLED BY DEFAULT</strong>. Uses AI Studio free-tier endpoint (generativelanguage.googleapis.com). The Google Cloud DPA (cloud.google.com/terms/data-processing-addendum) applies to the Vertex AI path, NOT the AI Studio free tier. Google LLC is DPF-certified, but the AI Studio free-tier data-handling terms are weaker than Vertex AI. Operator must set ENABLE_GOOGLE_GEMINI=true after reviewing AI Studio terms. For EU personal data, migrate to Vertex AI.</li>
             <li><strong>Vercel Inc.</strong> — DPF-certified. DPA available at <a href="https://vercel.com/legal/dpa" target="_blank" rel="noopener">vercel.com/legal/dpa</a>.</li>
             <li><strong>Stripe Inc.</strong> — DPF-certified. DPA available at <a href="https://stripe.com/legal/dpa" target="_blank" rel="noopener">stripe.com/legal/dpa</a>.</li>
             <li><strong>OpenRouter</strong> — <strong>DISABLED BY DEFAULT</strong>. No personal data is transferred to OpenRouter unless the operator explicitly sets ENABLE_OPENROUTER=true. Before enabling, the operator must complete a DPA with OpenRouter, verify SCCs or DPF certification, switch to paid-tier models (to disable training), and update this notice.</li>
           </ul>
           <p className="text-sm mt-2">
-            <strong className="text-emerald-700 dark:text-emerald-500">Summary:</strong> AI processing via Mistral (EU) and Groq (US, SCCs confirmed) has appropriate safeguards in place. Google is DPF-certified. OpenRouter is disabled by default and not used unless the operator explicitly enables it. Users should note that documents may contain personal data of multiple data subjects — the user is responsible for ensuring a valid legal basis for processing and transferring such data.
+            <strong className="text-emerald-700 dark:text-emerald-500">Summary:</strong> AI processing via Mistral (EU) and Groq (US, SCCs confirmed) has appropriate safeguards in place. OpenRouter and Google Gemini are disabled by default and are not used unless the operator explicitly enables them. Users should note that documents may contain personal data of multiple data subjects — the user is responsible for ensuring a valid legal basis for processing and transferring such data.
           </p>
         </div>
         <p>
@@ -208,10 +221,13 @@ export default function AIActNoticePage() {
           Pursuant to Article 4 of the EU AI Act (applicable since 2 February 2025), providers and
           deployers of AI systems shall take measures to ensure, to their best extent, a sufficient
           level of AI literacy in their staff and persons dealing with the operation and use of AI
-          systems on their behalf. OmniParse acknowledges this obligation and provides this Notice
-          (plus the in-Service AI disclaimers) as part of user-facing AI literacy. Internal staff
-          training on AI capabilities, limitations, and risks is documented in our internal records
-          and updated at least annually, or when significant changes to AI features occur.
+          systems on their behalf. This Notice forms part of OmniParse&apos;s measures supporting AI
+          literacy among persons involved in the operation and use of the Service. It is not, by
+          itself, a complete fulfillment of the Article 4 obligation — that obligation also
+          encompasses internal staff training, operational documentation, and ongoing assessment of
+          AI literacy needs. Internal staff training on AI capabilities, limitations, and risks is
+          documented in our internal records and updated at least annually, or when significant
+          changes to AI features occur.
         </p>
       </section>
 

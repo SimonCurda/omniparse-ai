@@ -78,6 +78,30 @@ function isGroqConfigured(): boolean {
 }
 
 /**
+ * Check whether Google Gemini (AI Studio free-tier endpoint) is explicitly
+ * enabled. Default: DISABLED.
+ *
+ * Legal compliance rationale: Google's AI Studio free-tier endpoint
+ * (generativelanguage.googleapis.com) has data-handling terms that are
+ * weaker than Google Cloud Vertex AI (which has a self-executing DPA).
+ * For EU personal data, the AI Studio free tier is not recommended. We
+ * therefore disable it by default and require explicit operator opt-in
+ * via ENABLE_GOOGLE_GEMINI=true.
+ *
+ * To enable Google Gemini (NOT recommended for production EU personal data):
+ *   set ENABLE_GOOGLE_GEMINI=true in Vercel env vars
+ *
+ * Before enabling, the operator must:
+ *   1. Review Google AI Studio terms at https://ai.google.dev/terms
+ *   2. Verify the data-handling terms are acceptable for the data being processed
+ *   3. OR migrate to Vertex AI (separate code path, not currently supported)
+ *   4. Update Privacy Policy §6 SCC Status table
+ */
+function isGoogleGeminiEnabled(): boolean {
+  return process.env.ENABLE_GOOGLE_GEMINI === 'true';
+}
+
+/**
  * Check whether OpenRouter is explicitly enabled. Default: DISABLED.
  *
  * Legal compliance rationale: OpenRouter's free-tier models (all model IDs
@@ -480,7 +504,8 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
     process.env.GEMINI_API_KEY_3,
   ].filter(Boolean) as string[];
 
-  if (geminiKeys.length > 0) {
+  if (isGoogleGeminiEnabled() && geminiKeys.length > 0) {
+    console.warn('[gemini] Google Gemini is ENABLED via ENABLE_GOOGLE_GEMINI env var. AI Studio free-tier data terms may not be suitable for EU personal data — review before processing customer documents.');
     const geminiModels = [
       'gemini-2.0-flash',           // fast, generous free tier (15 rpm)
       'gemini-2.5-flash',           // newer, also free tier
@@ -947,7 +972,8 @@ export async function geminiChatCall(
     process.env.GEMINI_API_KEY_3,
   ].filter(Boolean) as string[];
 
-  if (geminiKeys.length > 0) {
+  if (isGoogleGeminiEnabled() && geminiKeys.length > 0) {
+    console.warn('[gemini-chat] Google Gemini is ENABLED via ENABLE_GOOGLE_GEMINI env var. AI Studio free-tier data terms may not be suitable for EU personal data.');
     const geminiTextModels = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-1.5-flash'];
 
     for (const gm of geminiTextModels) {

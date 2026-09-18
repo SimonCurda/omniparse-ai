@@ -89,8 +89,11 @@ export default function TermsOfServicePage() {
           By uploading content, you grant OmniParse a worldwide, non-exclusive, royalty-free, revocable
           license to process, transmit, store, and display your content solely for the purpose of
           operating and providing the Service to you, including the right to transmit content to
-          third-party AI inference providers as described in the Privacy Policy. This license terminates
-          automatically when your content is deleted from the Service or your account is terminated.
+          third-party AI inference providers as described in the Privacy Policy. This license ends
+          when the relevant content is deleted from the Service, except to the extent continued
+          processing or retention is required for legitimate operational, security, legal, or backup
+          purposes described in the Privacy Policy (including backup copies that may persist for a
+          limited period after deletion from active storage).
         </p>
         <p>
           <strong>Service IP:</strong> The Service itself, including its source code, design, UI,
@@ -109,10 +112,15 @@ export default function TermsOfServicePage() {
       <section>
         <h2>6. Data Processing</h2>
         <p>
-          Uploaded documents are stored for 30 days for preview purposes, then automatically deleted.
-          Extracted data is stored in your account database and is accessible from your dashboard. You
-          can delete your data at any time. See our <a href="/privacy-policy" className="underline">Privacy
-          Policy</a> for full details on data handling.
+          Uploaded documents are retained in the active application environment for up to 30 days
+          for preview purposes and are then deleted from active storage, subject to applicable
+          backup, security, legal and provider retention periods described in our{' '}
+          <a href="/privacy-policy" className="underline">Privacy Policy</a> (Privacy Policy §4
+          retention table). Extracted data is stored in your account database and is accessible
+          from your dashboard. You can delete your data at any time. See our{' '}
+          <a href="/privacy-policy" className="underline">Privacy Policy</a> for full details on
+          data handling, including the distinction between active-storage deletion (30 days) and
+          post-termination cleanup (90 days).
         </p>
       </section>
 
@@ -136,7 +144,7 @@ export default function TermsOfServicePage() {
           communications, or tax filings based on them.
         </p>
         <p>
-          <strong>AI providers:</strong> OmniParse uses third-party AI providers for vision extraction and text generation. The primary provider is <strong>Mistral AI</strong> (Paris, France — EU-based; transfers are expected to remain within the EEA, subject to Mistral&apos;s applicable terms). <strong>Groq Inc.</strong> (US-based) has confirmed Standard Contractual Clauses (SCCs) in effect (EU SCC Module 2, self-executing under Groq&apos;s DPA dated October 15, 2025). <strong>Google LLC</strong> (US-based) is DPF-certified. <strong>OpenRouter</strong> (US-based) is <strong>disabled by default</strong> and not used unless the operator explicitly enables it after completing DPA/SCC review. These providers may experience rate limits, outages, or model deprecations that affect the availability and quality of AI features. We do not control and are not responsible for the behavior of these upstream models beyond our integration layer.
+          <strong>AI providers:</strong> OmniParse uses third-party AI providers for vision extraction and text generation. The primary provider is <strong>Mistral AI</strong> (Paris, France — EU-based; transfers are expected to remain within the EEA, subject to Mistral&apos;s applicable terms). <strong>Groq Inc.</strong> (US-based) has confirmed Standard Contractual Clauses (SCCs) in effect (EU SCC Module 2, self-executing under Groq&apos;s DPA dated October 15, 2025). <strong>OpenRouter</strong> (US-based) and <strong>Google Gemini</strong> (US-based, AI Studio free tier) are <strong>disabled by default</strong> and are not used unless the operator explicitly enables them after completing their own DPA/SCC review (OpenRouter) or AI Studio terms review (Google Gemini). These providers may experience rate limits, outages, or model deprecations that affect the availability and quality of AI features. We do not control and are not responsible for the behavior of these upstream models beyond our integration layer.
         </p>
         <p>
           See our <a href="/ai-act-notice" className="underline">AI Transparency Notice</a> for full
@@ -192,9 +200,13 @@ export default function TermsOfServicePage() {
           Any payment you make to a vendor, supplier, or other recipient — even if OmniParse extracted
           the vendor&apos;s bank details, suggested a payment amount, or displayed a &quot;Pay&quot; button that
           links to an external site — is solely your responsibility. You must independently verify
-          the payee, amount, bank account, and payment method before initiating any payment. OmniParse
-          is not a party to any payment transaction and bears no liability for payments made, missed,
-          or incorrectly executed based on data extracted or suggested by the Service.
+          the payee, amount, bank account, and payment method before initiating any payment. To the
+          maximum extent permitted by applicable law, OmniParse is not a party to any payment
+          transaction and bears no liability for payments made, missed, or incorrectly executed
+          based on data extracted or suggested by the Service. Nothing in this section excludes or
+          limits liability that cannot lawfully be excluded or limited under applicable law,
+          including liability for intentional damage, gross negligence, and mandatory consumer
+          protection rights (see §10.4 and §10.5).
         </p>
         <p>
           If OmniParse adds payment-integration features in the future (e.g., bank integrations,
@@ -243,11 +255,16 @@ export default function TermsOfServicePage() {
           <li>Reviewing the Pending Review queue regularly (at minimum weekly, or before any payment run)</li>
         </ul>
         <p>
-          <strong>OmniParse is not liable for missed invoices, late payment fees, vendor relationship
-          damage, tax filing errors, late filing penalties, or any other damages arising from the
-          Service&apos;s failure to capture or correctly process an invoice.</strong> This includes
-          scenarios where the user has stopped checking their email inbox manually and relies
-          exclusively on the Service&apos;s auto-capture feature.
+          <strong>To the maximum extent permitted by applicable law, OmniParse shall not be liable
+          for losses resulting from missed, delayed, incorrectly classified, or incorrectly
+          extracted invoices where such losses arise from limitations, errors, or failures of the
+          Service.</strong> This includes late payment fees, vendor relationship damage, tax filing
+          errors, late filing penalties, or any other damages arising from the Service&apos;s failure
+          to capture or correctly process an invoice, including scenarios where the user has stopped
+          checking their email inbox manually and relies exclusively on the Service&apos;s auto-capture
+          feature. Nothing in this section excludes or limits liability that cannot lawfully be
+          excluded or limited under applicable law, including liability for intentional damage, gross
+          negligence, and mandatory consumer protection rights (see §10.4 and §10.5).
         </p>
         <p>
           <strong>For paid users only:</strong> Where OmniParse is found directly at fault for
@@ -279,10 +296,11 @@ export default function TermsOfServicePage() {
         <p>
           We do not warrant that the Service will be uninterrupted, error-free, or free of harmful
           components. We do not warrant that AI extraction results will be accurate or complete.
-          AI providers (Mistral, Groq, Google Gemini) may experience rate limits, model
-          deprecations, or outages that affect availability of AI features. Mistral is EU-based (Paris);
-          Groq and Google are US-based. OpenRouter is disabled by default and not used unless the
-          operator explicitly enables it.
+          AI providers (Mistral, Groq) may experience rate limits, model deprecations, or outages
+          that affect availability of AI features. Mistral is EU-based (Paris, France); Groq is
+          US-based. OpenRouter and Google Gemini are <strong>disabled by default</strong> and are
+          not used unless explicitly enabled by the operator after completing their own DPA/SCC
+          review (OpenRouter) or AI Studio terms review (Google Gemini).
         </p>
       </section>
 
@@ -326,10 +344,10 @@ export default function TermsOfServicePage() {
         </p>
         <ul className="list-disc pl-6 space-y-1 text-sm">
           <li>Liability for intentional damage or intentional misconduct;</li>
-          <li>Liability for gross negligence ( Czech Civil Code § 2913(1) );</li>
+          <li>Liability for gross negligence under applicable mandatory provisions of Czech law;</li>
           <li>Liability for personal injury or death caused by negligence;</li>
           <li>Liability arising from breach of statutory duties under mandatory consumer-protection law;</li>
-          <li>Liability under Czech Act No. 89/2012 Coll. (Civil Code) for defects in goods or services that cannot be contractually excluded;</li>
+          <li>Liability for defects in goods or services to the extent such liability cannot be contractually excluded under applicable mandatory law;</li>
           <li>Liability under product liability laws;</li>
           <li>Any other liability that cannot be excluded or limited under applicable mandatory law.</li>
         </ul>
