@@ -566,8 +566,8 @@ export async function geminiChatCall(
 
   if (mistralKeys.length > 0) {
     const mistralChatModels = [
-      'mistral-small-latest',    // fast, good quality for text extraction
-      'mistral-large-latest',    // higher quality fallback
+      'mistral-small-latest',    // fast, available on free tier
+      'open-mistral-7b',         // older model, often available on free tier
     ];
 
     for (const mistralModel of mistralChatModels) {
@@ -954,5 +954,19 @@ export async function geminiChatCall(
 
   const allTriedModels = [...triedMistralModels, ...triedModels];
   const errorDetail = allTriedModels.length > 0 ? allTriedModels.join(', ') : 'all models';
-  throw new Error(`AI is temporarily busy — please wait 30 seconds and try again. (Tried: ${errorDetail})`);
+
+  // Build a helpful error message based on what failed
+  const has403 = allTriedModels.some(m => m.includes('(403)'));
+  const has429 = allTriedModels.some(m => m.includes('(429)'));
+  const has401 = allTriedModels.some(m => m.includes('(401)'));
+  let hint = '';
+  if (has401 || has403) {
+    hint = ' — API key may be invalid or the model is not available on your tier. Check MISTRAL_API_KEY and GROQ_API_KEY in Vercel env vars.';
+  } else if (has429) {
+    hint = ' — Free-tier rate limits exceeded. Wait a few minutes or upgrade to a paid API tier.';
+  } else if (allTriedModels.length === 0) {
+    hint = ' — No AI providers are configured. Set MISTRAL_API_KEY and/or GROQ_API_KEY in Vercel env vars. OpenRouter and Google Gemini are disabled by default (set ENABLE_OPENROUTER=true or ENABLE_GOOGLE_GEMINI=true to enable).';
+  }
+
+  throw new Error(`AI is temporarily busy — please wait 30 seconds and try again. (Tried: ${errorDetail})${hint}`);
 }
