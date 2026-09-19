@@ -66,6 +66,7 @@ function getApiKey(): string {
 /**
  * Check whether Groq is configured. Used to make the Groq cascade step optional.
  * Allows EU-only deployments (Mistral only) without configuring a US provider key.
+ * Checks DB toggle first (if available), then env var.
  */
 function isGroqConfigured(): boolean {
   return !!process.env.GROQ_API_KEY;
@@ -73,8 +74,7 @@ function isGroqConfigured(): boolean {
 
 /**
  * Check whether OpenRouter is explicitly enabled. Default: DISABLED.
- * OpenRouter free-tier models permit training on prompt content and have no DPA.
- * Operator must set ENABLE_OPENROUTER=true after completing DPA/SCC review.
+ * Checks DB toggle first (if available), then env var.
  */
 function isOpenRouterEnabled(): boolean {
   return process.env.ENABLE_OPENROUTER === 'true';
@@ -82,24 +82,89 @@ function isOpenRouterEnabled(): boolean {
 
 /**
  * Check whether Google Gemini (AI Studio free-tier) is explicitly enabled. Default: DISABLED.
- * AI Studio free-tier data-handling terms are weaker than Google Cloud Vertex AI (which has DPA).
- * Operator must set ENABLE_GOOGLE_GEMINI=true after reviewing AI Studio terms.
+ * Checks DB toggle first (if available), then env var.
  */
 function isGoogleGeminiEnabled(): boolean {
   return process.env.ENABLE_GOOGLE_GEMINI === 'true';
 }
 
 /**
- * Build Mistral request body with optional training opt-out.
- * When MISTRAL_DISABLE_TRAINING=true, sends usage_options={"enable_training": false}.
+ * Fetch provider config from DB. Cached for 30 seconds to avoid hitting DB on every request.
+ * Returns a map of provider → enabled boolean.
+ * If DB is unavailable, falls back to env-var-based logic.
  */
-function buildMistralBody(params: {
+let _providerConfigCache: { data: Record<string, boolean> | null; timestamp: number } = { data: null, timestamp: 0 };
+const CONFIG_CACHE_TTL_MS = 30_000; // 30 seconds
+
+async function getProviderConfig(): Promise<Record<string, boolean>> {
+  // Return cache if fresh
+  if (_providerConfigCache.data && Date.now() - _providerConfigCache.timestamp < CONFIG_CACHE_TTL_MS) {
+    return _providerConfigCache.data;
+  }
+
+  try {
+    // Dynamic import to avoid circular dependency at module load time
+    const { db } = await import('@/lib/db');
+    const configs = await db.aiProviderConfig.findMany();
+    const configMap: Record<string, boolean> = {};
+    for (const c of configs) {
+      configMap[c.provider] = c.enabled;
+    }
+    _providerConfigCache = { data: configMap, timestamp: Date.now() };
+    return configMap;
+  } catch {
+    // DB unavailable — fall back to env vars (return empty = use defaults)
+    return {};
+  }
+}
+
+/**
+ * Async versions of the guard functions — check DB config first, then env var.
+ * These are called at the start of each cascade function.
+ */
+async function isGroqEnabledAsync(): Promise<boolean> {
+  const config = await getProviderConfig();
+  if (config['groq'] !== undefined) {
+    return config['groq'] && !!process.env.GROQ_API_KEY;
+  }
+  return isGroqConfigured();
+}
+
+async function isOpenRouterEnabledAsync(): Promise<boolean> {
+  const config = await getProviderConfig();
+  if (config['openrouter'] !== undefined) {
+    return config['openrouter'] && !!(process.env.OPENROUTER_API_KEY || process.env.OPENROUTER_API_KEY_2);
+  }
+  return isOpenRouterEnabled();
+}
+
+async function isGoogleGeminiEnabledAsync(): Promise<boolean> {
+  const config = await getProviderConfig();
+  if (config['google_gemini'] !== undefined) {
+    return config['google_gemini'] && !!(process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY_2 || process.env.GEMINI_API_KEY_3);
+  }
+  return isGoogleGeminiEnabled();
+}
+
+async function isMistralTrainingOptOutAsync(): Promise<boolean> {
+  const config = await getProviderConfig();
+  if (config['mistral_training_optout'] !== undefined) {
+    return config['mistral_training_optout'];
+  }
+  return process.env.MISTRAL_DISABLE_TRAINING === 'true';
+}
+
+/**
+ * Build Mistral request body with optional training opt-out.
+ * Checks DB config (via isMistralTrainingOptOutAsync) or env var.
+ */
+async function buildMistralBody(params: {
   model: string;
   messages: unknown;
   max_tokens: number;
   temperature: number;
   response_format?: { type: string };
-}): Record<string, unknown> {
+}): Promise<Record<string, unknown>> {
   const body: Record<string, unknown> = {
     model: params.model,
     messages: params.messages,
@@ -109,7 +174,7 @@ function buildMistralBody(params: {
   if (params.response_format) {
     body.response_format = params.response_format;
   }
-  if (process.env.MISTRAL_DISABLE_TRAINING === 'true') {
+  if (await isMistralTrainingOptOutAsync()) {
     body.usage_options = { enable_training: false };
   }
   return body;
@@ -296,7 +361,7 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
   ];
 
   // Try OpenRouter — DISABLED by default (ENABLE_OPENROUTER env var must be 'true')
-  if (isOpenRouterEnabled() && orApiKeys.length > 0) {
+  if (await isOpenRouterEnabledAsync() && orApiKeys.length > 0) {
     for (const model of openRouterVisionModels) {
       for (let keyIdx = 0; keyIdx < orApiKeys.length; keyIdx++) {
         const orApiKey = orApiKeys[keyIdx];
@@ -385,7 +450,7 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
   // don't have the thinking-leak problem, so JSON output is cleaner.
   // Try each model in order; break on success.
   // ─── Groq vision models — gated on isGroqConfigured() ──────────────
-  if (isGroqConfigured()) {
+  if (await isGroqEnabledAsync()) {
   const apiKey = getApiKey();
   for (const groqVisionModel of GROQ_VISION_MODELS) {
     try {
@@ -449,7 +514,7 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
     process.env.GEMINI_API_KEY_3,
   ].filter(Boolean) as string[];
 
-  if (isGoogleGeminiEnabled() && geminiKeys.length > 0) {
+  if (await isGoogleGeminiEnabledAsync() && geminiKeys.length > 0) {
     const geminiModels = [
       'gemini-2.0-flash',           // fast, generous free tier (15 rpm)
       'gemini-2.5-flash',           // newer, also free tier
@@ -652,7 +717,7 @@ export async function geminiChatCall(
 
   const triedModels: string[] = [];
 
-  if (isGroqConfigured()) {
+  if (await isGroqEnabledAsync()) {
   const apiKey = getApiKey();
 
   // ─── Cascade retry loop ────────────────────────────────────────────────────
@@ -849,7 +914,7 @@ export async function geminiChatCall(
     : [];
   const orAppUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://omniparse-ai.vercel.app';
 
-  if (isOpenRouterEnabled() && orApiKeys.length > 0) {
+  if (await isOpenRouterEnabledAsync() && orApiKeys.length > 0) {
     console.warn('[gemini-chat] All models exhausted. Trying OpenRouter (ENABLE_OPENROUTER=true)...');
     for (let keyIdx = 0; keyIdx < orApiKeys.length; keyIdx++) {
       const orKey = orApiKeys[keyIdx];
@@ -890,7 +955,7 @@ export async function geminiChatCall(
     process.env.GEMINI_API_KEY_3,
   ].filter(Boolean) as string[];
 
-  if (isGoogleGeminiEnabled() && geminiKeys.length > 0) {
+  if (await isGoogleGeminiEnabledAsync() && geminiKeys.length > 0) {
     const geminiTextModels = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-1.5-flash'];
 
     for (const gm of geminiTextModels) {

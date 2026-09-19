@@ -37,6 +37,20 @@ interface Account {
   abuseRisk: AbuseRisk;
 }
 
+interface ProviderInfo {
+  provider: string;
+  label: string;
+  role: string;
+  location: string;
+  dbEnabled: boolean;
+  apiKeySet: boolean;
+  effectivelyEnabled: boolean;
+  canToggle: boolean;
+  envVar: string;
+  notes: string;
+  color: string;
+}
+
 interface DeletionLog {
   id: string;
   deletedUserId: string;
@@ -79,6 +93,8 @@ export default function AdminPage() {
   const [filter, setFilter] = useState<'all' | 'high' | 'medium' | 'low' | 'frozen'>('all');
   const [tab, setTab] = useState<'accounts' | 'hidden' | 'deleted' | 'providers'>('accounts');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [providers, setProviders] = useState<ProviderInfo[]>([]);
+  const [providersLoading, setProvidersLoading] = useState(false);
   const [sortField, setSortField] = useState<SortField>('risk');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 
@@ -95,6 +111,27 @@ export default function AdminPage() {
       } catch {}
     }
   }, []);
+
+  const fetchProviders = useCallback(async () => {
+    setProvidersLoading(true);
+    try {
+      const res = await fetch('/api/admin/providers');
+      const data = await res.json();
+      if (res.ok) {
+        setProviders(data.providers || []);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setProvidersLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (tab === 'providers') {
+      fetchProviders();
+    }
+  }, [tab, fetchProviders]);
 
   const fetchAccounts = useCallback(async () => {
     if (!secret) return;
@@ -578,99 +615,60 @@ export default function AdminPage() {
         {tab === 'providers' && (
           <div className="space-y-4">
             <div className="rounded-xl border border-border bg-card p-6">
-              <h3 className="text-lg font-semibold mb-1">AI Provider Status</h3>
+              <div className="flex items-center justify-between mb-1">
+                <h3 className="text-lg font-semibold">AI Provider Status</h3>
+                <button onClick={fetchProviders} disabled={providersLoading}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs hover:bg-muted/50 disabled:opacity-50">
+                  {providersLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} Refresh
+                </button>
+              </div>
               <p className="text-sm text-muted-foreground mb-4">
-                These are the AI providers configured in the production environment. Providers marked as
-                "Disabled by default" require an environment variable to be explicitly set to
-                <code className="mx-1 px-1.5 py-0.5 rounded bg-muted text-xs">true</code>
-                in Vercel before they will be used for customer content.
+                Toggle providers on or off instantly — no redeploy needed. Changes take effect within 30 seconds
+                (config cache). A provider only works if both the toggle is ON and the API key is set in Vercel env vars.
               </p>
 
-              {/* Provider cards */}
+              {/* Provider cards — dynamic from API */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Mistral */}
-                <ProviderCard
-                  name="Mistral AI"
-                  role="Primary AI — Vision + Text"
-                  location="Paris, France (EU)"
-                  status="active"
-                  statusLabel="Active (primary)"
-                  envVar="MISTRAL_API_KEY"
-                  notes="Training opt-out sent when MISTRAL_DISABLE_TRAINING=true. EU-based — no SCC required."
-                  color="emerald"
-                />
-
-                {/* Groq */}
-                <ProviderCard
-                  name="Groq Inc."
-                  role="Secondary AI — Vision + Text"
-                  location="United States"
-                  status="active"
-                  statusLabel="Active (secondary)"
-                  envVar="GROQ_API_KEY"
-                  notes="SCCs confirmed. Optional — can be disabled for EU-only mode by unsetting GROQ_API_KEY."
-                  color="emerald"
-                />
-
-                {/* OpenRouter */}
-                <ProviderCard
-                  name="OpenRouter"
-                  role="Fallback AI (disabled)"
-                  location="United States"
-                  status="disabled"
-                  statusLabel="Disabled by default"
-                  envVar="ENABLE_OPENROUTER"
-                  notes="Free-tier models permit training on prompt content. No DPA in place. Enable only after completing DPA/SCC review."
-                  color="amber"
-                />
-
-                {/* Google Gemini */}
-                <ProviderCard
-                  name="Google Gemini"
-                  role="Fallback AI (disabled)"
-                  location="United States"
-                  status="disabled"
-                  statusLabel="Disabled by default"
-                  envVar="ENABLE_GOOGLE_GEMINI"
-                  notes="AI Studio free-tier endpoint. Google Cloud DPA does NOT apply to AI Studio (only Vertex AI). Enable only after reviewing AI Studio terms."
-                  color="amber"
-                />
-
-                {/* Vercel */}
-                <ProviderCard
-                  name="Vercel Inc."
-                  role="Hosting + Serverless"
-                  location="United States"
-                  status="active"
-                  statusLabel="Active (infrastructure)"
-                  envVar="(always on)"
-                  notes="DPF-certified. DPA at vercel.com/legal/dpa."
-                  color="emerald"
-                />
-
-                {/* Supabase */}
-                <ProviderCard
-                  name="Supabase Inc."
-                  role="Database (PostgreSQL)"
-                  location="Ireland (EU)"
-                  status="active"
-                  statusLabel="Active (infrastructure)"
-                  envVar="(always on)"
-                  notes="DPA built into Terms of Service. EU-based — no SCC required."
-                  color="emerald"
-                />
-
-                {/* Stripe */}
-                <ProviderCard
-                  name="Stripe Inc."
-                  role="Payment Processing"
-                  location="United States"
-                  status="active"
-                  statusLabel="Active (payments)"
-                  envVar="STRIPE_SECRET_KEY"
-                  notes="DPF-certified. May act as independent controller for payment processing."
-                  color="emerald"
-                />
+                {providersLoading && providers.length === 0 && (
+                  <div className="col-span-2 text-center py-8 text-muted-foreground">
+                    <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
+                    Loading provider status...
+                  </div>
+                )}
+                {providers.map((p) => (
+                  <ProviderToggleCard
+                    key={p.provider}
+                    provider={p.provider}
+                    label={p.label}
+                    role={p.role}
+                    location={p.location}
+                    dbEnabled={p.dbEnabled}
+                    apiKeySet={p.apiKeySet}
+                    effectivelyEnabled={p.effectivelyEnabled}
+                    canToggle={p.canToggle}
+                    envVar={p.envVar}
+                    notes={p.notes}
+                    color={p.color as 'emerald' | 'amber' | 'blue'}
+                    onToggle={async (enabled) => {
+                      try {
+                        const res = await fetch('/api/admin/providers', {
+                          method: 'PUT',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ provider: p.provider, enabled }),
+                        });
+                        if (!res.ok) {
+                          const data = await res.json();
+                          toast.error(data.error || 'Failed to toggle provider');
+                          return;
+                        }
+                        toast.success(`${p.label} ${enabled ? 'enabled' : 'disabled'}`);
+                        fetchProviders();
+                      } catch {
+                        toast.error('Network error');
+                      }
+                    }}
+                  />
+                ))}
               </div>
 
               <div className="mt-6 p-4 rounded-lg bg-amber-500/5 border border-amber-500/20">
@@ -731,38 +729,59 @@ function RiskCard({ label, value, color, bg, icon: Icon, active, onClick }: { la
   );
 }
 
-function ProviderCard({ name, role, location, status, statusLabel, envVar, notes, color }: {
-  name: string;
+function ProviderToggleCard({ label, role, location, dbEnabled, apiKeySet, effectivelyEnabled, canToggle, envVar, notes, color, onToggle }: {
+  label: string;
   role: string;
   location: string;
-  status: 'active' | 'disabled';
-  statusLabel: string;
+  dbEnabled: boolean;
+  apiKeySet: boolean;
+  effectivelyEnabled: boolean;
+  canToggle: boolean;
   envVar: string;
   notes: string;
-  color: 'emerald' | 'amber';
+  color: 'emerald' | 'amber' | 'blue';
+  onToggle: (enabled: boolean) => void;
 }) {
   const colorClasses = {
     emerald: { bg: 'bg-emerald-500/5', border: 'border-emerald-500/20', text: 'text-emerald-600', icon: 'text-emerald-500' },
     amber: { bg: 'bg-amber-500/5', border: 'border-amber-500/20', text: 'text-amber-600', icon: 'text-amber-500' },
+    blue: { bg: 'bg-blue-500/5', border: 'border-blue-500/20', text: 'text-blue-600', icon: 'text-blue-500' },
   };
   const c = colorClasses[color];
 
   return (
-    <div className={`rounded-xl border p-4 ${c.bg} ${c.border}`}>
+    <div className={`rounded-xl border p-4 ${effectivelyEnabled ? c.bg : 'bg-muted/5'} ${effectivelyEnabled ? c.border : 'border-border'}`}>
       <div className="flex items-start justify-between gap-2 mb-2">
         <div>
-          <h4 className="font-semibold text-sm">{name}</h4>
+          <h4 className="font-semibold text-sm">{label}</h4>
           <p className="text-xs text-muted-foreground">{role}</p>
         </div>
-        {status === 'active' ? (
-          <CheckCircle2 className={`h-5 w-5 ${c.icon} shrink-0`} />
-        ) : (
-          <XCircle className={`h-5 w-5 ${c.icon} shrink-0`} />
-        )}
+        {/* Toggle switch */}
+        <button
+          onClick={() => canToggle && onToggle(!dbEnabled)}
+          disabled={!canToggle}
+          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ${
+            dbEnabled ? c.icon : 'bg-muted-foreground/20'
+          } ${!canToggle ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer hover:opacity-80'}`}
+          title={canToggle ? `Click to ${dbEnabled ? 'disable' : 'enable'}` : 'API key not set in Vercel — cannot toggle'}
+        >
+          <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${dbEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+        </button>
       </div>
       <div className="space-y-1">
-        <div className="flex items-center gap-2">
-          <span className={`text-xs font-medium ${c.text}`}>{statusLabel}</span>
+        <div className="flex items-center gap-2 flex-wrap">
+          {effectivelyEnabled ? (
+            <span className={`text-xs font-medium ${c.text} flex items-center gap-1`}>
+              <CheckCircle2 className="h-3 w-3" /> Active
+            </span>
+          ) : (
+            <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+              <XCircle className="h-3 w-3" /> {dbEnabled ? 'Enabled but no API key' : 'Disabled'}
+            </span>
+          )}
+          {!apiKeySet && (
+            <span className="text-xs text-amber-500">⚠ API key not set</span>
+          )}
         </div>
         <p className="text-xs text-muted-foreground">
           <span className="font-medium">Location:</span> {location}

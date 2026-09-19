@@ -360,3 +360,13 @@ model AdminDeletionLog {
   deletedAt       DateTime @default(now())
   @@index([deletedAt])
 }
+
+// AI provider toggle switches — controllable from admin panel without redeploy.
+// Each row = one provider. If enabled=false, the cascade skips that provider.
+// If the row doesn't exist for a provider, it falls back to env var logic.
+model AiProviderConfig {
+  provider    String   @id  // "mistral" | "groq" | "openrouter" | "google_gemini" | "mistral_training_optout"
+  enabled     Boolean  @default(false)
+  updatedBy   String   @default("admin")
+  updatedAt   DateTime @updatedAt
+}
