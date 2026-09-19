@@ -1183,7 +1183,7 @@ export async function POST(req: NextRequest) {
       take: 100,
       select: {
         id: true, vendor: true, invNumber: true, invDate: true,
-        total: true, confidence: true, isDuplicate: true,
+        total: true, currency: true, confidence: true, isDuplicate: true,
       },
     });
 

@@ -1079,7 +1079,32 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                 <EditDetailField label="Amount" value={editFields.amount} onChange={(v) => setEditFields((f) => ({ ...f, amount: v }))} mono />
                 <EditDetailField label="VAT" value={editFields.vatAmount} onChange={(v) => setEditFields((f) => ({ ...f, vatAmount: v }))} mono />
                 <EditDetailField label="Total" value={editFields.total} onChange={(v) => setEditFields((f) => ({ ...f, total: v }))} mono />
-                <EditDetailField label="Currency" value={editFields.currency} onChange={(v) => setEditFields((f) => ({ ...f, currency: v }))} />
+                {/* Currency — dropdown with common currencies */}
+                <div className="space-y-0.5">
+                  <p className="text-xs text-muted-foreground">Currency</p>
+                  <Select value={editFields.currency || 'USD'} onValueChange={(v) => setEditFields((f) => ({ ...f, currency: v }))}>
+                    <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="USD">USD — US Dollar ($)</SelectItem>
+                      <SelectItem value="EUR">EUR — Euro (€)</SelectItem>
+                      <SelectItem value="CZK">CZK — Czech Koruna (Kč)</SelectItem>
+                      <SelectItem value="GBP">GBP — British Pound (£)</SelectItem>
+                      <SelectItem value="PLN">PLN — Polish Złoty (zł)</SelectItem>
+                      <SelectItem value="SEK">SEK — Swedish Krona</SelectItem>
+                      <SelectItem value="NOK">NOK — Norwegian Krone</SelectItem>
+                      <SelectItem value="DKK">DKK — Danish Krone</SelectItem>
+                      <SelectItem value="HUF">HUF — Hungarian Forint (Ft)</SelectItem>
+                      <SelectItem value="RON">RON — Romanian Leu</SelectItem>
+                      <SelectItem value="CHF">CHF — Swiss Franc</SelectItem>
+                      <SelectItem value="JPY">JPY — Japanese Yen (¥)</SelectItem>
+                      <SelectItem value="CAD">CAD — Canadian Dollar</SelectItem>
+                      <SelectItem value="AUD">AUD — Australian Dollar</SelectItem>
+                      <SelectItem value="BRL">BRL — Brazilian Real (R$)</SelectItem>
+                      <SelectItem value="CNY">CNY — Chinese Yuan</SelectItem>
+                      <SelectItem value="INR">INR — Indian Rupee</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 <DetailField
                   label="Status"
                   value={inv.isDuplicate ? 'Duplicate' : inv.status === 'review' ? 'Review' : 'Done'}
