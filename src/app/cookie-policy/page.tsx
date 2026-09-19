@@ -4,7 +4,7 @@ export const dynamic = 'force-static';
 
 export default function CookiePolicyPage() {
   return (
-    <LegalLayout title="Cookie Policy" lastUpdated="September 18, 2026">
+    <LegalLayout title="Cookie Policy" lastUpdated="September 19, 2026">
       <section>
         <h2>1. What Are Cookies and Local Storage</h2>
         <p>
@@ -21,14 +21,14 @@ export default function CookiePolicyPage() {
         <p><strong>Essential storage (always active — exempt from consent per ePrivacy Art. 5(3), as implemented by Czech Act No. 127/2005 Coll. § 89):</strong></p>
         <ul>
           <li><strong>Authentication token (op_token):</strong> Stores your JWT session token in Local Storage so you stay signed in across page refreshes. <em>Retention:</em> 7 days (matching JWT expiry), then auto-cleared on next page load. <em>Purpose:</em> Strictly necessary for the Service to function.</li>
-          <li><strong>Cookie consent record (omniparse_cookie_consent):</strong> Stores your consent choice and timestamp. <em>Retention:</em> 12 months from last update, then re-prompted. <em>Purpose:</em> Prevents re-showing the consent banner and records your consent decision for accountability.</li>
+          <li><strong>Cookie consent record (omniparse_cookie_consent):</strong> The consent-preference record is used to remember the user&apos;s storage preferences and to avoid repeatedly displaying the consent prompt. Its classification and retention are assessed according to its specific purpose and applicable law. <em>Retention:</em> 12 months from last update, then re-prompted. <em>Purpose:</em> Prevents re-showing the consent banner and records your consent decision for accountability.</li>
         </ul>
         <p><strong>Non-essential storage (requires consent — only set after you accept via the cookie banner):</strong></p>
         <ul>
           <li><strong>Theme preference (theme):</strong> Stores your light/dark mode choice. <em>Retention:</em> Until withdrawn or browser data cleared. <em>Purpose:</em> User preference (UI customization).</li>
           <li><strong>Keyboard shortcuts (op_shortcuts):</strong> Stores custom keyboard shortcut assignments. <em>Retention:</em> Until withdrawn or browser data cleared. <em>Purpose:</em> User preference (UI customization).</li>
-          <li><strong>Legal consent (op_legal_consent):</strong> Records GDPR data-transfer consent for document uploads. <em>Retention:</em> Duration of account; refreshed on each upload if revoked. <em>Purpose:</em> Compliance (GDPR consent evidence).</li>
-          <li><strong>Crash logs (op_crash_log):</strong> Stores recent client-side errors for debugging. <em>Retention:</em> Rolling window — last 10 errors only, FIFO overwrite. <em>Purpose:</em> Service stability and debugging. No personal data is logged beyond error messages.</li>
+          <li><strong>Legal consent (op_legal_consent):</strong> Records GDPR data-transfer consent for document uploads. <em>Retention:</em> Duration of account; refreshed on each upload if revoked. <em>Purpose:</em> Compliance (GDPR consent evidence). <em>Note on separation:</em> This storage item records a consent decision; it is distinct from the legal basis for processing documents, which is determined separately based on the user&apos;s role, the purpose of processing and applicable law. Where consent is the legal basis, it will be requested through a separate, specific and informed mechanism and will not be bundled with unrelated cookie preferences.</li>
+          <li><strong>Crash logs (op_crash_log):</strong> Stores recent client-side errors for debugging. <em>Retention:</em> Rolling window — last 10 errors only, FIFO overwrite. <em>Purpose:</em> Service stability and debugging. Client-side crash logs are limited to a rolling window of the latest 10 entries. OmniParse is designed to avoid including document contents, authentication tokens or unnecessary personal data in crash logs. Where personal data is inadvertently included, it is handled under the applicable retention and security controls.</li>
         </ul>
         <p><strong>Analytics:</strong></p>
         <ul>
@@ -39,9 +39,9 @@ export default function CookiePolicyPage() {
           <li>OmniParse does not set third-party cookies on the omniparse-ai.vercel.app domain. No advertising, tracking, social-media, or fingerprinting cookies are used.</li>
           <li><strong>Note about Stripe:</strong> If you upgrade to a paid plan, Stripe&apos;s checkout page (at checkout.stripe.com) may set its own cookies on the Stripe domain (not omniparse-ai.vercel.app). These are governed by <a href="https://stripe.com/cookies" target="_blank" rel="noopener">Stripe&apos;s cookie policy</a> and are necessary for payment security and fraud prevention. OmniParse does not control Stripe&apos;s cookies.</li>
         </ul>
-        <p><strong>Session-only cookies (Next.js framework):</strong></p>
+        <p><strong>Other storage technologies:</strong></p>
         <ul>
-          <li>The Next.js framework may use short-lived session cookies (e.g., for CSRF protection) that are deleted when you close your browser. These are strictly necessary for security and are exempt from consent under ePrivacy Art. 5(3).</li>
+          <li>OmniParse&apos;s current production configuration uses Local Storage (not browser cookies) for client-side state. If cookies are introduced in the future (e.g., for session management, CSRF protection, or framework-level features), this Policy will be updated with the specific cookie name, purpose, duration, security attributes (Secure, HttpOnly, SameSite), and whether the cookie is first-party or third-party.</li>
         </ul>
       </section>
 
@@ -67,7 +67,7 @@ export default function CookiePolicyPage() {
         <ul>
           <li><strong>&quot;Accept all&quot;:</strong> Records consent for both essential and all non-essential storage (theme, shortcuts, legal consent, crash logs).</li>
           <li><strong>&quot;Essential only&quot;:</strong> Records consent for essential storage only; non-essential items are not set, and any previously set non-essential items are cleared.</li>
-          <li><strong>&quot;Manage preferences&quot; (planned):</strong> Granular per-category toggles for theme, shortcuts, legal consent, and crash logs. Each category can be accepted or declined independently, in line with EDPB Guidelines 03/2022 on dark patterns.</li>
+          <li><strong>&quot;Manage preferences&quot; (planned):</strong> A granular preference-management feature is planned. Until it is implemented, the banner provides the currently available choices described below. The Service does not represent that per-category consent controls are available before that feature is released.</li>
         </ul>
         <p>
           The banner does not block page load (essential cookies work regardless). Your choice is

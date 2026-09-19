@@ -52,7 +52,7 @@ export function AuthView({ mode, onSwitch, onBack }: { mode: 'login' | 'signup';
       return;
     }
     if (mode === 'signup' && !ageConfirmed) {
-      setApiError('You must confirm you are at least 15 years old.');
+      setApiError('You must confirm you are at least 18 years old (or have parental/guardian consent where applicable law permits).');
       return;
     }
     if (mode === 'signup' && !withdrawalAcknowledged) {
@@ -334,7 +334,7 @@ export function AuthView({ mode, onSwitch, onBack }: { mode: 'login' | 'signup';
                     htmlFor="age"
                     className="text-xs text-muted-foreground font-normal leading-relaxed cursor-pointer"
                   >
-                    I confirm I am at least 15 years old
+                    I confirm I am at least 18 years old (or have parental/guardian consent where applicable law permits)
                   </Label>
                 </div>
                 <div className="flex items-start gap-2">

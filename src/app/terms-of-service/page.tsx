@@ -4,7 +4,7 @@ export const dynamic = 'force-static';
 
 export default function TermsOfServicePage() {
   return (
-    <LegalLayout title="Terms of Service" lastUpdated="September 18, 2026">
+    <LegalLayout title="Terms of Service" lastUpdated="September 19, 2026">
       <section>
         <h2>1. Acceptance of Terms</h2>
         <p>
@@ -42,16 +42,20 @@ export default function TermsOfServicePage() {
       <section>
         <h2>3. Eligibility</h2>
         <p>
-          You must be at least <strong>15 years old</strong> to use this Service. This age corresponds
-          to the age of digital consent in the Czech Republic under GDPR Art. 8 (as implemented by
-          Czech Act No. 110/2019 Coll.). In other EU/EEA Member States where the age of digital consent
-          is higher (e.g., 16 in Germany), you must meet that higher age requirement. The Service is
-          not directed to children, and we do not knowingly collect personal data from children below
-          the applicable age of digital consent.
+          The Service is intended for business and professional users and is not directed at children.
+          You must be at least <strong>18 years old</strong> to register an account, unless applicable
+          law permits use by a younger person with the required parental or guardian consent and the
+          contractual arrangement is legally valid. In the Czech Republic, the age of digital consent
+          under GDPR Art. 8 (as implemented by Czech Act No. 110/2019 Coll.) is 15; in other EU/EEA
+          Member States the age ranges from 13 to 16 depending on national law.
         </p>
         <p>
-          If you are under 18 but above the applicable age of digital consent, you confirm that you
-          have obtained parental or guardian consent to use this Service and to enter into these Terms.
+          Where applicable law permits use by a person aged between the applicable digital-consent age
+          and 18, that person must obtain parental or guardian consent to use this Service and to enter
+          into these Terms. Where a minor accesses the Service through an organizational account (e.g.,
+          as an employee or contractor of a business customer), the organization is responsible for
+          ensuring that such access is lawful and complies with applicable child-labor and
+          data-protection law.
         </p>
         <p>
           If you are registering on behalf of a business entity, you confirm that you have the authority
@@ -156,14 +160,28 @@ export default function TermsOfServicePage() {
         <h2>7a. No Professional Advice</h2>
         <p>
           The Service is provided for informational and administrative purposes only and does not
-          constitute accounting, tax, legal, financial or other professional advice. AI-generated
-          calculations, classifications, summaries, recommendations and chat responses must not be
-          relied upon as the sole basis for financial, accounting, tax, legal or business decisions.
+          constitute accounting, tax, legal, financial or other professional advice. AI-generated or
+          AI-extracted information may contain errors, omissions or hallucinations. Users must verify
+          extracted amounts, dates, tax information, bank details and other material fields before
+          relying on them. AI-generated calculations, classifications, summaries, recommendations
+          and chat responses must not be relied upon as the sole basis for financial, accounting, tax,
+          legal or business decisions.
         </p>
         <p>
           Currency conversions, exchange rates, tax calculations and financial aggregations may be
           inaccurate or based on incomplete or outdated information. Always consult a qualified
-          professional for advice specific to your situation.
+          professional for advice specific to your situation. OmniParse is an assistive processing
+          tool and does not provide accounting, tax, legal or financial advice. Users remain
+          responsible for reviewing outputs and making their own business decisions.
+        </p>
+        <p>
+          Where the Service provides features that automate invoice approval, categorization, or
+          other workflow decisions, such features are configurable and require user setup and
+          review. If any automated feature produces a decision with legal or similarly significant
+          effects concerning an individual (e.g., a vendor or employee), the applicability of GDPR
+          Art. 22 and the EU AI Act must be assessed for that specific function. OmniParse does not
+          represent that a single disclaimer is sufficient for all possible automated-decision
+          scenarios; each material feature must be assessed on its own facts.
         </p>
       </section>
 

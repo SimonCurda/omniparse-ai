@@ -4,7 +4,7 @@ export const dynamic = 'force-static';
 
 export default function AIActNoticePage() {
   return (
-    <LegalLayout title="AI Transparency Notice" lastUpdated="September 18, 2026">
+    <LegalLayout title="AI Transparency Notice" lastUpdated="September 19, 2026">
       <section>
         <h2>EU AI Act Compliance (Regulation EU 2024/1689)</h2>
         <p>
