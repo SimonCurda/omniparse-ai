@@ -3,16 +3,31 @@ import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
 
 /**
- * GET /api/admin/providers
+ * Authenticate the request. Accepts either:
+ * 1. JWT token in Authorization header (for normal logged-in users)
+ * 2. CRON_SECRET in ?key= query param (for admin panel access)
+ */
+async function authenticate(req: NextRequest): Promise<boolean> {
+  // Try JWT auth first
+  const auth = await getUserFromRequest(req);
+  if (auth) return true;
+
+  // Fall back to CRON_SECRET query param (same as other admin endpoints)
+  const key = new URL(req.url).searchParams.get('key');
+  const cronSecret = process.env.CRON_SECRET;
+  if (key && cronSecret && key === cronSecret) return true;
+
+  return false;
+}
+
+/**
+ * GET /api/admin/providers?key=CRON_SECRET
  * Returns all AI provider toggle configs.
  * Also returns the env-var-based status (key configured or not).
  */
 export async function GET(req: NextRequest) {
-  const auth = await getUserFromRequest(req);
-  if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-  const user = await db.user.findUnique({ where: { id: auth.userId }, select: { email: true } });
-  if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+  const isAuthed = await authenticate(req);
+  if (!isAuthed) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   // Fetch all provider configs from DB
   const configs = await db.aiProviderConfig.findMany();
@@ -94,11 +109,8 @@ export async function GET(req: NextRequest) {
  * Body: { provider: "openrouter", enabled: true }
  */
 export async function PUT(req: NextRequest) {
-  const auth = await getUserFromRequest(req);
-  if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-  const user = await db.user.findUnique({ where: { id: auth.userId }, select: { email: true } });
-  if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+  const isAuthed = await authenticate(req);
+  if (!isAuthed) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = await req.json();
   const { provider, enabled } = body;
@@ -115,11 +127,11 @@ export async function PUT(req: NextRequest) {
   // Upsert the config
   const config = await db.aiProviderConfig.upsert({
     where: { provider },
-    update: { enabled, updatedBy: user.email || 'admin' },
-    create: { provider, enabled, updatedBy: user.email || 'admin' },
+    update: { enabled, updatedBy: 'admin' },
+    create: { provider, enabled, updatedBy: 'admin' },
   });
 
-  console.warn(`[admin/providers] ${user.email} set ${provider} = ${enabled}`);
+  console.warn(`[admin/providers] ${provider} = ${enabled}`);
 
   return NextResponse.json({
     provider: config.provider,

@@ -113,9 +113,10 @@ export default function AdminPage() {
   }, []);
 
   const fetchProviders = useCallback(async () => {
+    if (!secret) return;
     setProvidersLoading(true);
     try {
-      const res = await fetch('/api/admin/providers');
+      const res = await fetch(`/api/admin/providers?key=${encodeURIComponent(secret)}`);
       const data = await res.json();
       if (res.ok) {
         setProviders(data.providers || []);
@@ -125,7 +126,7 @@ export default function AdminPage() {
     } finally {
       setProvidersLoading(false);
     }
-  }, []);
+  }, [secret]);
 
   useEffect(() => {
     if (tab === 'providers') {
@@ -651,7 +652,7 @@ export default function AdminPage() {
                     color={p.color as 'emerald' | 'amber' | 'blue'}
                     onToggle={async (enabled) => {
                       try {
-                        const res = await fetch('/api/admin/providers', {
+                        const res = await fetch(`/api/admin/providers?key=${encodeURIComponent(secret)}`, {
                           method: 'PUT',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({ provider: p.provider, enabled }),
