@@ -571,12 +571,12 @@ export async function geminiChatCall(
     ];
 
     for (const mistralModel of mistralChatModels) {
+      let modelFailed = false;
       for (let keyIdx = 0; keyIdx < mistralKeys.length; keyIdx++) {
         const mistralKey = mistralKeys[keyIdx];
         try {
           console.warn(`[gemini-chat] Trying Mistral text: ${mistralModel} (key ${keyIdx + 1}/${mistralKeys.length})...`);
 
-          // Try WITHOUT response_format first — some free-tier models reject JSON mode
           const res = await fetch('https://api.mistral.ai/v1/chat/completions', {
             method: 'POST',
             headers: {
@@ -605,24 +605,22 @@ export async function geminiChatCall(
           console.warn(`[gemini-chat] Mistral ${mistralModel} failed (key ${keyIdx + 1}, status ${res.status}): ${errBody.slice(0, 300)}`);
 
           if (res.status === 429) {
-            console.warn(`[gemini-chat] Mistral ${mistralModel} rate limited (key ${keyIdx + 1}). Trying next key...`);
+            // Rate limited — try next key, but record the failure
             continue;
           }
 
-          // For 401/403 — key is invalid, don't try other keys
-          if (res.status === 401 || res.status === 403) {
-            console.warn(`[gemini-chat] Mistral API key ${keyIdx + 1} is invalid (${res.status}). Skipping remaining keys.`);
-            triedMistralModels.push(`${mistralModel}(${res.status})`);
-            break;
-          }
-
+          // 401/403/404 — model not available or key invalid, skip to next MODEL
           triedMistralModels.push(`${mistralModel}(${res.status})`);
-          break; // model doesn't work, try next model
+          modelFailed = true;
+          break;
         } catch (err) {
           console.warn(`[gemini-chat] Mistral ${mistralModel} error:`, err instanceof Error ? err.message : String(err));
-          triedMistralModels.push(`${mistralModel}(err)`);
           continue;
         }
+      }
+      // If all keys were exhausted (429 on all), record it
+      if (!modelFailed) {
+        triedMistralModels.push(`${mistralModel}(429)`);
       }
     }
     if (triedMistralModels.length > 0) {
