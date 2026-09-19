@@ -64,80 +64,34 @@ function getApiKey(): string {
 }
 
 /**
- * Check whether a Groq API key is configured. Used to make the Groq cascade
- * step conditional — without this, geminiVisionCall/geminiChatCall would throw
- * eagerly even if the operator only wants to use Mistral (EU-only mode).
- *
- * Legal compliance rationale: GROQ_API_KEY must NOT be mandatory, because
- * some operators may want to deploy in EU-only mode (Mistral only) to avoid
- * any US transfers. The previous eager getApiKey() call at the top of
- * geminiVisionCall/geminiChatCall blocked this configuration.
+ * Check whether Groq is configured. Used to make the Groq cascade step optional.
+ * Allows EU-only deployments (Mistral only) without configuring a US provider key.
  */
 function isGroqConfigured(): boolean {
   return !!process.env.GROQ_API_KEY;
 }
 
 /**
- * Check whether Google Gemini (AI Studio free-tier endpoint) is explicitly
- * enabled. Default: DISABLED.
- *
- * Legal compliance rationale: Google's AI Studio free-tier endpoint
- * (generativelanguage.googleapis.com) has data-handling terms that are
- * weaker than Google Cloud Vertex AI (which has a self-executing DPA).
- * For EU personal data, the AI Studio free tier is not recommended. We
- * therefore disable it by default and require explicit operator opt-in
- * via ENABLE_GOOGLE_GEMINI=true.
- *
- * To enable Google Gemini (NOT recommended for production EU personal data):
- *   set ENABLE_GOOGLE_GEMINI=true in Vercel env vars
- *
- * Before enabling, the operator must:
- *   1. Review Google AI Studio terms at https://ai.google.dev/terms
- *   2. Verify the data-handling terms are acceptable for the data being processed
- *   3. OR migrate to Vertex AI (separate code path, not currently supported)
- *   4. Update Privacy Policy §6 SCC Status table
- */
-function isGoogleGeminiEnabled(): boolean {
-  return process.env.ENABLE_GOOGLE_GEMINI === 'true';
-}
-
-/**
  * Check whether OpenRouter is explicitly enabled. Default: DISABLED.
- *
- * Legal compliance rationale: OpenRouter's free-tier models (all model IDs
- * ending in :free) route requests to underlying providers (Meta, Nvidia,
- * Google, etc.) whose data-handling terms typically permit training on
- * prompt content. There is no DPA or SCC in place with OpenRouter as of
- * September 2026. To protect EU personal-data transfers, OpenRouter is
- * disabled by default and requires explicit operator opt-in via env var.
- *
- * To enable OpenRouter (NOT recommended for production EU personal data):
- *   set ENABLE_OPENROUTER=true in Vercel env vars
- *
- * Before enabling, the operator must:
- *   1. Complete a DPA with OpenRouter
- *   2. Verify SCCs (or confirm DPF certification)
- *   3. Switch to paid-tier models (remove :free suffix) to disable training
- *   4. Update Privacy Policy §6 SCC Status table
+ * OpenRouter free-tier models permit training on prompt content and have no DPA.
+ * Operator must set ENABLE_OPENROUTER=true after completing DPA/SCC review.
  */
 function isOpenRouterEnabled(): boolean {
   return process.env.ENABLE_OPENROUTER === 'true';
 }
 
 /**
- * Build the Mistral request body with optional training opt-out.
- *
- * Legal compliance rationale: Mistral's free-tier terms permit training on
- * prompt content. On paid tier, the operator can set
- * usage_options={"enable_training": false} to disable training. We send
- * this parameter when MISTRAL_DISABLE_TRAINING=true (recommended for
- * production). If the parameter is not supported (free tier), Mistral
- * may return a 400 — the caller should retry without it.
- *
- * Note: This opt-out only applies to Mistral's own training. Underlying
- * model providers (e.g., if Mistral routes to a third-party model) may
- * have their own terms. Verify Mistral's current terms at
- * https://mistral.ai/legal/privacy-policy
+ * Check whether Google Gemini (AI Studio free-tier) is explicitly enabled. Default: DISABLED.
+ * AI Studio free-tier data-handling terms are weaker than Google Cloud Vertex AI (which has DPA).
+ * Operator must set ENABLE_GOOGLE_GEMINI=true after reviewing AI Studio terms.
+ */
+function isGoogleGeminiEnabled(): boolean {
+  return process.env.ENABLE_GOOGLE_GEMINI === 'true';
+}
+
+/**
+ * Build Mistral request body with optional training opt-out.
+ * When MISTRAL_DISABLE_TRAINING=true, sends usage_options={"enable_training": false}.
  */
 function buildMistralBody(params: {
   model: string;
@@ -155,9 +109,6 @@ function buildMistralBody(params: {
   if (params.response_format) {
     body.response_format = params.response_format;
   }
-  // Send training opt-out when explicitly enabled. On paid Mistral tier,
-  // this disables training on prompt content. On free tier, Mistral may
-  // ignore or reject this parameter — the caller handles 400 errors.
   if (process.env.MISTRAL_DISABLE_TRAINING === 'true') {
     body.usage_options = { enable_training: false };
   }
@@ -183,9 +134,7 @@ export interface GeminiVisionMessage {
  * OpenRouter's free vision models automatically.
  */
 export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise<string> {
-  // NOTE: GROQ_API_KEY is no longer required eagerly. The Groq cascade step
-  // below is gated on isGroqConfigured(). This allows EU-only deployments
-  // (Mistral only) without configuring a US provider key.
+  // GROQ_API_KEY is optional — allows EU-only mode (Mistral only)
 
   // Convert messages to OpenAI format
   const openaiMessages: Array<{ role: string; content: Array<{ type: string; text?: string; image_url?: { url: string } }> }> = [];
@@ -239,21 +188,20 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
 
           // Mistral API is OpenAI-compatible — uses the same message format
           // we already built. No conversion needed.
-          // buildMistralBody() adds usage_options={"enable_training": false}
-          // when MISTRAL_DISABLE_TRAINING=true (recommended for production).
           const res = await fetch('https://api.mistral.ai/v1/chat/completions', {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${mistralKey}`,
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify(buildMistralBody({
+            body: JSON.stringify({
               model: mistralModel,
               messages: openaiMessages,
               max_tokens: 4096,
               temperature: 0.1,
+              // Mistral supports response_format for JSON mode on some models
               response_format: { type: 'json_object' },
-            })),
+            }),
           });
 
           if (res.ok) {
@@ -275,13 +223,13 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
                 'Authorization': `Bearer ${mistralKey}`,
                 'Content-Type': 'application/json',
               },
-              body: JSON.stringify(buildMistralBody({
+              body: JSON.stringify({
                 model: mistralModel,
                 messages: openaiMessages,
                 max_tokens: 4096,
                 temperature: 0.1,
                 // No response_format — free-text mode
-              })),
+              }),
             });
             if (fbRes.ok) {
               const fbData = await fbRes.json();
@@ -347,11 +295,8 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
     'openrouter/free',                           // Auto-router — picks any available free model
   ];
 
-  // Try OpenRouter — iterate models × keys
-  // OpenRouter is DISABLED by default (ENABLE_OPENROUTER env var must be 'true').
-  // See isOpenRouterEnabled() for legal compliance rationale.
+  // Try OpenRouter — DISABLED by default (ENABLE_OPENROUTER env var must be 'true')
   if (isOpenRouterEnabled() && orApiKeys.length > 0) {
-    console.warn('[gemini] OpenRouter is ENABLED via ENABLE_OPENROUTER env var. Ensure DPA/SCC is in place before processing EU personal data.');
     for (const model of openRouterVisionModels) {
       for (let keyIdx = 0; keyIdx < orApiKeys.length; keyIdx++) {
         const orApiKey = orApiKeys[keyIdx];
@@ -439,58 +384,58 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
   // These replaced the decommissioned qwen3.6-27b. Llama 3.2 vision models
   // don't have the thinking-leak problem, so JSON output is cleaner.
   // Try each model in order; break on success.
-  // Gated on isGroqConfigured() — Groq is optional (allows EU-only mode).
+  // ─── Groq vision models — gated on isGroqConfigured() ──────────────
   if (isGroqConfigured()) {
-    const apiKey = getApiKey();
-    for (const groqVisionModel of GROQ_VISION_MODELS) {
-      try {
-        console.warn(`[gemini] Trying Groq vision model: ${groqVisionModel} (last resort)...`);
-        const res = await fetch(GROQ_API_URL, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: groqVisionModel,
-            messages: openaiMessages,
-            max_tokens: MAX_TOKENS_LOW,
-            temperature: 0.1,
-          }),
-        });
+  const apiKey = getApiKey();
+  for (const groqVisionModel of GROQ_VISION_MODELS) {
+    try {
+      console.warn(`[gemini] Trying Groq vision model: ${groqVisionModel} (last resort)...`);
+      const res = await fetch(GROQ_API_URL, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: groqVisionModel,
+          messages: openaiMessages,
+          max_tokens: MAX_TOKENS_LOW,
+          temperature: 0.1,
+        }),
+      });
 
-        if (res.ok) {
-          const data = await res.json();
-          const content = data.choices?.[0]?.message?.content || '';
-          if (content) {
-            console.warn(`[gemini] Groq vision model ${groqVisionModel} succeeded!`);
-            return content;
-          }
+      if (res.ok) {
+        const data = await res.json();
+        const content = data.choices?.[0]?.message?.content || '';
+        if (content) {
+          console.warn(`[gemini] Groq vision model ${groqVisionModel} succeeded!`);
+          return content;
         }
+      }
 
-        // 429 — rate limited, try next Groq vision model
-        if (res.status === 429) {
-          console.warn(`[gemini] Groq vision model ${groqVisionModel} rate limited. Trying next model...`);
-          continue;
-        }
-
-        // 400/404 — model not available (deprecated), try next
-        if (res.status === 400 || res.status === 404) {
-          const errText = await res.text().catch(() => '');
-          console.warn(`[gemini] Groq vision model ${groqVisionModel} not available (${res.status}). ${errText.slice(0, 200)}`);
-          continue;
-        }
-
-        // Other error — try next model
-        console.warn(`[gemini] Groq vision model ${groqVisionModel} failed (${res.status}). Trying next...`);
-      } catch (err) {
-        console.warn(`[gemini] Groq vision ${groqVisionModel} error:`, err instanceof Error ? err.message : String(err));
+      // 429 — rate limited, try next Groq vision model
+      if (res.status === 429) {
+        console.warn(`[gemini] Groq vision model ${groqVisionModel} rate limited. Trying next model...`);
         continue;
       }
+
+      // 400/404 — model not available (deprecated), try next
+      if (res.status === 400 || res.status === 404) {
+        const errText = await res.text().catch(() => '');
+        console.warn(`[gemini] Groq vision model ${groqVisionModel} not available (${res.status}). ${errText.slice(0, 200)}`);
+        continue;
+      }
+
+      // Other error — try next model
+      console.warn(`[gemini] Groq vision model ${groqVisionModel} failed (${res.status}). Trying next...`);
+    } catch (err) {
+      console.warn(`[gemini] Groq vision ${groqVisionModel} error:`, err instanceof Error ? err.message : String(err));
+      continue;
     }
   }
+  } // end if (isGroqConfigured())
 
-  // ─── Final fallback: Google Gemini direct API ────────────────────────
+  // ─── Final fallback: Google Gemini direct API — DISABLED BY DEFAULT ──
   // Google's Gemini API has its OWN free tier (separate from OpenRouter
   // and Groq) — 15 req/min on gemini-2.0-flash and gemini-2.5-flash.
   // Adding it here directly multiplies our total capacity by ~2-3x
@@ -505,7 +450,6 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
   ].filter(Boolean) as string[];
 
   if (isGoogleGeminiEnabled() && geminiKeys.length > 0) {
-    console.warn('[gemini] Google Gemini is ENABLED via ENABLE_GOOGLE_GEMINI env var. AI Studio free-tier data terms may not be suitable for EU personal data — review before processing customer documents.');
     const geminiModels = [
       'gemini-2.0-flash',           // fast, generous free tier (15 rpm)
       'gemini-2.5-flash',           // newer, also free tier
@@ -601,9 +545,7 @@ export async function geminiChatCall(
   systemPrompt: string,
   messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
 ): Promise<string> {
-  // NOTE: GROQ_API_KEY is no longer required eagerly. The Groq cascade step
-  // below is gated on isGroqConfigured(). This allows EU-only deployments
-  // (Mistral only) without configuring a US provider key.
+  // GROQ_API_KEY is optional — allows EU-only mode (Mistral only)
 
   const openaiMessages: Array<{ role: string; content: string }> = [
     { role: 'system', content: systemPrompt },
@@ -640,13 +582,13 @@ export async function geminiChatCall(
               'Authorization': `Bearer ${mistralKey}`,
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify(buildMistralBody({
+            body: JSON.stringify({
               model: mistralModel,
               messages: openaiMessages,
               max_tokens: MAX_TOKENS_HIGH,
               temperature: 0.1,
               response_format: { type: 'json_object' },
-            })),
+            }),
           });
 
           if (res.ok) {
@@ -667,12 +609,12 @@ export async function geminiChatCall(
                 'Authorization': `Bearer ${mistralKey}`,
                 'Content-Type': 'application/json',
               },
-              body: JSON.stringify(buildMistralBody({
+              body: JSON.stringify({
                 model: mistralModel,
                 messages: openaiMessages,
                 max_tokens: MAX_TOKENS_HIGH,
                 temperature: 0.1,
-              })),
+              }),
             });
             if (fbRes.ok) {
               const fbData = await fbRes.json();
@@ -711,8 +653,6 @@ export async function geminiChatCall(
   // OpenRouter text models produce lower-quality extraction.
   // We try Groq first; if ALL Groq models are rate-limited, we catch
   // the throw and try OpenRouter as a last resort.
-  //
-  // Gated on isGroqConfigured() — Groq is optional (allows EU-only mode).
 
   // ─── Groq cascade (original code) ────────────────────────────────────
 
@@ -733,7 +673,7 @@ export async function geminiChatCall(
   const triedModels: string[] = [];
 
   if (isGroqConfigured()) {
-    const apiKey = getApiKey();
+  const apiKey = getApiKey();
 
   // ─── Cascade retry loop ────────────────────────────────────────────────────
   // If all 4 models fail with 429 in the first pass, we wait 10s and try the
@@ -918,9 +858,7 @@ export async function geminiChatCall(
   }
   } // end if (isGroqConfigured())
 
-  // ─── OpenRouter fallback (only if ALL Groq models failed) ─────────────
-  // OpenRouter is DISABLED by default (ENABLE_OPENROUTER env var must be 'true').
-  // See isOpenRouterEnabled() for legal compliance rationale.
+  // ─── OpenRouter fallback — DISABLED by default ─────────────
   const orApiKeys = process.env.OPENROUTER_API_KEY
     ? [process.env.OPENROUTER_API_KEY,
        process.env.OPENROUTER_API_KEY_2,
@@ -932,7 +870,7 @@ export async function geminiChatCall(
   const orAppUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://omniparse-ai.vercel.app';
 
   if (isOpenRouterEnabled() && orApiKeys.length > 0) {
-    console.warn('[gemini-chat] All Groq models exhausted. Trying OpenRouter as last resort (ENABLE_OPENROUTER=true).');
+    console.warn('[gemini-chat] All models exhausted. Trying OpenRouter (ENABLE_OPENROUTER=true)...');
     for (let keyIdx = 0; keyIdx < orApiKeys.length; keyIdx++) {
       const orKey = orApiKeys[keyIdx];
       try {
@@ -973,7 +911,6 @@ export async function geminiChatCall(
   ].filter(Boolean) as string[];
 
   if (isGoogleGeminiEnabled() && geminiKeys.length > 0) {
-    console.warn('[gemini-chat] Google Gemini is ENABLED via ENABLE_GOOGLE_GEMINI env var. AI Studio free-tier data terms may not be suitable for EU personal data.');
     const geminiTextModels = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-1.5-flash'];
 
     for (const gm of geminiTextModels) {

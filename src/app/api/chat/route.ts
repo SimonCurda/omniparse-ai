@@ -1222,19 +1222,13 @@ export async function POST(req: NextRequest) {
         || groqMsg.includes('rate_limit')
         || groqMsg.includes('all models');
 
-      // OpenRouter is DISABLED by default (ENABLE_OPENROUTER env var must be 'true').
-      // This guard prevents the outer fallback from routing chat content to
-      // OpenRouter free-tier models (which permit training on prompt content)
-      // when the operator has not explicitly opted in. The inner geminiChatCall
-      // has the same guard on its own OpenRouter cascade step.
       const orConfigured = isOpenRouterConfigured() && process.env.ENABLE_OPENROUTER === 'true';
       // Diagnostic logs — check Vercel function logs for these to debug
       // OpenRouter fallback issues. If you see "Groq exhausted" but NOT
       // "Falling through to OpenRouter", the issue is that OPENROUTER_API_KEY
-      // is missing or ENABLE_OPENROUTER is not set to 'true'.
+      // is missing or not picked up by the deployment.
       console.warn('[chat] Groq failed:', groqMsg);
-      console.warn(`[chat] isOpenRouterConfigured: ${isOpenRouterConfigured() ? 'true' : 'false (OPENROUTER_API_KEY not set)'}`);
-      console.warn(`[chat] ENABLE_OPENROUTER: ${process.env.ENABLE_OPENROUTER === 'true' ? 'true' : 'false (default)'}`);
+      console.warn(`[chat] isOpenRouterConfigured: ${orConfigured ? 'true' : 'false (OPENROUTER_API_KEY not set)'}`);
       console.warn(`[chat] isGroqExhausted: ${isGroqExhausted ? 'true' : 'false'}`);
 
       if (!isGroqExhausted || !orConfigured) {
