@@ -877,16 +877,20 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
     try {
       const d = new Date(dateStr);
       const now = new Date();
-      const diffMs = now.getTime() - d.getTime();
-      const diffSec = Math.floor(diffMs / 1000);
-      if (diffSec < 60) return 'just now';
-      const diffMin = Math.floor(diffSec / 60);
-      if (diffMin < 60) return `${diffMin} minute${diffMin !== 1 ? 's' : ''} ago`;
-      const diffHr = Math.floor(diffMin / 60);
-      if (diffHr < 24) return `${diffHr} hour${diffHr !== 1 ? 's' : ''} ago`;
-      const diffDay = Math.floor(diffHr / 24);
-      if (diffDay < 7) return `${diffDay} day${diffDay !== 1 ? 's' : ''} ago`;
-      return d.toLocaleDateString();
+
+      // Same calendar day → show exact time (HH:MM)
+      const sameDay =
+        d.getFullYear() === now.getFullYear() &&
+        d.getMonth() === now.getMonth() &&
+        d.getDate() === now.getDate();
+
+      if (sameDay) {
+        return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      }
+
+      // Different day → show date only (no time)
+      // Use locale-aware short date format: "Sep 19" or "19. 9." depending on locale
+      return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
     } catch {
       return dateStr;
     }
@@ -1739,6 +1743,7 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                 <th className="text-center px-4 py-3 font-medium hidden lg:table-cell">Confidence</th>
                 <th className="text-center px-4 py-3 font-medium hidden lg:table-cell">Aging</th>
                 <th className="text-center px-4 py-3 font-medium hidden xl:table-cell">Proc. Time</th>
+                <th className="text-center px-4 py-3 font-medium hidden lg:table-cell">Processed</th>
                 <th className="text-center px-4 py-3 font-medium hidden md:table-cell">Lifecycle</th>
                 <th className="text-center px-3 py-3 font-medium w-[88px]">Checked</th>
                 {/* Action buttons: View + Delete (two columns) */}
@@ -1844,6 +1849,12 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                     {/* Processing Time */}
                     <td className="px-4 py-3 text-center hidden xl:table-cell">
                       {renderProcessingTime(inv)}
+                    </td>
+                    {/* Processed At — smart timestamp: time today, date otherwise */}
+                    <td className="px-4 py-3 text-center hidden lg:table-cell">
+                      <span className="text-xs text-muted-foreground" title={new Date(inv.createdAt).toLocaleString()}>
+                        {fmtRelativeTime(inv.createdAt)}
+                      </span>
                     </td>
                     {/* Lifecycle Status */}
                     <td className="px-4 py-3 text-center hidden md:table-cell" onClick={(e) => e.stopPropagation()}>
