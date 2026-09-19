@@ -576,6 +576,7 @@ export async function geminiChatCall(
         try {
           console.warn(`[gemini-chat] Trying Mistral text: ${mistralModel} (key ${keyIdx + 1}/${mistralKeys.length})...`);
 
+          // Try WITHOUT response_format first — some free-tier models reject JSON mode
           const res = await fetch('https://api.mistral.ai/v1/chat/completions', {
             method: 'POST',
             headers: {
@@ -587,7 +588,6 @@ export async function geminiChatCall(
               messages: openaiMessages,
               max_tokens: MAX_TOKENS_HIGH,
               temperature: 0.1,
-              response_format: { type: 'json_object' },
             }),
           });
 
@@ -600,45 +600,27 @@ export async function geminiChatCall(
             }
           }
 
-          // If JSON mode failed (400/422), try WITHOUT response_format
-          if (res.status === 400 || res.status === 422) {
-            console.warn(`[gemini-chat] Mistral ${mistralModel} doesn't support JSON mode. Retrying without...`);
-            const fbRes = await fetch('https://api.mistral.ai/v1/chat/completions', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${mistralKey}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                model: mistralModel,
-                messages: openaiMessages,
-                max_tokens: MAX_TOKENS_HIGH,
-                temperature: 0.1,
-              }),
-            });
-            if (fbRes.ok) {
-              const fbData = await fbRes.json();
-              const fbContent = fbData.choices?.[0]?.message?.content || '';
-              if (fbContent) {
-                console.warn(`[gemini-chat] Mistral text succeeded (free-text, model: ${mistralModel})!`);
-                return fbContent;
-              }
-            }
-            triedMistralModels.push(mistralModel);
-            break; // model doesn't work, try next model
-          }
+          // Log the actual error response for debugging
+          const errBody = await res.text().catch(() => '');
+          console.warn(`[gemini-chat] Mistral ${mistralModel} failed (key ${keyIdx + 1}, status ${res.status}): ${errBody.slice(0, 300)}`);
 
           if (res.status === 429) {
             console.warn(`[gemini-chat] Mistral ${mistralModel} rate limited (key ${keyIdx + 1}). Trying next key...`);
             continue;
           }
 
-          console.warn(`[gemini-chat] Mistral ${mistralModel} failed (key ${keyIdx + 1}, status ${res.status})`);
-          triedMistralModels.push(mistralModel);
-          break;
+          // For 401/403 — key is invalid, don't try other keys
+          if (res.status === 401 || res.status === 403) {
+            console.warn(`[gemini-chat] Mistral API key ${keyIdx + 1} is invalid (${res.status}). Skipping remaining keys.`);
+            triedMistralModels.push(`${mistralModel}(${res.status})`);
+            break;
+          }
+
+          triedMistralModels.push(`${mistralModel}(${res.status})`);
+          break; // model doesn't work, try next model
         } catch (err) {
           console.warn(`[gemini-chat] Mistral ${mistralModel} error:`, err instanceof Error ? err.message : String(err));
-          triedMistralModels.push(mistralModel);
+          triedMistralModels.push(`${mistralModel}(err)`);
           continue;
         }
       }
@@ -722,8 +704,8 @@ export async function geminiChatCall(
 
           if (res.status === 404) {
             const errText = await res.text();
-            console.warn(`[gemini] Model ${model} unavailable (404), trying next...`);
-            triedModels.push(model);
+            console.warn(`[gemini] Model ${model} unavailable (404): ${errText.slice(0, 200)}`);
+            triedModels.push(`${model}(404)`);
             break; // model doesn't exist, try next model
           }
 
@@ -971,5 +953,6 @@ export async function geminiChatCall(
   }
 
   const allTriedModels = [...triedMistralModels, ...triedModels];
-  throw new Error(`AI is temporarily busy. Please wait 30 seconds and try again. (Tried: ${allTriedModels.join(', ') || 'all models'})`);
+  const errorDetail = allTriedModels.length > 0 ? allTriedModels.join(', ') : 'all models';
+  throw new Error(`AI is temporarily busy — please wait 30 seconds and try again. (Tried: ${errorDetail})`);
 }
