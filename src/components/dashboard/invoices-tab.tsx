@@ -1771,9 +1771,9 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                 <th className="text-center px-4 py-3 font-medium hidden lg:table-cell">Processed</th>
                 <th className="text-center px-4 py-3 font-medium hidden md:table-cell">Lifecycle</th>
                 <th className="text-center px-3 py-3 font-medium w-[88px]">Checked</th>
-                {/* Action buttons: View + Delete (two columns) */}
-                <th className="px-3 py-3 w-8"></th>
-                <th className="px-3 py-3 w-8"></th>
+                {/* Action buttons: View + Delete (two columns) — always visible */}
+                <th className="px-2 py-3 w-8 sticky right-0 bg-card z-10"></th>
+                <th className="px-2 py-3 w-8 sticky right-8 bg-card z-10"></th>
               </tr>
             </thead>
             <tbody>
@@ -1979,8 +1979,8 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                         </TooltipContent>
                       </Tooltip>
                     </td>
-                    {/* View button */}
-                    <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                    {/* View button — sticky, always visible */}
+                    <td className="px-2 py-3 sticky right-0 bg-card z-10 group-hover:bg-muted/30" onClick={(e) => e.stopPropagation()}>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
@@ -1996,8 +1996,8 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                         <TooltipContent>View invoice details</TooltipContent>
                       </Tooltip>
                     </td>
-                    {/* Delete */}
-                    <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                    {/* Delete — sticky, always visible */}
+                    <td className="px-2 py-3 sticky right-8 bg-card z-10 group-hover:bg-muted/30" onClick={(e) => e.stopPropagation()}>
                       <Button
                         variant="ghost"
                         size="icon"

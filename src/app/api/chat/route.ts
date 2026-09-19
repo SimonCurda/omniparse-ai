@@ -951,6 +951,34 @@ function extractArtifact(text: string): { reply: string; artifact: Artifact | un
   // Clean the reply — strip thinking patterns (only used for non-JSON-mode models)
   let reply = cleanReplyText(text);
 
+  // ─── FALLBACK: if the raw text looks like JSON with a "text" field, extract it ──
+  // This catches cases where the model outputs the JSON structure as plain text
+  // (e.g., open-mistral-7b without JSON mode) and the primary JSON.parse path
+  // failed due to minor formatting issues.
+  if (reply.trim().startsWith('{') && reply.includes('"text"')) {
+    try {
+      // Try to find and parse the JSON object
+      const startIdx = reply.indexOf('{');
+      const lastBrace = reply.lastIndexOf('}');
+      if (startIdx >= 0 && lastBrace > startIdx) {
+        const jsonCandidate = reply.slice(startIdx, lastBrace + 1);
+        const parsed = JSON.parse(jsonCandidate) as { text?: unknown; artifact?: unknown };
+        if (parsed && typeof parsed.text === 'string') {
+          reply = parsed.text;
+          // Also try to extract artifact if present
+          if (parsed.artifact && typeof parsed.artifact === 'object' && parsed.artifact !== null) {
+            const a = parsed.artifact as Record<string, unknown>;
+            if (a.type && a.data && !artifact) {
+              artifact = a as unknown as Artifact;
+            }
+          }
+        }
+      }
+    } catch {
+      // Not valid JSON — keep the original reply
+    }
+  }
+
   const lastAnswerIdx = findLastAnswerPrefixIndex(reply);
   if (lastAnswerIdx >= 0) {
     reply = reply.slice(lastAnswerIdx).replace(ANSWER_PREFIX_PATTERN, '').trim();
