@@ -69,10 +69,10 @@ const PLANS: Plan[] = [
     badgeColor: 'bg-emerald-500',
     features: [
       { text: 'Everything in Free, plus:' },
-      { text: '500 invoices / month', isLimit: true },
+      { text: '500 invoices / month (hard limit)', isLimit: true },
       { text: 'Unlimited AI chat', isLimit: true },
       { text: 'Invoice editing — fix AI mistakes, re-validate' },
-      { text: 'Duplicate detection (90-day window)' },
+      { text: 'Line item extraction & duplicate detection' },
       { text: 'Batch upload up to 5 files' },
       { text: 'CSV, JSON & Excel export' },
       { text: '3 custom validation rules' },
@@ -93,10 +93,9 @@ const PLANS: Plan[] = [
     description: 'For teams doing real invoice processing.',
     features: [
       { text: 'Everything in Pro, plus:' },
-      { text: '2,000 invoices / month', isLimit: true },
+      { text: '2,000 invoices / month (hard limit)', isLimit: true },
       { text: 'Up to 20 custom validation rules', isLimit: true },
       { text: 'Approval workflows (auto-approve/flag/block by amount)' },
-      { text: 'Line item extraction & duplicate detection' },
       { text: 'Custom validation rules builder' },
       { text: 'Vendor risk scoring (0-100, daily)' },
       { text: 'Advanced analytics (volume, confidence, anomalies)' },
@@ -121,14 +120,13 @@ const PLANS: Plan[] = [
     description: 'Mid-market teams & enterprises.',
     features: [
       { text: 'Everything in Plus, plus:' },
-      { text: '10,000 invoices / month', isLimit: true },
-      { text: 'Up to 30 approval rules, multi-step workflows', isLimit: true },
-      { text: 'Up to 5 subsidiaries', isLimit: true },
+      { text: '10,000 invoices / month (hard limit)', isLimit: true },
+      { text: 'Advanced approval workflows (up to 30 rules, multi-step)', isLimit: true },
       { text: 'Multi-entity support (up to 5 subsidiaries)' },
-      { text: 'Advanced approval workflows (30+ rules, multi-step)' },
       { text: 'Executive dashboard (KPIs, MoM trends)' },
       { text: 'Cost optimization — auto-detect vendor price hikes' },
       { text: 'Vendor performance scorecard (reliability, trends)' },
+      { text: 'Price change alerts' },
       { text: 'Unlimited rules', included: false },
       { text: 'Advanced audit logs (immutable export)', included: false },
     ],
@@ -146,10 +144,10 @@ const PLANS: Plan[] = [
     features: [
       { text: 'Everything in Business, plus:' },
       { text: 'Unlimited invoices / month', isLimit: true },
-      { text: 'Unlimited everything (rules, entities, exports)', isLimit: true },
-      { text: 'Unlimited custom rules (100+, nested conditions)' },
+      { text: 'Unlimited rules, entities & exports' },
       { text: 'Advanced audit logs (immutable, exportable as PDF/CSV)' },
       { text: 'Unlimited subsidiaries' },
+      { text: 'More enterprise features coming soon' },
     ],
     cta: 'Start Enterprise',
     highlighted: false,
@@ -360,7 +358,7 @@ export function PricingSection({ onAuth }: { onAuth: (v: 'login' | 'signup') => 
         <p className="text-center text-sm text-muted-foreground mt-8">
           All plans include data export, account deletion & audit logging. Built with GDPR, EU AI Act & PIPEDA principles. No credit card required for Free.
           <br className="hidden sm:block" />
-          Prices shown in USD. Annual billing billed upfront.
+          Prices shown in USD. Hard limits on all tiers — no overage charges. Annual billing billed upfront (20% off).
         </p>
       </div>
     </section>
