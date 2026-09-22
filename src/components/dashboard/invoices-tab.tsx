@@ -27,6 +27,16 @@ import {
 } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -107,6 +117,8 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
 
   const [filter, setFilter] = useState('all');
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; vendor: string } | null>(null);
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceRow | null>(null);
   const [showNormalized, setShowNormalized] = useState(false);
 
@@ -496,6 +508,15 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
 
   const deleteInvoice = async (id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
+    // Show confirmation dialog
+    const inv = invoices.find((i) => i.id === id);
+    setDeleteConfirm({ id, vendor: inv?.vendor ?? 'this invoice' });
+  };
+
+  const confirmDeleteInvoice = async () => {
+    if (!deleteConfirm) return;
+    const id = deleteConfirm.id;
+    setDeleteConfirm(null);
     const token = getToken();
     if (!token) {
       toast.error('Session expired. Please sign in again.');
@@ -523,6 +544,11 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
   };
 
   const bulkDelete = async () => {
+    setBulkDeleteConfirm(true);
+  };
+
+  const confirmBulkDelete = async () => {
+    setBulkDeleteConfirm(false);
     const token = getToken();
     if (!token) return;
     setBulkDeleting(true);
@@ -2077,6 +2103,50 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
 
       {/* Detail Dialog */}
       {renderDetailDialog()}
+
+      {/* Delete confirmation — single invoice */}
+      <AlertDialog open={!!deleteConfirm} onOpenChange={(open) => !open && setDeleteConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete invoice?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the invoice from <strong>{deleteConfirm?.vendor}</strong>?
+              This action cannot be undone. The extracted data and any associated file will be permanently removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteInvoice}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete confirmation — bulk */}
+      <AlertDialog open={bulkDeleteConfirm} onOpenChange={setBulkDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedIds.size} invoices?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {selectedIds.size} invoice{selectedIds.size !== 1 ? 's' : ''}?
+              This action cannot be undone. All selected invoices and their associated data will be permanently removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmBulkDelete}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              Delete {selectedIds.size} invoice{selectedIds.size !== 1 ? 's' : ''}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
