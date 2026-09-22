@@ -58,8 +58,12 @@ export async function PUT(req: NextRequest) {
       customFields: Array.isArray(body.customFields)
         ? body.customFields
         : currentSettings.customFields || [],
-      // Persist retentionDays (Plus+ feature) — was previously silently dropped
-      retentionDays: body.retentionDays !== undefined ? body.retentionDays : currentSettings.retentionDays ?? null,
+      // Persist retentionDays (Plus+ feature) — validate type
+      retentionDays: body.retentionDays !== undefined
+        ? (typeof body.retentionDays === 'number' && (body.retentionDays === null || (body.retentionDays > 0 && body.retentionDays <= 36500))
+          ? body.retentionDays
+          : null)
+        : currentSettings.retentionDays ?? null,
     };
 
     await db.user.update({
