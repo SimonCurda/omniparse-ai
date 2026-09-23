@@ -114,6 +114,42 @@ function detectPromptInjection(message: string): boolean {
   return INJECTION_PATTERNS.some((pattern) => pattern.test(message));
 }
 
+/**
+ * Post-response safety check. If the AI's reply is clearly off-topic
+ * (not about invoices/vendors/amounts/data), replace it with a generic
+ * redirect. This catches cases where:
+ * - The AI accepted a roleplay ("I'm GenericBot")
+ * - The AI produced garbage/nonsense after a confusion attack
+ * - The AI went off-topic after an obfuscated injection
+ *
+ * Only triggers for CLEAR off-topic responses — not for legitimate
+ * invoice questions that happen to not mention the word "invoice".
+ */
+function isOffTopicResponse(reply: string): boolean {
+  const lower = reply.toLowerCase();
+  // Must mention at least one invoice-related keyword to be considered on-topic
+  const invoiceKeywords = [
+    'invoice', 'vendor', 'amount', 'currency', 'total', 'spend', 'spent',
+    'cost', 'payment', 'receipt', 'bill', 'tax', 'vat', 'czk', 'eur', 'usd',
+    'koruna', 'euro', 'dollar', 'duplicate', 'confidence', 'upload', 'parse',
+    'extract', 'document', 'pdf', 'data', 'analytics', 'summary', 'breakdown',
+    'no invoices', 'haven\'t received', 'please upload', 'ask about',
+    'i help with', 'i\'m here to', 'i am here to', 'invoice data',
+    'omniparse', 'assistant',
+  ];
+  const hasInvoiceKeyword = invoiceKeywords.some(kw => lower.includes(kw));
+  if (hasInvoiceKeyword) return false;
+
+  // Check for garbage patterns
+  const hasGarbage = /[\u4e00-\u9fff]{10,}/.test(reply) // 10+ CJK chars in a row
+    || /[\u0600-\u06FF]{20,}/.test(reply) // 20+ Arabic chars
+    || /[\u0400-\u04FF]{20,}/.test(reply) // 20+ Cyrillic chars
+    || /^[^a-zA-Z0-9\s]{20,}/.test(reply.trim()) // 20+ non-alphanumeric at start
+    || /^(.)\1{50,}/.test(reply.trim()); // 50+ of same char at start
+
+  return hasGarbage || reply.length < 10; // Very short non-invoice responses are suspicious
+}
+
 // ─── System Prompt (structured JSON output mode) ─────────────────────────────
 // The chat route calls Groq with `response_format: { type: "json_object" }` for
 // models that support it (llama-3.1, llama-3.3, llama-4-scout). JSON mode forces
@@ -1295,7 +1331,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'AI returned an empty response. Please try again.' }, { status: 500 });
     }
 
-    const { reply, artifact } = extractArtifact(responseText);
+    const { reply: rawReply, artifact } = extractArtifact(responseText);
+
+    // ─── Post-response safety check ──────────────────────────────────────
+    // If the AI went off-topic (accepted roleplay, produced garbage, etc.),
+    // replace the reply with a safe redirect. The original reply is logged
+    // for debugging but never shown to the user.
+    let reply = rawReply;
+    if (isOffTopicResponse(reply)) {
+      console.warn(`[chat] Off-topic response detected, replacing. Original: ${reply.slice(0, 200)}`);
+      reply = "I help with invoice data — ask about your invoices, vendors, or amounts.";
+    }
 
     // Save messages to DB
     await db.chatMessage.create({
