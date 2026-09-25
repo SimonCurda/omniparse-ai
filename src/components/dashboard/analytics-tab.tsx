@@ -37,6 +37,36 @@ const tooltipStyle = {
   boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
 };
 
+// Chart axis/grid colors — must be explicit hex values because Recharts
+// renders SVG <text> elements where hsl(var(--x)) doesn't always resolve
+// correctly in dark mode (text appears black-on-black).
+// These are set via JS by reading the computed CSS variable values.
+function useChartColors() {
+  const [colors, setColors] = useState({
+    axis: '#71717a',
+    grid: '#e4e4e7',
+    text: '#71717a',
+  });
+
+  useEffect(() => {
+    const update = () => {
+      const isDark = document.documentElement.classList.contains('dark');
+      setColors({
+        axis: isDark ? '#a1a1aa' : '#71717a',
+        grid: isDark ? '#27272a' : '#e4e4e7',
+        text: isDark ? '#a1a1aa' : '#71717a',
+      });
+    };
+    update();
+    // Watch for theme changes
+    const observer = new MutationObserver(update);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+
+  return colors;
+}
+
 // ─── Currency-aware formatting ────────────────────────────────────────────
 // Renders a number using the correct narrow symbol for the given ISO 4217 code.
 // e.g. fmtCurrency(1234.56, 'CZK') → "Kč 1,234.56"
@@ -76,6 +106,7 @@ function currencySymbol(currency?: string | null): string {
 }
 
 export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
+  const chartColors = useChartColors();
   // --- Top Stats ---
   const totalParsed = invoices.length;
   const avgConfidence =
@@ -476,9 +507,9 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
                 <CardContent>
                   <ResponsiveContainer width="100%" height={280}>
                     <AreaChart data={monthlyData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                      <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                      <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
+                      <XAxis dataKey="month" stroke={chartColors.axis} fontSize={12} />
+                      <YAxis stroke={chartColors.axis} fontSize={12} />
                       <Tooltip contentStyle={tooltipStyle} />
                       <Area
                         type="monotone"
@@ -507,10 +538,10 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
                 <CardContent>
                   <ResponsiveContainer width="100%" height={280}>
                     <BarChart data={monthlyData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                      <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
+                      <XAxis dataKey="month" stroke={chartColors.axis} fontSize={12} />
                       <YAxis
-                        stroke="hsl(var(--muted-foreground))"
+                        stroke={chartColors.axis}
                         fontSize={12}
                         tickFormatter={(v) => {
                           if (isMixedCurrency) return (Number(v) / 1000).toFixed(0) + 'k';
@@ -571,7 +602,7 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
                         }}
                       />
                       <Legend
-                        wrapperStyle={{ fontSize: '11px', color: 'hsl(var(--muted-foreground))' }}
+                        wrapperStyle={{ fontSize: '11px', color: chartColors.text }}
                         iconType="circle"
                         iconSize={8}
                       />
@@ -589,17 +620,17 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
                 <CardContent>
                   <ResponsiveContainer width="100%" height={280}>
                     <BarChart data={confidenceData} layout="vertical">
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
                       <XAxis
                         type="number"
                         domain={[0, 100]}
-                        stroke="hsl(var(--muted-foreground))"
+                        stroke={chartColors.axis}
                         fontSize={12}
                       />
                       <YAxis
                         type="category"
                         dataKey="vendor"
-                        stroke="hsl(var(--muted-foreground))"
+                        stroke={chartColors.axis}
                         fontSize={11}
                         width={100}
                       />
@@ -757,9 +788,9 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
               <CardContent>
                 <ResponsiveContainer width="100%" height={280}>
                   <BarChart data={validationChartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                    <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                    <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
+                    <XAxis dataKey="month" stroke={chartColors.axis} fontSize={12} />
+                    <YAxis stroke={chartColors.axis} fontSize={12} />
                     <Tooltip contentStyle={tooltipStyle} />
                     <Bar dataKey="pass" stackId="a" fill="#10b981" name="Pass" radius={[0,0,0,0]} />
                     <Bar dataKey="warning" stackId="a" fill="#f59e0b" name="Warning" />
