@@ -8,12 +8,24 @@ const glassCardStyle = `
     --mouse-x: 50%;
     --mouse-y: 50%;
     --glow-strength: 0;
-    --edge-top: 0;
-    --edge-bottom: 0;
-    --edge-left: 0;
-    --edge-right: 0;
-    --mouse-x-pct: 50%;
-    --mouse-y-pct: 50%;
+    --edge-top-0: 0;
+    --edge-top-25: 0;
+    --edge-top-50: 0;
+    --edge-top-75: 0;
+    --edge-top-100: 0;
+    --edge-bottom-0: 0;
+    --edge-bottom-25: 0;
+    --edge-bottom-50: 0;
+    --edge-bottom-75: 0;
+    --edge-bottom-100: 0;
+    --edge-left-0: 0;
+    --edge-left-33: 0;
+    --edge-left-66: 0;
+    --edge-left-100: 0;
+    --edge-right-0: 0;
+    --edge-right-33: 0;
+    --edge-right-66: 0;
+    --edge-right-100: 0;
     position: relative;
   }
 
@@ -36,24 +48,62 @@ const glassCardStyle = `
     filter: blur(8px);
   }
 
-  /* Reactive edge glow — each wall lights up based on cursor proximity.
-     The border uses a single radial-gradient positioned at the cursor
-     so that the part of the wall closest to the cursor is brightest,
-     and it fades along the wall as it gets further from the cursor.
-     This creates a "light leaking through the nearest wall" effect. */
+  /* Reactive border — each wall is split into segments. Each segment's
+     brightness is independently controlled by a CSS variable that the
+     JS sets based on the exact pixel distance from the cursor to that
+     point on the wall. This makes every part of every wall dimmer or
+     brighter depending on exact distance from cursor. */
   .glass-card::before {
     content: '';
     position: absolute;
     inset: 0;
     border-radius: inherit;
     padding: 1.5px;
-    background: radial-gradient(
-      280px circle at var(--mouse-x) var(--mouse-y),
-      rgba(245,158,11,calc(0.9 * var(--glow-strength))) 0%,
-      rgba(245,158,11,calc(0.4 * var(--glow-strength))) 30%,
-      rgba(245,158,11,calc(0.1 * var(--glow-strength))) 55%,
-      transparent 75%
-    );
+    background:
+      /* Top wall: 5 segments left-to-right */
+      linear-gradient(to right,
+        rgba(245,158,11,calc(1.0 * var(--edge-top-0))) 0%,
+        rgba(245,158,11,calc(1.0 * var(--edge-top-0))) 20%,
+        rgba(245,158,11,calc(1.0 * var(--edge-top-25))) 20%,
+        rgba(245,158,11,calc(1.0 * var(--edge-top-25))) 40%,
+        rgba(245,158,11,calc(1.0 * var(--edge-top-50))) 40%,
+        rgba(245,158,11,calc(1.0 * var(--edge-top-50))) 60%,
+        rgba(245,158,11,calc(1.0 * var(--edge-top-75))) 60%,
+        rgba(245,158,11,calc(1.0 * var(--edge-top-75))) 80%,
+        rgba(245,158,11,calc(1.0 * var(--edge-top-100))) 80%,
+        rgba(245,158,11,calc(1.0 * var(--edge-top-100))) 100%
+      ),
+      /* Bottom wall: 5 segments left-to-right */
+      linear-gradient(to right,
+        rgba(245,158,11,calc(1.0 * var(--edge-bottom-0))) 0%,
+        rgba(245,158,11,calc(1.0 * var(--edge-bottom-0))) 20%,
+        rgba(245,158,11,calc(1.0 * var(--edge-bottom-25))) 20%,
+        rgba(245,158,11,calc(1.0 * var(--edge-bottom-25))) 40%,
+        rgba(245,158,11,calc(1.0 * var(--edge-bottom-50))) 40%,
+        rgba(245,158,11,calc(1.0 * var(--edge-bottom-50))) 60%,
+        rgba(245,158,11,calc(1.0 * var(--edge-bottom-75))) 60%,
+        rgba(245,158,11,calc(1.0 * var(--edge-bottom-75))) 80%,
+        rgba(245,158,11,calc(1.0 * var(--edge-bottom-100))) 80%,
+        rgba(245,158,11,calc(1.0 * var(--edge-bottom-100))) 100%
+      ),
+      /* Left wall: 4 segments top-to-bottom */
+      linear-gradient(to bottom,
+        rgba(245,158,11,calc(1.0 * var(--edge-left-0))) 0%,
+        rgba(245,158,11,calc(1.0 * var(--edge-left-0))) 33%,
+        rgba(245,158,11,calc(1.0 * var(--edge-left-33))) 33%,
+        rgba(245,158,11,calc(1.0 * var(--edge-left-33))) 66%,
+        rgba(245,158,11,calc(1.0 * var(--edge-left-66))) 66%,
+        rgba(245,158,11,calc(1.0 * var(--edge-left-66))) 100%
+      ),
+      /* Right wall: 4 segments top-to-bottom */
+      linear-gradient(to bottom,
+        rgba(245,158,11,calc(1.0 * var(--edge-right-0))) 0%,
+        rgba(245,158,11,calc(1.0 * var(--edge-right-0))) 33%,
+        rgba(245,158,11,calc(1.0 * var(--edge-right-33))) 33%,
+        rgba(245,158,11,calc(1.0 * var(--edge-right-33))) 66%,
+        rgba(245,158,11,calc(1.0 * var(--edge-right-66))) 66%,
+        rgba(245,158,11,calc(1.0 * var(--edge-right-66))) 100%
+      );
     -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
     -webkit-mask-composite: xor;
     mask-composite: exclude;
