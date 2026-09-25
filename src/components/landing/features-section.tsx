@@ -7,25 +7,7 @@ const glassCardStyle = `
   .glass-card {
     --mouse-x: 50%;
     --mouse-y: 50%;
-    --glow-strength: 0;
-    --edge-top-0: 0;
-    --edge-top-25: 0;
-    --edge-top-50: 0;
-    --edge-top-75: 0;
-    --edge-top-100: 0;
-    --edge-bottom-0: 0;
-    --edge-bottom-25: 0;
-    --edge-bottom-50: 0;
-    --edge-bottom-75: 0;
-    --edge-bottom-100: 0;
-    --edge-left-0: 0;
-    --edge-left-33: 0;
-    --edge-left-66: 0;
-    --edge-left-100: 0;
-    --edge-right-0: 0;
-    --edge-right-33: 0;
-    --edge-right-66: 0;
-    --edge-right-100: 0;
+    --border-glow: 0;
     position: relative;
   }
 
@@ -44,65 +26,35 @@ const glassCardStyle = `
     pointer-events: none;
     z-index: 0;
     visibility: hidden;
-    transition: visibility 0s, opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     opacity: 0;
+    transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     filter: blur(8px);
   }
   .glass-card[data-glow-active]::after {
     visibility: visible;
     opacity: 1;
-    transition: visibility 0s linear 0s, opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  /* Reactive border — segment brightness controlled by CSS vars.
-     Hidden by default, shown on hover via data-glow-active. */
+  /* Border glow — single radial-gradient positioned at cursor.
+     The mask shows only the 1.5px border ring. The radial gradient
+     creates a SMOOTH falloff: the point on the border closest to the
+     cursor is brightest, and it smoothly fades to transparent as you
+     move along the border away from the cursor. No banding, no segments.
+     The radius is tight enough that far walls stay dark. */
   .glass-card::before {
     content: '';
     position: absolute;
     inset: 0;
     border-radius: inherit;
     padding: 1.5px;
-    background:
-      linear-gradient(to right,
-        rgba(245,158,11,var(--edge-top-0)) 0%,
-        rgba(245,158,11,var(--edge-top-0)) 20%,
-        rgba(245,158,11,var(--edge-top-25)) 20%,
-        rgba(245,158,11,var(--edge-top-25)) 40%,
-        rgba(245,158,11,var(--edge-top-50)) 40%,
-        rgba(245,158,11,var(--edge-top-50)) 60%,
-        rgba(245,158,11,var(--edge-top-75)) 60%,
-        rgba(245,158,11,var(--edge-top-75)) 80%,
-        rgba(245,158,11,var(--edge-top-100)) 80%,
-        rgba(245,158,11,var(--edge-top-100)) 100%
-      ),
-      linear-gradient(to right,
-        rgba(245,158,11,var(--edge-bottom-0)) 0%,
-        rgba(245,158,11,var(--edge-bottom-0)) 20%,
-        rgba(245,158,11,var(--edge-bottom-25)) 20%,
-        rgba(245,158,11,var(--edge-bottom-25)) 40%,
-        rgba(245,158,11,var(--edge-bottom-50)) 40%,
-        rgba(245,158,11,var(--edge-bottom-50)) 60%,
-        rgba(245,158,11,var(--edge-bottom-75)) 60%,
-        rgba(245,158,11,var(--edge-bottom-75)) 80%,
-        rgba(245,158,11,var(--edge-bottom-100)) 80%,
-        rgba(245,158,11,var(--edge-bottom-100)) 100%
-      ),
-      linear-gradient(to bottom,
-        rgba(245,158,11,var(--edge-left-0)) 0%,
-        rgba(245,158,11,var(--edge-left-0)) 33%,
-        rgba(245,158,11,var(--edge-left-33)) 33%,
-        rgba(245,158,11,var(--edge-left-33)) 66%,
-        rgba(245,158,11,var(--edge-left-66)) 66%,
-        rgba(245,158,11,var(--edge-left-66)) 100%
-      ),
-      linear-gradient(to bottom,
-        rgba(245,158,11,var(--edge-right-0)) 0%,
-        rgba(245,158,11,var(--edge-right-0)) 33%,
-        rgba(245,158,11,var(--edge-right-33)) 33%,
-        rgba(245,158,11,var(--edge-right-33)) 66%,
-        rgba(245,158,11,var(--edge-right-66)) 66%,
-        rgba(245,158,11,var(--edge-right-66)) 100%
-      );
+    background: radial-gradient(
+      180px circle at var(--mouse-x) var(--mouse-y),
+      rgba(245,158,11,0.9) 0%,
+      rgba(245,158,11,0.5) 25%,
+      rgba(245,158,11,0.2) 50%,
+      rgba(245,158,11,0.05) 75%,
+      transparent 100%
+    );
     -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
     -webkit-mask-composite: xor;
     mask-composite: exclude;
