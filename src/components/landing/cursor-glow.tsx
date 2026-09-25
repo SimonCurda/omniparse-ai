@@ -1,22 +1,29 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 /**
  * A subtle amber/yellow glow that follows the cursor on the landing page.
- * - Uses a radial gradient div that tracks mouse position
- * - Fixed position, pointer-events: none (doesn't interfere with clicks)
- * - 500px diameter, fades out at edges
- * - Only visible on desktop (hidden on touch devices)
- * - Respects prefers-reduced-motion (disabled for users who request it)
+ * 
+ * Two effects:
+ * 1. Global ambient glow — large, soft, follows cursor across the page
+ * 2. Card spotlight — when hovering over a [data-glow] element, the glow
+ *    constrains to that element's bounding box with a liquid-glass feel
+ *    (inspired by Apple's liquid glass — soft inner glow + border highlight)
+ *
+ * - Respects prefers-reduced-motion
+ * - Hidden on touch devices
+ * - pointer-events: none on all layers
  */
 export function CursorGlow() {
-  const glowRef = useRef<HTMLDivElement>(null);
+  const ambientRef = useRef<HTMLDivElement>(null);
+  const spotlightRef = useRef<HTMLDivElement>(null);
+  const [spotlight, setSpotlight] = useState<{ x: number; y: number; w: number; h: number; active: boolean }>({
+    x: 0, y: 0, w: 0, h: 0, active: false,
+  });
 
   useEffect(() => {
-    // Skip on touch devices
     if (window.matchMedia('(pointer: coarse)').matches) return;
-    // Skip if user prefers reduced motion
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
     let rafId: number | null = null;
@@ -24,21 +31,61 @@ export function CursorGlow() {
     let targetY = window.innerHeight / 2;
     let currentX = targetX;
     let currentY = targetY;
+    let mouseX = targetX;
+    let mouseY = targetY;
+    let activeGlowEl: HTMLElement | null = null;
+    let glowRect: DOMRect | null = null;
 
     const animate = () => {
-      // Smooth lerp toward target
-      currentX += (targetX - currentX) * 0.12;
-      currentY += (targetY - currentY) * 0.12;
+      currentX += (targetX - currentX) * 0.15;
+      currentY += (targetY - currentY) * 0.15;
 
-      if (glowRef.current) {
-        glowRef.current.style.transform = `translate(${currentX - 250}px, ${currentY - 250}px)`;
+      if (ambientRef.current) {
+        ambientRef.current.style.transform = `translate(${currentX - 300}px, ${currentY - 300}px)`;
       }
+
+      // Update spotlight position within the hovered card
+      if (spotlightRef.current && activeGlowEl && glowRect) {
+        const localX = mouseX - glowRect.left;
+        const localY = mouseY - glowRect.top;
+        spotlightRef.current.style.background = `radial-gradient(180px circle at ${localX}px ${localY}px, rgba(245,158,11,0.15), transparent 70%)`;
+      }
+
       rafId = requestAnimationFrame(animate);
     };
 
     const handleMouseMove = (e: MouseEvent) => {
       targetX = e.clientX;
       targetY = e.clientY;
+      mouseX = e.clientX;
+      mouseY = e.clientY;
+
+      // Check if we're hovering over a [data-glow] element
+      const el = e.target as HTMLElement;
+      const glowEl = el.closest('[data-glow]') as HTMLElement | null;
+
+      if (glowEl !== activeGlowEl) {
+        // Leaving old element
+        if (activeGlowEl) {
+          activeGlowEl.style.removeProperty('--glow-opacity');
+        }
+        // Entering new element
+        if (glowEl) {
+          glowRect = glowEl.getBoundingClientRect();
+          setSpotlight({ x: glowRect.left, y: glowRect.top, w: glowRect.width, h: glowRect.height, active: true });
+        } else {
+          glowRect = null;
+          setSpotlight(s => ({ ...s, active: false }));
+        }
+        activeGlowEl = glowEl;
+      } else if (glowEl && glowRect) {
+        // Update rect on scroll/resize while hovering
+        const newRect = glowEl.getBoundingClientRect();
+        if (Math.abs(newRect.top - glowRect.top) > 1 || Math.abs(newRect.left - glowRect.left) > 1) {
+          glowRect = newRect;
+          setSpotlight({ x: newRect.left, y: newRect.top, w: newRect.width, h: newRect.height, active: true });
+        }
+      }
     };
 
     window.addEventListener('mousemove', handleMouseMove, { passive: true });
@@ -51,14 +98,36 @@ export function CursorGlow() {
   }, []);
 
   return (
-    <div
-      ref={glowRef}
-      className="pointer-events-none fixed left-0 top-0 z-0 h-[500px] w-[500px] rounded-full opacity-40 dark:opacity-25 hidden md:block"
-      style={{
-        background: 'radial-gradient(circle, rgba(245,158,11,0.12) 0%, rgba(245,158,11,0.04) 40%, transparent 70%)',
-        willChange: 'transform',
-      }}
-      aria-hidden="true"
-    />
+    <>
+      {/* Ambient glow — large, soft, follows cursor across page */}
+      <div
+        ref={ambientRef}
+        className="pointer-events-none fixed left-0 top-0 z-0 h-[600px] w-[600px] rounded-full hidden md:block"
+        style={{
+          background: 'radial-gradient(circle, rgba(245,158,11,0.08) 0%, rgba(245,158,11,0.03) 35%, transparent 65%)',
+          willChange: 'transform',
+          filter: 'blur(20px)',
+        }}
+        aria-hidden="true"
+      />
+
+      {/* Card spotlight — liquid glass effect inside hovered [data-glow] element */}
+      {spotlight.active && (
+        <div
+          ref={spotlightRef}
+          className="pointer-events-none fixed z-20 hidden md:block overflow-hidden"
+          style={{
+            left: spotlight.x,
+            top: spotlight.y,
+            width: spotlight.w,
+            height: spotlight.h,
+            borderRadius: 'inherit',
+            mixBlendMode: 'screen',
+            transition: 'opacity 0.2s ease',
+          }}
+          aria-hidden="true"
+        />
+      )}
+    </>
   );
 }
