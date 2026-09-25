@@ -12,9 +12,12 @@ const glassCardStyle = `
     --edge-bottom: 0;
     --edge-left: 0;
     --edge-right: 0;
+    --mouse-x-pct: 50%;
+    --mouse-y-pct: 50%;
     position: relative;
   }
 
+  /* Inner spotlight — soft radial that follows cursor */
   .glass-card::after {
     content: '';
     position: absolute;
@@ -33,29 +36,24 @@ const glassCardStyle = `
     filter: blur(8px);
   }
 
+  /* Reactive edge glow — each wall lights up based on cursor proximity.
+     The border uses a single radial-gradient positioned at the cursor
+     so that the part of the wall closest to the cursor is brightest,
+     and it fades along the wall as it gets further from the cursor.
+     This creates a "light leaking through the nearest wall" effect. */
   .glass-card::before {
     content: '';
     position: absolute;
     inset: 0;
     border-radius: inherit;
     padding: 1.5px;
-    background:
-      linear-gradient(to bottom,
-        rgba(245,158,11,calc(1.2 * var(--edge-top))) 0%,
-        rgba(245,158,11,calc(0.3 * var(--edge-top))) 4%,
-        transparent 12%,
-        transparent 88%,
-        rgba(245,158,11,calc(0.3 * var(--edge-bottom))) 96%,
-        rgba(245,158,11,calc(1.2 * var(--edge-bottom))) 100%
-      ),
-      linear-gradient(to right,
-        rgba(245,158,11,calc(1.2 * var(--edge-left))) 0%,
-        rgba(245,158,11,calc(0.3 * var(--edge-left))) 4%,
-        transparent 12%,
-        transparent 88%,
-        rgba(245,158,11,calc(0.3 * var(--edge-right))) 96%,
-        rgba(245,158,11,calc(1.2 * var(--edge-right))) 100%
-      );
+    background: radial-gradient(
+      280px circle at var(--mouse-x) var(--mouse-y),
+      rgba(245,158,11,calc(0.9 * var(--glow-strength))) 0%,
+      rgba(245,158,11,calc(0.4 * var(--glow-strength))) 30%,
+      rgba(245,158,11,calc(0.1 * var(--glow-strength))) 55%,
+      transparent 75%
+    );
     -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
     -webkit-mask-composite: xor;
     mask-composite: exclude;
