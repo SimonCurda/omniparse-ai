@@ -15,7 +15,6 @@ const glassCardStyle = `
     position: relative;
   }
 
-  /* Inner spotlight — larger, softer, smoother radial that follows cursor */
   .glass-card::after {
     content: '';
     position: absolute;
@@ -34,9 +33,6 @@ const glassCardStyle = `
     filter: blur(8px);
   }
 
-  /* Reactive edge glow — each wall lights up based on cursor proximity.
-     Uses stronger multiplier (1.2) and wider gradient spread (12%) so
-     the glow is more visible and reactive. */
   .glass-card::before {
     content: '';
     position: absolute;

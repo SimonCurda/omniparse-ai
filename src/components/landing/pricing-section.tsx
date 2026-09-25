@@ -235,7 +235,7 @@ export function PricingSection({ onAuth }: { onAuth: (v: 'login' | 'signup') => 
         <div className="mb-8">
           <h3 className="text-center text-base font-semibold mb-4">Most noticeable upgrades</h3>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 max-w-5xl mx-auto">
-            <div className="flex items-start gap-2.5 rounded-lg border border-border bg-card p-3">
+            <div data-glow className="glass-card flex items-start gap-2.5 rounded-lg border border-border bg-card p-3">
               <div className="rounded-full bg-emerald-500/10 p-1.5 mt-0.5">
                 <Pencil className="h-3.5 w-3.5 text-emerald-500" />
               </div>
@@ -244,7 +244,7 @@ export function PricingSection({ onAuth }: { onAuth: (v: 'login' | 'signup') => 
                 <p className="text-[11px] text-muted-foreground mt-0.5">Fix AI extraction errors yourself</p>
               </div>
             </div>
-            <div className="flex items-start gap-2.5 rounded-lg border border-border bg-card p-3">
+            <div data-glow className="glass-card flex items-start gap-2.5 rounded-lg border border-border bg-card p-3">
               <div className="rounded-full bg-amber-500/10 p-1.5 mt-0.5">
                 <FileDown className="h-3.5 w-3.5 text-amber-500" />
               </div>
@@ -253,7 +253,7 @@ export function PricingSection({ onAuth }: { onAuth: (v: 'login' | 'signup') => 
                 <p className="text-[11px] text-muted-foreground mt-0.5">Custom export templates for your GL codes</p>
               </div>
             </div>
-            <div className="flex items-start gap-2.5 rounded-lg border border-border bg-card p-3">
+            <div data-glow className="glass-card flex items-start gap-2.5 rounded-lg border border-border bg-card p-3">
               <div className="rounded-full bg-red-500/10 p-1.5 mt-0.5">
                 <TrendingUp className="h-3.5 w-3.5 text-red-500" />
               </div>
@@ -262,7 +262,7 @@ export function PricingSection({ onAuth }: { onAuth: (v: 'login' | 'signup') => 
                 <p className="text-[11px] text-muted-foreground mt-0.5">Detect vendor price hikes automatically</p>
               </div>
             </div>
-            <div className="flex items-start gap-2.5 rounded-lg border border-border bg-card p-3">
+            <div data-glow className="glass-card flex items-start gap-2.5 rounded-lg border border-border bg-card p-3">
               <div className="rounded-full bg-purple-500/10 p-1.5 mt-0.5">
                 <Shield className="h-3.5 w-3.5 text-purple-500" />
               </div>
@@ -285,7 +285,8 @@ export function PricingSection({ onAuth }: { onAuth: (v: 'login' | 'signup') => 
             return (
               <Card
                 key={plan.name}
-                className={`relative flex flex-col ${colorClasses}`}
+                data-glow
+                className={`glass-card relative flex flex-col overflow-hidden ${colorClasses}`}
               >
                 {plan.highlighted && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2">

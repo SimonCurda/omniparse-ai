@@ -24,7 +24,7 @@ function CellValue({ value, highlight }: { value: string | boolean; highlight?: 
 function MobileFeatureRow({ row }: { row: typeof COMPARISON_DATA[number] }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="rounded-xl border border-border bg-card overflow-hidden">
+    <div data-glow className="glass-card rounded-xl border border-border bg-card overflow-hidden">
       <button
         type="button"
         className="w-full px-4 py-3 border-b border-border flex items-center justify-between text-left hover:bg-muted/30 transition-colors"
@@ -80,7 +80,7 @@ export function ComparisonSection() {
         </div>
 
         {/* Desktop table - hidden on mobile */}
-        <div className="hidden lg:block rounded-xl border border-border overflow-hidden bg-card">
+        <div data-glow className="glass-card hidden lg:block rounded-xl border border-border overflow-hidden bg-card">
           {/* Header row */}
           <div className="grid grid-cols-5 bg-muted/50">
             <div className="p-4 text-sm font-medium text-muted-foreground border-b border-border">
