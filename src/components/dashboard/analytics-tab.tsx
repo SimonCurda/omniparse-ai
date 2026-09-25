@@ -3,7 +3,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
+  XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
 } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -32,6 +32,9 @@ const tooltipStyle = {
   border: '1px solid hsl(var(--border))',
   borderRadius: '8px',
   fontSize: '12px',
+  color: 'hsl(var(--foreground))',
+  padding: '8px 12px',
+  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
 };
 
 // ─── Currency-aware formatting ────────────────────────────────────────────
@@ -550,16 +553,28 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
                         innerRadius={60}
                         outerRadius={100}
                         dataKey="value"
-                        label={({ name, percent }) =>
-                          name + ' ' + (percent * 100).toFixed(0) + '%'
-                        }
+                        label={false}
                         labelLine={false}
                       >
                         {vendorData.map((_, i) => (
                           <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                         ))}
                       </Pie>
-                      <Tooltip contentStyle={tooltipStyle} />
+                      <Tooltip
+                        contentStyle={tooltipStyle}
+                        formatter={(value: number, _name: string, props: { payload?: { payload?: { name?: string; currency?: string } } }) => {
+                          const vendor = props?.payload?.payload?.name ?? 'Unknown';
+                          const currency = props?.payload?.payload?.currency ?? 'USD';
+                          const total = vendorData.reduce((s, d) => s + d.value, 0);
+                          const pct = total > 0 ? ((value / total) * 100).toFixed(1) : '0';
+                          return [`${fmtCurrency(value, currency)} (${pct}%)`, vendor];
+                        }}
+                      />
+                      <Legend
+                        wrapperStyle={{ fontSize: '11px', color: 'hsl(var(--muted-foreground))' }}
+                        iconType="circle"
+                        iconSize={8}
+                      />
                     </PieChart>
                   </ResponsiveContainer>
                 </CardContent>
