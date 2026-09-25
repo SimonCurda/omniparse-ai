@@ -240,7 +240,7 @@ export function UploadTab() {
       </div>
 
       {showWelcome && invoices.length === 0 && (
-        <Card data-glow data-glow-border-only className="glass-card "border-l-4 border-l-amber-500 bg-card">
+        <Card data-glow data-glow-border-only className="glass-card border-l-4 border-l-amber-500 bg-card">
           <CardContent className="p-5">
             <div className="flex items-center gap-2 mb-3">
               <Sparkles className="h-5 w-5 text-amber-500" />
@@ -269,7 +269,7 @@ export function UploadTab() {
           Required before user can upload documents containing personal data
           (e.g. vendor names, email addresses) that will be processed by
           US-based AI providers (OpenRouter, Groq, Google Gemini). */ }
-      <Card data-glow data-glow-border-only className="glass-card {'border-l-4 ' + (legalConsent ? 'border-l-emerald-500 bg-emerald-500/5' : 'border-l-amber-500 bg-amber-500/5')}>
+      <Card data-glow data-glow-border-only className={'glass-card border-l-4 ' + (legalConsent ? 'border-l-emerald-500 bg-emerald-500/5' : 'border-l-amber-500 bg-amber-500/5')}>
         <CardContent className="p-4">
           <div className="flex items-start gap-3">
             <TriangleAlert className={'h-5 w-5 shrink-0 mt-0.5 ' + (legalConsent ? 'text-emerald-500' : 'text-amber-500')} />
@@ -357,7 +357,7 @@ export function UploadTab() {
       )}
 
       {errors.length > 0 && (
-        <Card data-glow data-glow-border-only className="glass-card "border-red-500/30">
+        <Card data-glow data-glow-border-only className="glass-card border-red-500/30">
           <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2 text-red-500">
               <AlertCircle className="h-5 w-5" /> Errors ({errors.length})

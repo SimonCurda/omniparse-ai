@@ -757,7 +757,7 @@ export function PendingReviewTab() {
             </div>
           )}
           {filteredItems.map((item) => (
-            <Card key={item.id} data-glow data-glow-border-only className="glass-card {`border-border/50 ${selectedIds.has(item.id) ? 'ring-2 ring-amber-500/30' : ''}`}>
+            <Card key={item.id} data-glow data-glow-border-only className={`glass-card border-border/50 ${selectedIds.has(item.id) ? 'ring-2 ring-amber-500/30' : ''}`}>
               <CardContent className="p-3">
                 <div className="flex items-start gap-3">
                   {filter === 'pending' && (
