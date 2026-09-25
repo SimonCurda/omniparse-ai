@@ -270,7 +270,7 @@ export function ChatTab() {
         </div>
       )}
 
-      <Card className="flex-1 flex flex-col border-border/50 overflow-hidden">
+      <Card data-glow data-glow-border-only className="glass-card "flex-1 flex flex-col border-border/50 overflow-hidden">
         <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4">
           {chatHistory.length === 0 && (
             <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">

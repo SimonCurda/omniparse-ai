@@ -735,12 +735,12 @@ export function PendingReviewTab() {
 
       {/* Items list */}
       {loading ? (
-        <Card><CardContent className="py-12 text-center">
+        <Card data-glow data-glow-border-only className="glass-card"><CardContent className="py-12 text-center">
           <Loader2 className="h-6 w-6 mx-auto animate-spin text-muted-foreground" />
           <p className="text-sm text-muted-foreground mt-2">Loading pending emails...</p>
         </CardContent></Card>
       ) : items.length === 0 ? (
-        <Card><CardContent className="py-12 text-center">
+        <Card data-glow data-glow-border-only className="glass-card"><CardContent className="py-12 text-center">
           <Inbox className="h-10 w-10 mx-auto text-muted-foreground/30 mb-3" />
           <p className="font-medium text-muted-foreground">No pending emails</p>
           <p className="text-sm text-muted-foreground mt-1">
@@ -757,7 +757,7 @@ export function PendingReviewTab() {
             </div>
           )}
           {filteredItems.map((item) => (
-            <Card key={item.id} className={`border-border/50 ${selectedIds.has(item.id) ? 'ring-2 ring-amber-500/30' : ''}`}>
+            <Card key={item.id} data-glow data-glow-border-only className="glass-card {`border-border/50 ${selectedIds.has(item.id) ? 'ring-2 ring-amber-500/30' : ''}`}>
               <CardContent className="p-3">
                 <div className="flex items-start gap-3">
                   {filter === 'pending' && (

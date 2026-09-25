@@ -276,7 +276,7 @@ function ApprovalsContent({ plan }: { plan: string }) {
   return (
     <div className="space-y-6">
       {/* Section A: Approval Rules */}
-      <Card>
+      <Card data-glow data-glow-border-only className="glass-card">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg">Approval Rules</CardTitle>
@@ -339,7 +339,7 @@ function ApprovalsContent({ plan }: { plan: string }) {
       </Card>
 
       {/* Section B: Pending Approvals */}
-      <Card>
+      <Card data-glow data-glow-border-only className="glass-card">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg flex items-center gap-2">

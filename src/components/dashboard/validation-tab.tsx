@@ -338,7 +338,7 @@ export function ValidationTab() {
       </div>
 
       {/* Section 1: Validation Rules Manager */}
-      <Card className="border-border/50">
+      <Card data-glow data-glow-border-only className="glass-card "border-border/50">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
@@ -400,7 +400,7 @@ export function ValidationTab() {
       </Card>
 
       {/* Section 2: Variance Thresholds */}
-      <Card className="border-border/50">
+      <Card data-glow data-glow-border-only className="glass-card "border-border/50">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
@@ -477,7 +477,7 @@ export function ValidationTab() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Summary Stats Cards */}
         <div className="lg:col-span-1 space-y-4">
-          <Card className="border-border/50">
+          <Card data-glow data-glow-border-only className="glass-card "border-border/50">
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <TrendingUp className="h-5 w-5 text-amber-500" />
@@ -563,7 +563,7 @@ export function ValidationTab() {
 
         {/* Recent Validation Issues */}
         <div className="lg:col-span-2">
-          <Card className="border-border/50 h-full">
+          <Card data-glow data-glow-border-only className="glass-card "border-border/50 h-full">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -659,7 +659,7 @@ export function ValidationTab() {
       </div>
 
       {/* Section 4: Invoice Aging Overview */}
-      <Card className="border-border/50">
+      <Card data-glow data-glow-border-only className="glass-card "border-border/50">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
@@ -882,7 +882,7 @@ function CustomRulesBuilder() {
       )}
 
       {showForm && !isLocked && (
-        <Card className="mb-4 border-amber-500/30 bg-amber-500/5">
+        <Card data-glow data-glow-border-only className="glass-card "mb-4 border-amber-500/30 bg-amber-500/5">
           <CardContent className="p-4 space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
