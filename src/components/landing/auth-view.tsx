@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { ArrowLeft, Check, Eye, EyeOff, Loader2, X } from 'lucide-react';
 import { useAppStore, type UserProfile } from '@/stores/app-store';
 import { toast } from 'sonner';
+import { GlassCardProvider } from '@/components/shared/glass-card-provider';
 
 export function AuthView({ mode, onSwitch, onBack }: { mode: 'login' | 'signup'; onSwitch: (m: 'login' | 'signup') => void; onBack: () => void }) {
   const [email, setEmail] = useState('');
@@ -125,7 +126,8 @@ export function AuthView({ mode, onSwitch, onBack }: { mode: 'login' | 'signup';
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4 bg-background">
-      <Card className="w-full max-w-md border-border/50">
+      <GlassCardProvider />
+      <Card data-glow data-glow-border-only className="glass-card w-full max-w-md border-border/50">
         <CardHeader className="text-center">
           <div className="flex items-center justify-center gap-2 mb-2">
             <div className="w-8 h-8 rounded-lg bg-amber-500 flex items-center justify-center">

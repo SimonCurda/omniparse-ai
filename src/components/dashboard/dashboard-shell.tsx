@@ -27,6 +27,7 @@ import { SettingsTab } from './settings-tab';
 import { ValidationTab } from './validation-tab';
 import { ApprovalsTab } from './approvals-tab';
 import { PendingReviewTab } from './pending-review-tab';
+import { GlassCardProvider } from '@/components/shared/glass-card-provider';
 
 interface TabItem {
   key: string;
@@ -209,6 +210,7 @@ export function DashboardShell() {
 
   return (
     <div className="min-h-screen flex flex-col">
+      <GlassCardProvider />
       {/* Top Header Bar */}
       <header className="h-14 border-b border-border flex items-center justify-between px-4 bg-background/95 backdrop-blur-sm sticky top-0 z-40">
         <div className="flex items-center gap-2">

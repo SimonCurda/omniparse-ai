@@ -171,3 +171,75 @@ html {
 .scrollbar-none::-webkit-scrollbar {
   display: none;
 }
+
+/* ─── Glass Card Border Glow (global) ─────────────────────────────── */
+/* Applied to any element with class "glass-card" + data-glow attribute. */
+/* The CursorGlow component (landing) or GlassCardProvider (dashboard)   */
+/* injects --mouse-x/--mouse-y CSS vars and toggles data-glow-active.    */
+.glass-card {
+  --mouse-x: 50%;
+  --mouse-y: 50%;
+  position: relative;
+}
+
+/* Inner spotlight (only on landing page — skip for dashboard) */
+.glass-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    320px circle at var(--mouse-x) var(--mouse-y),
+    rgba(245,158,11,0.10),
+    rgba(245,158,11,0.04) 30%,
+    transparent 60%
+  );
+  pointer-events: none;
+  z-index: 0;
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  filter: blur(8px);
+}
+.glass-card[data-glow-active]::after {
+  visibility: visible;
+  opacity: 1;
+}
+/* Dashboard cards: no inner spotlight, only border glow */
+.glass-card[data-glow-border-only]::after {
+  display: none;
+}
+
+/* Border glow — smooth radial gradient positioned at cursor */
+.glass-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: radial-gradient(
+    180px circle at var(--mouse-x) var(--mouse-y),
+    rgba(245,158,11,0.9) 0%,
+    rgba(245,158,11,0.5) 25%,
+    rgba(245,158,11,0.2) 50%,
+    rgba(245,158,11,0.05) 75%,
+    transparent 100%
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: 1;
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.glass-card[data-glow-active]::before {
+  visibility: visible;
+  opacity: 1;
+}
+
+.glass-card > * {
+  position: relative;
+  z-index: 2;
+}

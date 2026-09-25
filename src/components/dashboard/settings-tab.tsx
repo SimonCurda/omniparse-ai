@@ -540,7 +540,7 @@ export function SettingsTab() {
       </div>
 
       {/* Profile Card */}
-      <Card className="border-border/50">
+      <Card data-glow data-glow-border-only className="glass-card border-border/50">
         <CardHeader>
           <CardTitle className="text-lg">Profile</CardTitle>
           <CardDescription>Your account information</CardDescription>
@@ -596,7 +596,7 @@ export function SettingsTab() {
       <EmailInboxSettings />
 
       {/* Security Card */}
-      <Card className="border-border/50">
+      <Card data-glow data-glow-border-only className="glass-card border-border/50">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <Shield className="h-5 w-5" />
@@ -695,7 +695,7 @@ export function SettingsTab() {
       </Card>
 
       {/* Billing Card */}
-      <Card className="border-border/50">
+      <Card data-glow data-glow-border-only className="glass-card border-border/50">
         <CardHeader>
           <CardTitle className="text-lg">Billing</CardTitle>
           <CardDescription>Manage your subscription and usage</CardDescription>
@@ -756,7 +756,7 @@ export function SettingsTab() {
       </Card>
 
       {/* Custom Field Extraction Templates Card — Quick Win #6 */}
-      <Card className="border-border/50">
+      <Card data-glow data-glow-border-only className="glass-card border-border/50">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-amber-500" />
@@ -823,7 +823,7 @@ export function SettingsTab() {
       </Card>
 
       {/* Custom Export Templates Card — Plus+ */}
-      <Card className="border-border/50">
+      <Card data-glow data-glow-border-only className="glass-card border-border/50">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <Download className="h-5 w-5 text-amber-500" />
@@ -881,7 +881,7 @@ export function SettingsTab() {
       </Card>
 
       {/* Data Retention Control Card — Plus+ */}
-      <Card className="border-border/50">
+      <Card data-glow data-glow-border-only className="glass-card border-border/50">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <Clock className="h-5 w-5 text-amber-500" />
@@ -946,7 +946,7 @@ export function SettingsTab() {
       </Card>
 
       {/* Keyboard Shortcuts Card */}
-      <Card className="border-border/50">
+      <Card data-glow data-glow-border-only className="glass-card border-border/50">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-amber-500" />
@@ -960,7 +960,7 @@ export function SettingsTab() {
       </Card>
 
       {/* Data & Privacy Card */}
-      <Card className="border-border/50">
+      <Card data-glow data-glow-border-only className="glass-card border-border/50">
         <CardHeader>
           <CardTitle className="text-lg">Data & Privacy</CardTitle>
           <CardDescription>Export or delete your personal data</CardDescription>
@@ -1105,7 +1105,7 @@ export function SettingsTab() {
       </Dialog>
 
       {/* Compliance Card */}
-      <Card className="border-border/50">
+      <Card data-glow data-glow-border-only className="glass-card border-border/50">
         <CardHeader>
           <CardTitle className="text-lg">Compliance</CardTitle>
           <CardDescription>Legal and regulatory information</CardDescription>

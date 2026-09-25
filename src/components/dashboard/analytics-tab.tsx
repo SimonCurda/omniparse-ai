@@ -283,7 +283,7 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
       </div>
 
       {invoices.length === 0 ? (
-        <Card className="border-border/50">
+        <Card data-glow data-glow-border-only className="glass-card border-border/50">
           <CardContent className="p-12 text-center">
             <BarChart3Icon className="h-12 w-12 mx-auto text-muted-foreground/30 mb-4" />
             <p className="font-medium text-muted-foreground">No data yet</p>
@@ -308,7 +308,7 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
           </div>
 
           {/* ============ Currencies Breakdown — new ============ */}
-          <Card className="border-border/50">
+          <Card data-glow data-glow-border-only className="glass-card border-border/50">
             <CardHeader className="pb-2">
               <CardTitle className="text-lg flex items-center gap-2">
                 <DollarSign className="h-4 w-4 text-emerald-500" />
@@ -367,7 +367,7 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
 
           {/* ============ Cost Metrics Section ============ */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="border-border/50">
+            <Card data-glow data-glow-border-only className="glass-card border-border/50">
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Zap className="h-4 w-4 text-amber-500" />
@@ -411,7 +411,7 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
               </CardContent>
             </Card>
 
-            <Card className="border-border/50">
+            <Card data-glow data-glow-border-only className="glass-card border-border/50">
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <DollarSign className="h-4 w-4 text-emerald-500" />
@@ -466,7 +466,7 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
           {/* ============ Charts Grid (2x2) ============ */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {monthlyData.length > 0 && (
-              <Card className="border-border/50">
+              <Card data-glow data-glow-border-only className="glass-card border-border/50">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-lg">Monthly Volume</CardTitle>
                 </CardHeader>
@@ -492,7 +492,7 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
             )}
 
             {monthlyData.length > 0 && (
-              <Card className="border-border/50">
+              <Card data-glow data-glow-border-only className="glass-card border-border/50">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-lg">Processing Amount{isMixedCurrency ? ' (by currency)' : ''}</CardTitle>
                   {isMixedCurrency && (
@@ -536,7 +536,7 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
             )}
 
             {vendorData.length > 0 && (
-              <Card className="border-border/50">
+              <Card data-glow data-glow-border-only className="glass-card border-border/50">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-lg">Vendor Distribution</CardTitle>
                 </CardHeader>
@@ -567,7 +567,7 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
             )}
 
             {confidenceData.length > 0 && (
-              <Card className="border-border/50">
+              <Card data-glow data-glow-border-only className="glass-card border-border/50">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-lg">AI Confidence Scores</CardTitle>
                 </CardHeader>
@@ -615,7 +615,7 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
 
           {/* ============ Batch Analysis Section ============ */}
           {batchAnalysis && (
-            <Card className="border-border/50">
+            <Card data-glow data-glow-border-only className="glass-card border-border/50">
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Users className="h-4 w-4 text-amber-500" />
@@ -734,7 +734,7 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
 
           {/* ============ Validation Pass Rate Chart ============ */}
           {invoices.length >= 2 && (
-            <Card className="border-border/50">
+            <Card data-glow data-glow-border-only className="glass-card border-border/50">
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg">Validation Pass Rate</CardTitle>
                 <CardDescription>How many invoices pass validation each month</CardDescription>
@@ -757,7 +757,7 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
 
           {/* ============ Pattern Anomalies Section ============ */}
           {invoices.length >= 3 && (
-            <Card className="border-border/50">
+            <Card data-glow data-glow-border-only className="glass-card border-border/50">
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4 text-orange-500" />
@@ -828,7 +828,7 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
           )}
 
           {/* ============ Cost Optimization & Price Change Alerts (Business+) ============ */}
-          <Card className="border-border/50">
+          <Card data-glow data-glow-border-only className="glass-card border-border/50">
             <CardHeader className="pb-2">
               <CardTitle className="text-lg flex items-center gap-2">
                 <DollarSign className="h-4 w-4 text-emerald-500" />
@@ -924,7 +924,7 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
           </Card>
 
           {/* ============ Vendor Performance Scorecard (Business+) ============ */}
-          <Card className="border-border/50">
+          <Card data-glow data-glow-border-only className="glass-card border-border/50">
             <CardHeader className="pb-2">
               <CardTitle className="text-lg flex items-center gap-2">
                 <BarChart3Icon className="h-4 w-4 text-amber-500" />
@@ -1092,7 +1092,7 @@ function VendorRiskSection({ invoices }: { invoices: InvoiceRow[] }) {
 
   if (!['plus', 'business', 'enterprise'].includes(plan || '')) {
     return (
-      <Card className="border-border/50">
+      <Card data-glow data-glow-border-only className="glass-card border-border/50">
         <CardHeader className="pb-2">
           <CardTitle className="text-lg flex items-center gap-2">
             <ShieldAlert className="h-4 w-4 text-amber-500" />
@@ -1108,7 +1108,7 @@ function VendorRiskSection({ invoices }: { invoices: InvoiceRow[] }) {
   }
 
   return (
-    <Card className="border-border/50">
+    <Card data-glow data-glow-border-only className="glass-card border-border/50">
       <CardHeader className="pb-2">
         <CardTitle className="text-lg flex items-center gap-2">
           <ShieldAlert className="h-4 w-4 text-amber-500" />
