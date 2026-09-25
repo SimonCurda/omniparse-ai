@@ -37,22 +37,24 @@ const glassCardStyle = `
     border-radius: inherit;
     background: radial-gradient(
       320px circle at var(--mouse-x) var(--mouse-y),
-      rgba(245,158,11,calc(0.10 * var(--glow-strength))),
-      rgba(245,158,11,calc(0.04 * var(--glow-strength))) 30%,
+      rgba(245,158,11,0.10),
+      rgba(245,158,11,0.04) 30%,
       transparent 60%
     );
     pointer-events: none;
     z-index: 0;
-    opacity: var(--glow-strength);
-    transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    opacity: 0;
+    transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     filter: blur(8px);
+  }
+  .glass-card[data-glow-active]::after {
+    opacity: 1;
   }
 
   /* Reactive border — each wall is split into segments. Each segment's
-     brightness is independently controlled by a CSS variable that the
-     JS sets based on the exact pixel distance from the cursor to that
-     point on the wall. This makes every part of every wall dimmer or
-     brighter depending on exact distance from cursor. */
+     brightness is independently controlled by a CSS variable. The entire
+     ::before is invisible (opacity:0) until --glow-strength is set to 1
+     by JS on hover. */
   .glass-card::before {
     content: '';
     position: absolute;
@@ -60,57 +62,56 @@ const glassCardStyle = `
     border-radius: inherit;
     padding: 1.5px;
     background:
-      /* Top wall: 5 segments left-to-right */
       linear-gradient(to right,
-        rgba(245,158,11,calc(1.0 * var(--edge-top-0))) 0%,
-        rgba(245,158,11,calc(1.0 * var(--edge-top-0))) 20%,
-        rgba(245,158,11,calc(1.0 * var(--edge-top-25))) 20%,
-        rgba(245,158,11,calc(1.0 * var(--edge-top-25))) 40%,
-        rgba(245,158,11,calc(1.0 * var(--edge-top-50))) 40%,
-        rgba(245,158,11,calc(1.0 * var(--edge-top-50))) 60%,
-        rgba(245,158,11,calc(1.0 * var(--edge-top-75))) 60%,
-        rgba(245,158,11,calc(1.0 * var(--edge-top-75))) 80%,
-        rgba(245,158,11,calc(1.0 * var(--edge-top-100))) 80%,
-        rgba(245,158,11,calc(1.0 * var(--edge-top-100))) 100%
+        rgba(245,158,11,var(--edge-top-0)) 0%,
+        rgba(245,158,11,var(--edge-top-0)) 20%,
+        rgba(245,158,11,var(--edge-top-25)) 20%,
+        rgba(245,158,11,var(--edge-top-25)) 40%,
+        rgba(245,158,11,var(--edge-top-50)) 40%,
+        rgba(245,158,11,var(--edge-top-50)) 60%,
+        rgba(245,158,11,var(--edge-top-75)) 60%,
+        rgba(245,158,11,var(--edge-top-75)) 80%,
+        rgba(245,158,11,var(--edge-top-100)) 80%,
+        rgba(245,158,11,var(--edge-top-100)) 100%
       ),
-      /* Bottom wall: 5 segments left-to-right */
       linear-gradient(to right,
-        rgba(245,158,11,calc(1.0 * var(--edge-bottom-0))) 0%,
-        rgba(245,158,11,calc(1.0 * var(--edge-bottom-0))) 20%,
-        rgba(245,158,11,calc(1.0 * var(--edge-bottom-25))) 20%,
-        rgba(245,158,11,calc(1.0 * var(--edge-bottom-25))) 40%,
-        rgba(245,158,11,calc(1.0 * var(--edge-bottom-50))) 40%,
-        rgba(245,158,11,calc(1.0 * var(--edge-bottom-50))) 60%,
-        rgba(245,158,11,calc(1.0 * var(--edge-bottom-75))) 60%,
-        rgba(245,158,11,calc(1.0 * var(--edge-bottom-75))) 80%,
-        rgba(245,158,11,calc(1.0 * var(--edge-bottom-100))) 80%,
-        rgba(245,158,11,calc(1.0 * var(--edge-bottom-100))) 100%
+        rgba(245,158,11,var(--edge-bottom-0)) 0%,
+        rgba(245,158,11,var(--edge-bottom-0)) 20%,
+        rgba(245,158,11,var(--edge-bottom-25)) 20%,
+        rgba(245,158,11,var(--edge-bottom-25)) 40%,
+        rgba(245,158,11,var(--edge-bottom-50)) 40%,
+        rgba(245,158,11,var(--edge-bottom-50)) 60%,
+        rgba(245,158,11,var(--edge-bottom-75)) 60%,
+        rgba(245,158,11,var(--edge-bottom-75)) 80%,
+        rgba(245,158,11,var(--edge-bottom-100)) 80%,
+        rgba(245,158,11,var(--edge-bottom-100)) 100%
       ),
-      /* Left wall: 4 segments top-to-bottom */
       linear-gradient(to bottom,
-        rgba(245,158,11,calc(1.0 * var(--edge-left-0))) 0%,
-        rgba(245,158,11,calc(1.0 * var(--edge-left-0))) 33%,
-        rgba(245,158,11,calc(1.0 * var(--edge-left-33))) 33%,
-        rgba(245,158,11,calc(1.0 * var(--edge-left-33))) 66%,
-        rgba(245,158,11,calc(1.0 * var(--edge-left-66))) 66%,
-        rgba(245,158,11,calc(1.0 * var(--edge-left-66))) 100%
+        rgba(245,158,11,var(--edge-left-0)) 0%,
+        rgba(245,158,11,var(--edge-left-0)) 33%,
+        rgba(245,158,11,var(--edge-left-33)) 33%,
+        rgba(245,158,11,var(--edge-left-33)) 66%,
+        rgba(245,158,11,var(--edge-left-66)) 66%,
+        rgba(245,158,11,var(--edge-left-66)) 100%
       ),
-      /* Right wall: 4 segments top-to-bottom */
       linear-gradient(to bottom,
-        rgba(245,158,11,calc(1.0 * var(--edge-right-0))) 0%,
-        rgba(245,158,11,calc(1.0 * var(--edge-right-0))) 33%,
-        rgba(245,158,11,calc(1.0 * var(--edge-right-33))) 33%,
-        rgba(245,158,11,calc(1.0 * var(--edge-right-33))) 66%,
-        rgba(245,158,11,calc(1.0 * var(--edge-right-66))) 66%,
-        rgba(245,158,11,calc(1.0 * var(--edge-right-66))) 100%
+        rgba(245,158,11,var(--edge-right-0)) 0%,
+        rgba(245,158,11,var(--edge-right-0)) 33%,
+        rgba(245,158,11,var(--edge-right-33)) 33%,
+        rgba(245,158,11,var(--edge-right-33)) 66%,
+        rgba(245,158,11,var(--edge-right-66)) 66%,
+        rgba(245,158,11,var(--edge-right-66)) 100%
       );
     -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
     -webkit-mask-composite: xor;
     mask-composite: exclude;
     pointer-events: none;
     z-index: 1;
-    opacity: var(--glow-strength);
-    transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    opacity: 0;
+    transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .glass-card[data-glow-active]::before {
+    opacity: 1;
   }
 
   .glass-card > * {

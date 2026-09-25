@@ -53,7 +53,7 @@ export function CursorGlow() {
 
         glowEl.style.setProperty('--mouse-x', `${localX}px`);
         glowEl.style.setProperty('--mouse-y', `${localY}px`);
-        glowEl.style.setProperty('--glow-strength', '1');
+        glowEl.setAttribute('data-glow-active', '');
 
         // Compute brightness at specific points along each wall.
         // For each sample point, compute the Euclidean distance from
@@ -97,7 +97,7 @@ export function CursorGlow() {
       document.querySelectorAll('[data-glow]').forEach((el) => {
         if (el !== glowEl) {
           const e = el as HTMLElement;
-          e.style.setProperty('--glow-strength', '0');
+          e.removeAttribute('data-glow-active');
           ['--edge-top-0','--edge-top-25','--edge-top-50','--edge-top-75','--edge-top-100',
            '--edge-bottom-0','--edge-bottom-25','--edge-bottom-50','--edge-bottom-75','--edge-bottom-100',
            '--edge-left-0','--edge-left-33','--edge-left-66','--edge-left-100',
