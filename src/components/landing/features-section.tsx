@@ -43,18 +43,19 @@ const glassCardStyle = `
     );
     pointer-events: none;
     z-index: 0;
+    visibility: hidden;
+    transition: visibility 0s, opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     opacity: 0;
-    transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     filter: blur(8px);
   }
   .glass-card[data-glow-active]::after {
+    visibility: visible;
     opacity: 1;
+    transition: visibility 0s linear 0s, opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  /* Reactive border — each wall is split into segments. Each segment's
-     brightness is independently controlled by a CSS variable. The entire
-     ::before is invisible (opacity:0) until --glow-strength is set to 1
-     by JS on hover. */
+  /* Reactive border — segment brightness controlled by CSS vars.
+     Hidden by default, shown on hover via data-glow-active. */
   .glass-card::before {
     content: '';
     position: absolute;
@@ -107,10 +108,12 @@ const glassCardStyle = `
     mask-composite: exclude;
     pointer-events: none;
     z-index: 1;
+    visibility: hidden;
     opacity: 0;
     transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   }
   .glass-card[data-glow-active]::before {
+    visibility: visible;
     opacity: 1;
   }
 
