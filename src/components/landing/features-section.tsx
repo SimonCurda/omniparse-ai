@@ -15,28 +15,28 @@ const glassCardStyle = `
     position: relative;
   }
 
-  /* Inner spotlight — soft radial that follows cursor */
+  /* Inner spotlight — larger, softer, smoother radial that follows cursor */
   .glass-card::after {
     content: '';
     position: absolute;
     inset: 0;
     border-radius: inherit;
     background: radial-gradient(
-      250px circle at var(--mouse-x) var(--mouse-y),
-      rgba(245,158,11,calc(0.14 * var(--glow-strength))),
-      rgba(245,158,11,calc(0.05 * var(--glow-strength))) 25%,
-      transparent 55%
+      320px circle at var(--mouse-x) var(--mouse-y),
+      rgba(245,158,11,calc(0.10 * var(--glow-strength))),
+      rgba(245,158,11,calc(0.04 * var(--glow-strength))) 30%,
+      transparent 60%
     );
     pointer-events: none;
     z-index: 0;
     opacity: var(--glow-strength);
-    transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    filter: blur(8px);
   }
 
-  /* Reactive edge glow — each edge (top/bottom/left/right) has its own
-     gradient whose brightness depends on how close the cursor is to that edge.
-     --edge-top is high when cursor is near the top, low when near the bottom.
-     All 4 edges are rendered as a single border via mask trick. */
+  /* Reactive edge glow — each wall lights up based on cursor proximity.
+     Uses stronger multiplier (1.2) and wider gradient spread (12%) so
+     the glow is more visible and reactive. */
   .glass-card::before {
     content: '';
     position: absolute;
@@ -45,16 +45,20 @@ const glassCardStyle = `
     padding: 1.5px;
     background:
       linear-gradient(to bottom,
-        rgba(245,158,11,calc(0.8 * var(--edge-top))) 0%,
-        transparent 8%,
-        transparent 92%,
-        rgba(245,158,11,calc(0.8 * var(--edge-bottom))) 100%
+        rgba(245,158,11,calc(1.2 * var(--edge-top))) 0%,
+        rgba(245,158,11,calc(0.3 * var(--edge-top))) 4%,
+        transparent 12%,
+        transparent 88%,
+        rgba(245,158,11,calc(0.3 * var(--edge-bottom))) 96%,
+        rgba(245,158,11,calc(1.2 * var(--edge-bottom))) 100%
       ),
       linear-gradient(to right,
-        rgba(245,158,11,calc(0.8 * var(--edge-left))) 0%,
-        transparent 8%,
-        transparent 92%,
-        rgba(245,158,11,calc(0.8 * var(--edge-right))) 100%
+        rgba(245,158,11,calc(1.2 * var(--edge-left))) 0%,
+        rgba(245,158,11,calc(0.3 * var(--edge-left))) 4%,
+        transparent 12%,
+        transparent 88%,
+        rgba(245,158,11,calc(0.3 * var(--edge-right))) 96%,
+        rgba(245,158,11,calc(1.2 * var(--edge-right))) 100%
       );
     -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
     -webkit-mask-composite: xor;
@@ -62,7 +66,7 @@ const glassCardStyle = `
     pointer-events: none;
     z-index: 1;
     opacity: var(--glow-strength);
-    transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .glass-card > * {

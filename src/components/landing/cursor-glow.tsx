@@ -56,11 +56,15 @@ export function CursorGlow() {
         glowEl.style.setProperty('--glow-strength', '1');
 
         // Per-edge proximity: how close is the cursor to each edge?
-        // 1.0 = right at the edge, 0.0 = at the opposite edge.
-        const edgeTop = Math.max(0, 1 - (localY / rect.height) * 1.8);
-        const edgeBottom = Math.max(0, 1 - ((rect.height - localY) / rect.height) * 1.8);
-        const edgeLeft = Math.max(0, 1 - (localX / rect.width) * 1.8);
-        const edgeRight = Math.max(0, 1 - ((rect.width - localX) / rect.width) * 1.8);
+        // Uses a steeper curve (1.2 multiplier) so edges light up more dramatically.
+        // Squared falloff for more reactive feel — stays dim in the middle,
+        // brightens quickly as cursor approaches the wall.
+        const yRatio = localY / rect.height;
+        const xRatio = localX / rect.width;
+        const edgeTop = Math.max(0, Math.pow(1 - yRatio, 2.5));
+        const edgeBottom = Math.max(0, Math.pow(yRatio, 2.5));
+        const edgeLeft = Math.max(0, Math.pow(1 - xRatio, 2.5));
+        const edgeRight = Math.max(0, Math.pow(xRatio, 2.5));
 
         glowEl.style.setProperty('--edge-top', edgeTop.toFixed(3));
         glowEl.style.setProperty('--edge-bottom', edgeBottom.toFixed(3));
