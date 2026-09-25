@@ -7,44 +7,61 @@ const glassCardStyle = `
   .glass-card {
     --mouse-x: 50%;
     --mouse-y: 50%;
-    --glow-opacity: 0;
+    --glow-strength: 0;
+    --corner-glow: 0;
     position: relative;
   }
-  .glass-card::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    padding: 1px;
-    background: linear-gradient(
-      135deg,
-      rgba(245,158,11,calc(0.4 * var(--glow-opacity))) 0%,
-      rgba(245,158,11,calc(0.1 * var(--glow-opacity))) 40%,
-      transparent 60%
-    );
-    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-    pointer-events: none;
-    z-index: 1;
-    transition: opacity 0.3s ease;
-  }
+
+  /* Inner spotlight — smooth radial gradient that follows cursor */
   .glass-card::after {
     content: '';
     position: absolute;
     inset: 0;
     border-radius: inherit;
     background: radial-gradient(
-      200px circle at var(--mouse-x) var(--mouse-y),
-      rgba(245,158,11,calc(0.12 * var(--glow-opacity))),
-      rgba(245,158,11,calc(0.04 * var(--glow-opacity))) 30%,
-      transparent 60%
+      250px circle at var(--mouse-x) var(--mouse-y),
+      rgba(245,158,11,calc(0.14 * var(--glow-strength))),
+      rgba(245,158,11,calc(0.05 * var(--glow-strength))) 25%,
+      transparent 55%
     );
     pointer-events: none;
     z-index: 0;
-    transition: opacity 0.3s ease;
-    opacity: var(--glow-opacity);
+    opacity: var(--glow-strength);
+    transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   }
+
+  /* Corner glow border — brightness depends on cursor proximity to each corner.
+     Uses 4 separate radial-gradients, one per corner, all in one background layer.
+     Each corner's brightness is driven by --corner-glow which the JS updates
+     based on cursor distance to that corner. */
+  .glass-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1.5px;
+    background:
+      radial-gradient(80px circle at 0% 0%,
+        rgba(245,158,11,calc(0.6 * var(--corner-glow))) 0%,
+        transparent 70%),
+      radial-gradient(80px circle at 100% 0%,
+        rgba(245,158,11,calc(0.6 * var(--corner-glow))) 0%,
+        transparent 70%),
+      radial-gradient(80px circle at 0% 100%,
+        rgba(245,158,11,calc(0.6 * var(--corner-glow))) 0%,
+        transparent 70%),
+      radial-gradient(80px circle at 100% 100%,
+        rgba(245,158,11,calc(0.6 * var(--corner-glow))) 0%,
+        transparent 70%);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+    z-index: 1;
+    opacity: var(--glow-strength);
+    transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
   .glass-card > * {
     position: relative;
     z-index: 2;

@@ -43,7 +43,6 @@ export function CursorGlow() {
       targetX = e.clientX;
       targetY = e.clientY;
 
-      // Update CSS variables on the hovered [data-glow] element
       const el = e.target as HTMLElement;
       const glowEl = el.closest('[data-glow]') as HTMLElement | null;
 
@@ -51,15 +50,40 @@ export function CursorGlow() {
         const rect = glowEl.getBoundingClientRect();
         const localX = e.clientX - rect.left;
         const localY = e.clientY - rect.top;
+
         glowEl.style.setProperty('--mouse-x', `${localX}px`);
         glowEl.style.setProperty('--mouse-y', `${localY}px`);
-        glowEl.style.setProperty('--glow-opacity', '1');
+        glowEl.style.setProperty('--glow-strength', '1');
+
+        // Corner proximity: compute distance from cursor to the nearest corner.
+        // The closer the cursor is to a corner, the brighter --corner-glow gets.
+        const corners = [
+          { x: 0, y: 0 },           // top-left
+          { x: rect.width, y: 0 },   // top-right
+          { x: 0, y: rect.height },  // bottom-left
+          { x: rect.width, y: rect.height }, // bottom-right
+        ];
+
+        // Find distance to nearest corner
+        let minDist = Infinity;
+        for (const c of corners) {
+          const dist = Math.sqrt((localX - c.x) ** 2 + (localY - c.y) ** 2);
+          if (dist < minDist) minDist = dist;
+        }
+
+        // Map distance to 0-1 range. When cursor is right at a corner (dist=0),
+        // corner-glow = 1 (max brightness). When cursor is in the opposite
+        // corner (dist = diagonal), corner-glow = 0.
+        const diagonal = Math.sqrt(rect.width ** 2 + rect.height ** 2);
+        const cornerGlow = Math.max(0, 1 - (minDist / diagonal) * 1.5);
+        glowEl.style.setProperty('--corner-glow', cornerGlow.toFixed(3));
       }
 
-      // Clear previous element when leaving
+      // Fade out cards we've left
       document.querySelectorAll('[data-glow]').forEach((el) => {
         if (el !== glowEl) {
-          (el as HTMLElement).style.setProperty('--glow-opacity', '0');
+          (el as HTMLElement).style.setProperty('--glow-strength', '0');
+          (el as HTMLElement).style.setProperty('--corner-glow', '0');
         }
       });
     };
