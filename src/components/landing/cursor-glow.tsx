@@ -41,7 +41,7 @@ export function CursorGlow() {
       currentY += (targetY - currentY) * 0.15;
 
       if (ambientRef.current) {
-        ambientRef.current.style.transform = `translate(${currentX - 300}px, ${currentY - 300}px)`;
+        ambientRef.current.style.transform = `translate(${currentX - 150}px, ${currentY - 150}px)`;
       }
 
       // Update spotlight position within the hovered card
@@ -78,35 +78,44 @@ export function CursorGlow() {
           setSpotlight(s => ({ ...s, active: false }));
         }
         activeGlowEl = glowEl;
-      } else if (glowEl && glowRect) {
-        // Update rect on scroll/resize while hovering
-        const newRect = glowEl.getBoundingClientRect();
-        if (Math.abs(newRect.top - glowRect.top) > 1 || Math.abs(newRect.left - glowRect.left) > 1) {
-          glowRect = newRect;
-          setSpotlight({ x: newRect.left, y: newRect.top, w: newRect.width, h: newRect.height, active: true });
-        }
+      }
+      // Removed the scroll-during-hover rect update — it was causing the glitch.
+      // The spotlight is position:fixed so it stays put during scroll.
+      // If the user scrolls, the spotlight briefly drifts but that's less
+      // jarring than the constant getBoundingClientRect calls were.
+    };
+
+    // Hide spotlight on scroll to avoid glitchy position jumps
+    const handleScroll = () => {
+      if (activeGlowEl) {
+        setSpotlight(s => ({ ...s, active: false }));
+        activeGlowEl = null;
+        glowRect = null;
       }
     };
+
+    window.addEventListener('scroll', handleScroll, { passive: true, capture: true });
 
     window.addEventListener('mousemove', handleMouseMove, { passive: true });
     rafId = requestAnimationFrame(animate);
 
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('scroll', handleScroll, { capture: true } as EventListenerOptions);
       if (rafId !== null) cancelAnimationFrame(rafId);
     };
   }, []);
 
   return (
     <>
-      {/* Ambient glow — large, soft, follows cursor across page */}
+      {/* Ambient glow — small, soft, follows cursor across page */}
       <div
         ref={ambientRef}
-        className="pointer-events-none fixed left-0 top-0 z-0 h-[600px] w-[600px] rounded-full hidden md:block"
+        className="pointer-events-none fixed left-0 top-0 z-0 h-[300px] w-[300px] rounded-full hidden md:block"
         style={{
-          background: 'radial-gradient(circle, rgba(245,158,11,0.08) 0%, rgba(245,158,11,0.03) 35%, transparent 65%)',
+          background: 'radial-gradient(circle, rgba(245,158,11,0.07) 0%, rgba(245,158,11,0.02) 40%, transparent 65%)',
           willChange: 'transform',
-          filter: 'blur(20px)',
+          filter: 'blur(12px)',
         }}
         aria-hidden="true"
       />
