@@ -3,30 +3,73 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FEATURES, type Feature } from './landing-data';
 
+const glassCardStyle = `
+  .glass-card {
+    --mouse-x: 50%;
+    --mouse-y: 50%;
+    --glow-opacity: 0;
+    position: relative;
+  }
+  .glass-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(
+      135deg,
+      rgba(245,158,11,calc(0.4 * var(--glow-opacity))) 0%,
+      rgba(245,158,11,calc(0.1 * var(--glow-opacity))) 40%,
+      transparent 60%
+    );
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+    z-index: 1;
+    transition: opacity 0.3s ease;
+  }
+  .glass-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(
+      200px circle at var(--mouse-x) var(--mouse-y),
+      rgba(245,158,11,calc(0.12 * var(--glow-opacity))),
+      rgba(245,158,11,calc(0.04 * var(--glow-opacity))) 30%,
+      transparent 60%
+    );
+    pointer-events: none;
+    z-index: 0;
+    transition: opacity 0.3s ease;
+    opacity: var(--glow-opacity);
+  }
+  .glass-card > * {
+    position: relative;
+    z-index: 2;
+  }
+`;
+
 function FeatureCard({ icon: Icon, title, description }: Feature) {
   return (
-    <Card
-      data-glow
-      className="border-border/50 bg-card transition-all h-full relative overflow-hidden hover:border-amber-500/30 hover:shadow-lg hover:shadow-amber-500/5"
-    >
-      {/* Liquid glass border highlight on hover */}
-      <div
-        className="pointer-events-none absolute inset-0 rounded-[inherit] opacity-0 transition-opacity duration-300 hover:opacity-100"
-        style={{
-          background: 'linear-gradient(135deg, rgba(245,158,11,0.06) 0%, transparent 50%, rgba(245,158,11,0.03) 100%)',
-        }}
-        aria-hidden="true"
-      />
-      <CardHeader className="relative">
-        <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center mb-3 transition-transform duration-300 group-hover:scale-110">
-          <Icon className="h-5 w-5 text-amber-500" />
-        </div>
-        <CardTitle className="text-lg">{title}</CardTitle>
-      </CardHeader>
-      <CardContent className="relative">
-        <p className="text-sm text-muted-foreground leading-relaxed">{description}</p>
-      </CardContent>
-    </Card>
+    <>
+      <style>{glassCardStyle}</style>
+      <Card
+        data-glow
+        className="glass-card border-border/50 bg-card transition-all h-full overflow-hidden hover:border-amber-500/30 hover:shadow-lg hover:shadow-amber-500/5"
+      >
+        <CardHeader>
+          <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center mb-3 transition-transform duration-300 hover:scale-110">
+            <Icon className="h-5 w-5 text-amber-500" />
+          </div>
+          <CardTitle className="text-lg">{title}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground leading-relaxed">{description}</p>
+        </CardContent>
+      </Card>
+    </>
   );
 }
 
