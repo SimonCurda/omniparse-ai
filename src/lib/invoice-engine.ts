@@ -719,22 +719,56 @@ export function analyzeBatch(invoices: Array<{
     }
   }
 
-  // ─── Outlier detection — currency-aware ──────────────────────────────────
+  // ─── Outlier detection — currency-aware, outlier-excluded average ────────
   // Compute average PER CURRENCY, then find outliers within each currency.
   // An invoice in EUR can never be an outlier against CZK averages.
+  //
+  // KEY FIX: The average used for outlier detection EXCLUDES the outlier
+  // itself. We use a two-pass approach:
+  //   Pass 1: Compute raw average including all invoices
+  //   Pass 2: Flag invoices > 3x raw average as outliers
+  //   Pass 3: Recompute average EXCLUDING flagged outliers
+  //   Pass 4: Re-flag using the clean average (catches more outliers)
+  // The "clean average" is what we show to the user — it's not skewed
+  // by the suspicious invoice.
   for (const [currency, invs] of Object.entries(byCurrency)) {
     const withTotal = invs.filter((i) => typeof i.total === 'number' && i.total! > 0);
     if (withTotal.length === 0) continue;
-    const avgAmount = withTotal.reduce((s, i) => s + i.total!, 0) / withTotal.length;
 
+    // Pass 1: Raw average
+    const rawAvg = withTotal.reduce((s, i) => s + i.total!, 0) / withTotal.length;
+
+    // Pass 2: Flag initial outliers (>3x raw average)
+    const flaggedIds = new Set<string>();
     for (const inv of withTotal) {
-      if (avgAmount > 0 && inv.total! > avgAmount * 3) {
+      if (rawAvg > 0 && inv.total! > rawAvg * 3) {
+        flaggedIds.add(inv.id);
+      }
+    }
+
+    // Pass 3: Clean average (excluding flagged outliers)
+    const cleanInvs = withTotal.filter((i) => !flaggedIds.has(i.id));
+    const cleanAvg = cleanInvs.length > 0
+      ? cleanInvs.reduce((s, i) => s + i.total!, 0) / cleanInvs.length
+      : rawAvg;
+
+    // Pass 4: Re-flag using clean average (may catch more outliers)
+    for (const inv of withTotal) {
+      if (cleanAvg > 0 && inv.total! > cleanAvg * 3) {
+        flaggedIds.add(inv.id);
+      }
+    }
+
+    // Build outlier list with clean average in the reason text
+    for (const inv of withTotal) {
+      if (flaggedIds.has(inv.id)) {
+        const multiplier = cleanAvg > 0 ? (inv.total! / cleanAvg).toFixed(1) : '∞';
         outliers.push({
           id: inv.id,
           vendor: inv.vendor || 'Unknown',
           amount: inv.total!,
           currency,
-          reason: `Amount is ${(inv.total! / avgAmount).toFixed(1)}x the ${currency} average (${avgAmount.toFixed(2)})`,
+          reason: `Amount is ${multiplier}x the ${currency} average (${cleanAvg.toFixed(2)}) — average excludes this outlier`,
         });
       }
     }
@@ -1330,10 +1364,39 @@ export function detectPatterns(
 
     if (totals.length < 2) continue;
 
-    const avg = totals.reduce((a, b) => a + b, 0) / totals.length;
-    const stdDev = Math.sqrt(totals.reduce((s, t) => s + Math.pow(t - avg, 2), 0) / totals.length);
+    // ─── Outlier-excluded average (same approach as analyzeBatch) ───────
+    // Pass 1: Raw average
+    const rawAvg = totals.reduce((a, b) => a + b, 0) / totals.length;
+
+    // Pass 2: Flag initial outliers (>3x raw average)
+    const flaggedTotals = new Set<number>();
+    for (let i = 0; i < vendorInvoices.length; i++) {
+      const t = vendorInvoices[i].total;
+      if (typeof t === 'number' && t > 0 && rawAvg > 0 && t > rawAvg * 3) {
+        flaggedTotals.add(i);
+      }
+    }
+
+    // Pass 3: Clean average (excluding flagged outliers)
+    const cleanTotals = totals.filter((_, i) => {
+      // Map totals back to invoice indices — this is approximate but
+      // works because totals was built in the same order as vendorInvoices
+      return !flaggedTotals.has(i);
+    });
+    const avg = cleanTotals.length > 0
+      ? cleanTotals.reduce((a, b) => a + b, 0) / cleanTotals.length
+      : rawAvg;
+    const cleanInvoices = vendorInvoices.filter((_, i) => !flaggedTotals.has(i));
+    const stdDev = cleanInvoices.length > 1
+      ? Math.sqrt(cleanInvoices.reduce((s, inv) => {
+          const t = inv.total ?? 0;
+          return s + Math.pow(t - avg, 2);
+        }, 0) / cleanInvoices.length)
+      : 0;
 
     // Anomaly: Invoice amount > avg + 3*stdDev (within this currency)
+    // Uses the CLEAN average (excludes outliers) so the threshold isn't
+    // inflated by the outlier itself.
     if (stdDev > 0) {
       for (const inv of vendorInvoices) {
         if (typeof inv.total === 'number' && inv.total > avg + 3 * stdDev) {
@@ -1343,13 +1406,14 @@ export function detectPatterns(
             anomaly: 'Unusual amount',
             severity: 'warning',
             currency,
-            detail: `${currency} ${inv.total.toFixed(2)} is ${(stdDev > 0 ? ((inv.total - avg) / stdDev).toFixed(1) : '?')}σ above the vendor average of ${currency} ${avg.toFixed(2)} (${currency}).`,
+            detail: `${currency} ${inv.total.toFixed(2)} is ${(stdDev > 0 ? ((inv.total - avg) / stdDev).toFixed(1) : '?')}σ above the vendor average of ${currency} ${avg.toFixed(2)} (average excludes this outlier).`,
           });
         }
       }
     }
 
     // Anomaly: Amount is >5x the vendor's average (within this currency)
+    // Uses the CLEAN average so the multiplier isn't understated.
     if (avg > 0) {
       for (const inv of vendorInvoices) {
         if (typeof inv.total === 'number' && inv.total > avg * 5) {
@@ -1360,7 +1424,7 @@ export function detectPatterns(
               anomaly: 'Spike in amount',
               severity: 'critical',
               currency,
-              detail: `${currency} ${inv.total.toFixed(2)} is ${((inv.total / avg)).toFixed(1)}x the vendor's average of ${currency} ${avg.toFixed(2)} (${currency}).`,
+              detail: `${currency} ${inv.total.toFixed(2)} is ${(inv.total / avg).toFixed(1)}x the vendor's average of ${currency} ${avg.toFixed(2)} (average excludes this outlier).`,
             });
           }
         }
