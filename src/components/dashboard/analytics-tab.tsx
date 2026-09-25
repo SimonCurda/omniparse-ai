@@ -28,11 +28,11 @@ import {
 const PIE_COLORS = ['#f59e0b', '#10b981', '#6366f1', '#ef4444', '#71717a', '#06b6d4', '#f97316', '#8b5cf6'];
 
 const tooltipStyle = {
-  backgroundColor: 'hsl(var(--card))',
-  border: '1px solid hsl(var(--border))',
+  backgroundColor: '#141416',
+  border: '1px solid #27272a',
   borderRadius: '8px',
   fontSize: '12px',
-  color: 'hsl(var(--foreground))',
+  color: '#e4e4e7',
   padding: '8px 12px',
   boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
 };
