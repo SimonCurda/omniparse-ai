@@ -328,7 +328,7 @@ export function UploadTab() {
       </div>
 
       {files.length > 0 && (
-        <Card>
+        <Card data-glow data-glow-border-only className="glass-card">
           <CardContent className="p-4 space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="font-medium text-sm">{files.length} file{files.length > 1 ? 's' : ''} selected</h3>
@@ -372,7 +372,7 @@ export function UploadTab() {
       )}
 
       {results.length > 0 && (
-        <Card>
+        <Card data-glow data-glow-border-only className="glass-card">
           <CardHeader className="pb-3">
             <CardTitle className="text-lg">Extraction Results</CardTitle>
             <CardDescription>

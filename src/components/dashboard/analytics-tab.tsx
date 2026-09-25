@@ -295,7 +295,7 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
           {/* ============ Top Stats Row ============ */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {stats.map((s) => (
-              <Card key={s.label} className="border-border/50">
+              <Card key={s.label} data-glow data-glow-border-only className="glass-card border-border/50">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm text-muted-foreground">{s.label}</span>

@@ -328,7 +328,7 @@ export function EmailInboxSettings() {
   return (
     <>
       {/* Email Inboxes Card */}
-      <Card className="border-border/50">
+      <Card data-glow data-glow-border-only className="glass-card border-border/50">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <Mail className="h-5 w-5 text-amber-500" />
@@ -616,7 +616,7 @@ export function EmailInboxSettings() {
 
       {/* Blocklist Card */}
       {blocklist.length > 0 && (
-        <Card className="border-border/50">
+        <Card data-glow data-glow-border-only className="glass-card border-border/50">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <Ban className="h-5 w-5 text-red-500" />
