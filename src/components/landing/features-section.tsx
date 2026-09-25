@@ -8,11 +8,14 @@ const glassCardStyle = `
     --mouse-x: 50%;
     --mouse-y: 50%;
     --glow-strength: 0;
-    --corner-glow: 0;
+    --edge-top: 0;
+    --edge-bottom: 0;
+    --edge-left: 0;
+    --edge-right: 0;
     position: relative;
   }
 
-  /* Inner spotlight — smooth radial gradient that follows cursor */
+  /* Inner spotlight — soft radial that follows cursor */
   .glass-card::after {
     content: '';
     position: absolute;
@@ -30,10 +33,10 @@ const glassCardStyle = `
     transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  /* Corner glow border — brightness depends on cursor proximity to each corner.
-     Uses 4 separate radial-gradients, one per corner, all in one background layer.
-     Each corner's brightness is driven by --corner-glow which the JS updates
-     based on cursor distance to that corner. */
+  /* Reactive edge glow — each edge (top/bottom/left/right) has its own
+     gradient whose brightness depends on how close the cursor is to that edge.
+     --edge-top is high when cursor is near the top, low when near the bottom.
+     All 4 edges are rendered as a single border via mask trick. */
   .glass-card::before {
     content: '';
     position: absolute;
@@ -41,18 +44,18 @@ const glassCardStyle = `
     border-radius: inherit;
     padding: 1.5px;
     background:
-      radial-gradient(80px circle at 0% 0%,
-        rgba(245,158,11,calc(0.6 * var(--corner-glow))) 0%,
-        transparent 70%),
-      radial-gradient(80px circle at 100% 0%,
-        rgba(245,158,11,calc(0.6 * var(--corner-glow))) 0%,
-        transparent 70%),
-      radial-gradient(80px circle at 0% 100%,
-        rgba(245,158,11,calc(0.6 * var(--corner-glow))) 0%,
-        transparent 70%),
-      radial-gradient(80px circle at 100% 100%,
-        rgba(245,158,11,calc(0.6 * var(--corner-glow))) 0%,
-        transparent 70%);
+      linear-gradient(to bottom,
+        rgba(245,158,11,calc(0.8 * var(--edge-top))) 0%,
+        transparent 8%,
+        transparent 92%,
+        rgba(245,158,11,calc(0.8 * var(--edge-bottom))) 100%
+      ),
+      linear-gradient(to right,
+        rgba(245,158,11,calc(0.8 * var(--edge-left))) 0%,
+        transparent 8%,
+        transparent 92%,
+        rgba(245,158,11,calc(0.8 * var(--edge-right))) 100%
+      );
     -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
     -webkit-mask-composite: xor;
     mask-composite: exclude;

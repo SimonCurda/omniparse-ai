@@ -55,35 +55,27 @@ export function CursorGlow() {
         glowEl.style.setProperty('--mouse-y', `${localY}px`);
         glowEl.style.setProperty('--glow-strength', '1');
 
-        // Corner proximity: compute distance from cursor to the nearest corner.
-        // The closer the cursor is to a corner, the brighter --corner-glow gets.
-        const corners = [
-          { x: 0, y: 0 },           // top-left
-          { x: rect.width, y: 0 },   // top-right
-          { x: 0, y: rect.height },  // bottom-left
-          { x: rect.width, y: rect.height }, // bottom-right
-        ];
+        // Per-edge proximity: how close is the cursor to each edge?
+        // 1.0 = right at the edge, 0.0 = at the opposite edge.
+        const edgeTop = Math.max(0, 1 - (localY / rect.height) * 1.8);
+        const edgeBottom = Math.max(0, 1 - ((rect.height - localY) / rect.height) * 1.8);
+        const edgeLeft = Math.max(0, 1 - (localX / rect.width) * 1.8);
+        const edgeRight = Math.max(0, 1 - ((rect.width - localX) / rect.width) * 1.8);
 
-        // Find distance to nearest corner
-        let minDist = Infinity;
-        for (const c of corners) {
-          const dist = Math.sqrt((localX - c.x) ** 2 + (localY - c.y) ** 2);
-          if (dist < minDist) minDist = dist;
-        }
-
-        // Map distance to 0-1 range. When cursor is right at a corner (dist=0),
-        // corner-glow = 1 (max brightness). When cursor is in the opposite
-        // corner (dist = diagonal), corner-glow = 0.
-        const diagonal = Math.sqrt(rect.width ** 2 + rect.height ** 2);
-        const cornerGlow = Math.max(0, 1 - (minDist / diagonal) * 1.5);
-        glowEl.style.setProperty('--corner-glow', cornerGlow.toFixed(3));
+        glowEl.style.setProperty('--edge-top', edgeTop.toFixed(3));
+        glowEl.style.setProperty('--edge-bottom', edgeBottom.toFixed(3));
+        glowEl.style.setProperty('--edge-left', edgeLeft.toFixed(3));
+        glowEl.style.setProperty('--edge-right', edgeRight.toFixed(3));
       }
 
       // Fade out cards we've left
       document.querySelectorAll('[data-glow]').forEach((el) => {
         if (el !== glowEl) {
           (el as HTMLElement).style.setProperty('--glow-strength', '0');
-          (el as HTMLElement).style.setProperty('--corner-glow', '0');
+          (el as HTMLElement).style.setProperty('--edge-top', '0');
+          (el as HTMLElement).style.setProperty('--edge-bottom', '0');
+          (el as HTMLElement).style.setProperty('--edge-left', '0');
+          (el as HTMLElement).style.setProperty('--edge-right', '0');
         }
       });
     };
