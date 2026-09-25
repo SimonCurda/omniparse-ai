@@ -36,6 +36,14 @@ const tooltipStyle = {
   padding: '8px 12px',
   boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
 };
+const tooltipItemStyle = {
+  color: '#e4e4e7',
+};
+const tooltipLabelStyle = {
+  color: '#a1a1aa',
+  marginBottom: '4px',
+  fontSize: '11px',
+};
 
 // Chart axis/grid colors — must be explicit hex values because Recharts
 // renders SVG <text> elements where hsl(var(--x)) doesn't always resolve
@@ -510,7 +518,7 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
                       <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
                       <XAxis dataKey="month" stroke={chartColors.axis} fontSize={12} />
                       <YAxis stroke={chartColors.axis} fontSize={12} />
-                      <Tooltip contentStyle={tooltipStyle} />
+                      <Tooltip contentStyle={tooltipStyle} itemStyle={tooltipItemStyle} labelStyle={tooltipLabelStyle} />
                       <Area
                         type="monotone"
                         dataKey="parsed"
@@ -550,6 +558,8 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
                       />
                       <Tooltip
                         contentStyle={tooltipStyle}
+                        itemStyle={tooltipItemStyle}
+                        labelStyle={tooltipLabelStyle}
                         formatter={(v, name) => [
                           fmtCurrency(Number(v), String(name)),
                           String(name),
@@ -593,6 +603,8 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
                       </Pie>
                       <Tooltip
                         contentStyle={tooltipStyle}
+                        itemStyle={tooltipItemStyle}
+                        labelStyle={tooltipLabelStyle}
                         formatter={(value: number, _name: string, props: { payload?: { payload?: { name?: string; currency?: string } } }) => {
                           const vendor = props?.payload?.payload?.name ?? 'Unknown';
                           const currency = props?.payload?.payload?.currency ?? 'USD';
@@ -636,6 +648,8 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
                       />
                       <Tooltip
                         contentStyle={tooltipStyle}
+                        itemStyle={tooltipItemStyle}
+                        labelStyle={tooltipLabelStyle}
                         formatter={(v) => [Number(v).toFixed(1) + '%', 'Confidence']}
                       />
                       <Bar dataKey="confidence" radius={[0, 4, 4, 0]}>
@@ -791,7 +805,7 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
                     <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
                     <XAxis dataKey="month" stroke={chartColors.axis} fontSize={12} />
                     <YAxis stroke={chartColors.axis} fontSize={12} />
-                    <Tooltip contentStyle={tooltipStyle} />
+                    <Tooltip contentStyle={tooltipStyle} itemStyle={tooltipItemStyle} labelStyle={tooltipLabelStyle} />
                     <Bar dataKey="pass" stackId="a" fill="#10b981" name="Pass" radius={[0,0,0,0]} />
                     <Bar dataKey="warning" stackId="a" fill="#f59e0b" name="Warning" />
                     <Bar dataKey="fail" stackId="a" fill="#ef4444" name="Fail" radius={[4,4,0,0]} />
