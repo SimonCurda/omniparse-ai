@@ -147,6 +147,29 @@ html {
   animation: bounce 1.4s infinite ease-in-out both;
 }
 
+/* Rotating headline — fade + slide up on each phrase change.
+   Triggered by re-mounting the span with a new key prop. */
+@keyframes headline-fade {
+  0% {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-headline-fade {
+  animation: headline-fade 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-headline-fade {
+    animation: none;
+  }
+}
+
 /* Pricing feature list scrollbar */
 .pricing-scroll::-webkit-scrollbar {
   width: 4px;
