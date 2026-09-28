@@ -3,6 +3,87 @@ import { db } from '@/lib/db';
 import { getUserFromRequest, hasFeature } from '@/lib/auth';
 import { checkMonthlyParseLimit, incrementMonthlyParseCount } from '@/lib/parse-limit';
 
+// ─── Server-side MIME attachment extraction ───────────────────────────────
+// When a pending review item was stored with the raw email body instead of
+// the actual PDF (happened before the email-scanner fix), we need to extract
+// the real attachment from the MIME structure before sending to /api/parse.
+// Otherwise /api/parse's magic-byte validation rejects it.
+
+function detectMimeFromBuffer(buf: Buffer): string {
+  if (buf.length < 4) return 'application/octet-stream';
+  if (buf[0] === 0x25 && buf[1] === 0x50 && buf[2] === 0x44 && buf[3] === 0x46) return 'application/pdf';
+  if (buf[0] === 0xFF && buf[1] === 0xD8 && buf[2] === 0xFF) return 'image/jpeg';
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47) return 'image/png';
+  if (buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46 &&
+      buf.length > 11 && buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50) return 'image/webp';
+  return 'application/octet-stream';
+}
+
+function isRawEmail(buf: Buffer): boolean {
+  const text = buf.slice(0, Math.min(buf.length, 500)).toString('latin1').toLowerCase();
+  return /^(delivered-to|received|return-path|dkim-signature|arc-|mime-version|content-type|from:|to:|subject:)/im.test(text);
+}
+
+function extractAttachmentFromRawEmail(rawEmail: Buffer): { buffer: Buffer; filename: string; mime: string } | null {
+  try {
+    const raw = rawEmail.toString('latin1');
+    const ctMatch = raw.match(/content-type:\s*multipart\/[^;]+;\s*boundary=(?:"([^"]+)"|([^\s\r\n]+))/i);
+    if (!ctMatch) return null;
+    const boundary = ctMatch[1] || ctMatch[2];
+    if (!boundary) return null;
+
+    const delimiter = `--${boundary}`;
+    const parts = raw.split(delimiter);
+    if (parts.length < 2) return null;
+
+    for (let i = 1; i < parts.length; i++) {
+      const part = parts[i];
+      if (!part || part.trim() === '--' || part.trim() === '') continue;
+
+      const headerEnd = part.indexOf('\r\n\r\n') >= 0 ? part.indexOf('\r\n\r\n') : part.indexOf('\n\n');
+      if (headerEnd < 0) continue;
+      const partHeaders = part.slice(0, headerEnd).toLowerCase();
+      const partBody = part.slice(headerEnd + 4).trim();
+
+      const isPdf = partHeaders.includes('content-type: application/pdf') ||
+                    partHeaders.match(/name="[^"]*\.pdf"/i) ||
+                    partHeaders.match(/filename=[^\s]*\.pdf/i);
+      const isImage = partHeaders.includes('content-type: image/') ||
+                      partHeaders.match(/name="[^"]*\.(jpg|jpeg|png|webp)"/i) ||
+                      partHeaders.match(/filename=[^\s]*\.(jpg|jpeg|png|webp)/i);
+
+      if (!isPdf && !isImage) continue;
+
+      let filename = 'attachment';
+      const nameMatch = partHeaders.match(/name="([^"]+)"/i) ||
+                        partHeaders.match(/filename=([^\s;]+)/i) ||
+                        partHeaders.match(/filename="([^"]+)"/i);
+      if (nameMatch) filename = nameMatch[1] || filename;
+
+      let fileBuffer: Buffer;
+      if (partHeaders.includes('content-transfer-encoding: base64')) {
+        fileBuffer = Buffer.from(partBody.replace(/[\s\r\n]/g, ''), 'base64');
+      } else if (partHeaders.includes('content-transfer-encoding: quoted-printable')) {
+        const decoded = partBody
+          .replace(/=\r?\n/g, '')
+          .replace(/=([0-9A-F]{2})/gi, (_m, hex) => String.fromCharCode(parseInt(hex, 16)));
+        fileBuffer = Buffer.from(decoded, 'latin1');
+      } else {
+        fileBuffer = Buffer.from(partBody, 'latin1');
+      }
+
+      // Verify magic bytes
+      const detectedMime = detectMimeFromBuffer(fileBuffer);
+      if (detectedMime !== 'application/octet-stream') {
+        return { buffer: fileBuffer, filename, mime: detectedMime };
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 // POST /api/pending-review/[id]/approve — approve a pending item, run full
 // extraction, create an Invoice record, and clear the pending item.
 //
@@ -50,12 +131,34 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   // Decode the attachment
-  const fileBuffer = Buffer.from(item.attachmentData, 'base64');
+  let fileBuffer = Buffer.from(item.attachmentData, 'base64');
+  let fileMime = item.attachmentMime;
+  let fileFilename = item.attachmentFilename;
+
+  // ─── Recover PDF from raw email if needed ──────────────────────────
+  // If the stored attachment is actually the raw email body (happened before
+  // the email-scanner fix), extract the real PDF/image from the MIME structure.
+  // Otherwise /api/parse's magic-byte validation will reject it.
+  if (isRawEmail(fileBuffer)) {
+    console.warn(`[pending-review/approve] Stored attachment is raw email, extracting real PDF...`);
+    const extracted = extractAttachmentFromRawEmail(fileBuffer);
+    if (extracted) {
+      console.warn(`[pending-review/approve] Extracted "${extracted.filename}" (${extracted.mime}, ${extracted.buffer.length} bytes) from raw email`);
+      fileBuffer = extracted.buffer;
+      fileMime = extracted.mime;
+      fileFilename = extracted.filename;
+    } else {
+      return NextResponse.json(
+        { error: 'The stored attachment is a raw email, but no PDF/image could be extracted from its MIME structure. Please delete this item and re-scan the inbox.' },
+        { status: 400 },
+      );
+    }
+  }
 
   // Build a FormData for the internal call to /api/parse
   const formData = new FormData();
-  const blob = new Blob([fileBuffer], { type: item.attachmentMime });
-  formData.append('file', blob, item.attachmentFilename);
+  const blob = new Blob([fileBuffer], { type: fileMime });
+  formData.append('file', blob, fileFilename);
 
   // ─── Pass email provenance metadata to /api/parse ──────────────────
   // /api/parse stamps these onto the Invoice's customFields at creation
