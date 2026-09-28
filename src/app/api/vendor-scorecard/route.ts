@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getUserFromRequest, hasFeature } from '@/lib/auth';
+import { computeOutlierExcludedStats } from '@/lib/invoice-engine';
 
 // GET /api/vendor-scorecard — Vendor performance report (Business+)
+//
+// KEY: avgAmount is the OUTLIER-EXCLUDED average. If a vendor has 5 invoices
+// at $200, $210, $190, $180, $50,000, the scorecard shows avgAmount = $195
+// (not $10,156). The $50,000 invoice is flagged as a suspicious high outlier
+// and excluded, with `excludedOutliers` listing what was excluded.
 export async function GET(req: NextRequest) {
   try {
     const auth = await getUserFromRequest(req);
@@ -22,6 +28,7 @@ export async function GET(req: NextRequest) {
     const invoices = await db.invoice.findMany({
       where,
       select: {
+        id: true,
         vendor: true, total: true, amount: true, confidence: true,
         isDuplicate: true, validationStatus: true, invDate: true,
         processingTime: true, lineItems: true, createdAt: true,
@@ -30,9 +37,7 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: 'desc' },
     });
 
-    // Group by vendor + currency — never mix currencies when summing totals
-    // or computing averages. A vendor with invoices in 2 currencies shows up
-    // as 2 separate scorecard entries.
+    // Group by vendor + currency.
     const vendorCurrencyMap = new Map<string, typeof invoices>();
     for (const inv of invoices) {
       const v = inv.vendor!;
@@ -44,8 +49,14 @@ export async function GET(req: NextRequest) {
 
     const scorecards = Array.from(vendorCurrencyMap.entries()).map(([key, invs]) => {
       const [vendor, currency] = key.split('|||');
+
+      const outlierStats = computeOutlierExcludedStats(invs);
+      const avgAmount = outlierStats.cleanAvg;
+
+      // Total Amount still shows the TRUE total (incl. outliers) so the user's
+      // books reconcile — but the avg is the clean one.
       const totalAmount = invs.reduce((s, i) => s + (i.total ?? 0), 0);
-      const avgAmount = totalAmount / invs.length;
+
       const avgConfidence = invs.reduce((s, i) => s + (i.confidence ?? 0), 0) / invs.length;
       const avgProcessingTime = invs.reduce((s, i) => s + (i.processingTime ?? 0), 0) / invs.length;
       const duplicateCount = invs.filter((i) => i.isDuplicate).length;
@@ -53,22 +64,20 @@ export async function GET(req: NextRequest) {
       const warningCount = invs.filter((i) => i.validationStatus === 'warning').length;
       const passCount = invs.filter((i) => i.validationStatus === 'pass').length;
 
-      // Price trend: compare first half vs second half avg (within this currency)
+      // Price trend: outlier-excluded averages per half.
       const mid = Math.floor(invs.length / 2);
       const firstHalf = invs.slice(0, mid || 1);
       const secondHalf = invs.slice(mid || 1);
-      const firstAvg = firstHalf.reduce((s, i) => s + (i.total ?? 0), 0) / firstHalf.length;
-      const secondAvg = secondHalf.length > 0
-        ? secondHalf.reduce((s, i) => s + (i.total ?? 0), 0) / secondHalf.length
-        : firstAvg;
+      const firstStats = computeOutlierExcludedStats(firstHalf);
+      const secondStats = computeOutlierExcludedStats(secondHalf);
+      const firstAvg = firstStats.cleanAvg;
+      const secondAvg = secondStats.cleanAvg > 0 ? secondStats.cleanAvg : firstAvg;
       const priceTrend = firstAvg > 0 ? ((secondAvg - firstAvg) / firstAvg) * 100 : 0;
 
-      // On-time invoicing: how many invoices have consistent date patterns
       const dates = invs.map((i) => i.invDate).filter(Boolean) as string[];
-      const uniqueDays = new Set(dates.map((d) => d.slice(8, 10))); // day of month
+      const uniqueDays = new Set(dates.map((d) => d.slice(8, 10)));
       const invoicingRegularity = dates.length > 1 ? Math.min(100, (1 / uniqueDays.size) * 100) : 100;
 
-      // Reliability score (0-100)
       const duplicateRate = invs.length > 0 ? (duplicateCount / invs.length) * 100 : 0;
       const failRate = invs.length > 0 ? (failCount / invs.length) * 100 : 0;
       const reliabilityScore = Math.max(0, Math.min(100,
@@ -81,6 +90,19 @@ export async function GET(req: NextRequest) {
         invoiceCount: invs.length,
         totalAmount: Math.round(totalAmount * 100) / 100,
         avgAmount: Math.round(avgAmount * 100) / 100,
+        rawAvgAmount: Math.round(outlierStats.rawAvg * 100) / 100,
+        outlierCount: outlierStats.outlierCount,
+        outlierAmount: Math.round(outlierStats.outlierAmount * 100) / 100,
+        excludedOutliers: outlierStats.outliers.map((o) => {
+          const inv = invs.find((i) => i.id === o.id);
+          return {
+            id: o.id,
+            amount: Math.round(o.amount * 100) / 100,
+            direction: o.direction,
+            reason: o.reason,
+            invDate: inv?.invDate || null,
+          };
+        }),
         avgConfidence: Math.round(avgConfidence * 1000) / 1000,
         avgProcessingTime: Math.round(avgProcessingTime * 100) / 100,
         duplicateCount,
@@ -95,8 +117,6 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    // Sort by total amount descending (still meaningful since each scorecard
-    // is per-currency — within a currency, the totals are comparable).
     scorecards.sort((a, b) => b.totalAmount - a.totalAmount);
 
     return NextResponse.json({ scorecards, totalVendors: scorecards.length });

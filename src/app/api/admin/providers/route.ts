@@ -1,23 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { getUserFromRequest } from '@/lib/auth';
 
 /**
- * Authenticate the request. Accepts either:
- * 1. JWT token in Authorization header (for normal logged-in users)
- * 2. CRON_SECRET in ?key= query param (for admin panel access)
+ * Authenticate the request using CRON_SECRET only.
+ *
+ * SECURITY FIX (2026-09-27 audit): Previously this endpoint accepted JWT auth
+ * as a fallback, which meant ANY logged-in user could access/toggle AI
+ * provider configs. Now it ONLY accepts the CRON_SECRET query param — same
+ * model as /api/admin/accounts. The admin panel passes ?key=CRON_SECRET.
  */
 async function authenticate(req: NextRequest): Promise<boolean> {
-  // Try JWT auth first
-  const auth = await getUserFromRequest(req);
-  if (auth) return true;
-
-  // Fall back to CRON_SECRET query param (same as other admin endpoints)
   const key = new URL(req.url).searchParams.get('key');
   const cronSecret = process.env.CRON_SECRET;
-  if (key && cronSecret && key === cronSecret) return true;
-
-  return false;
+  if (!cronSecret) return false; // Not configured → deny
+  return !!key && key === cronSecret;
 }
 
 /**

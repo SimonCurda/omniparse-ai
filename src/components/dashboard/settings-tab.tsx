@@ -144,7 +144,33 @@ export function SettingsTab() {
   const plan = user?.plan ?? 'free';
   const planLabel = PLAN_LABELS[plan] ?? plan;
   const planLimit = PLAN_LIMITS[plan] ?? 25;
-  const invoiceCount = invoices.length;
+  // Real monthly parse count from /api/usage — NOT invoices.length (which
+  // counts invoices the user still has, not what they parsed this month).
+  const [monthlyUsage, setMonthlyUsage] = useState<{
+    count: number;
+    limit: number;
+    remaining: number;
+    resetsAt: string;
+  } | null>(null);
+
+  useEffect(() => {
+    const token = localStorage.getItem('op_token');
+    if (!token) return;
+    fetch('/api/usage', { headers: { Authorization: 'Bearer ' + token } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data && typeof data.count === 'number') {
+          setMonthlyUsage({
+            count: data.count,
+            limit: data.limit,
+            remaining: data.remaining,
+            resetsAt: data.resetsAt,
+          });
+        }
+      })
+      .catch(() => {});
+  }, [invoices.length]);
+  const invoiceCount = monthlyUsage?.count ?? invoices.length;
 
   // Profile state
   const [editName, setEditName] = useState(user?.name ?? '');

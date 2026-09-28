@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getUserFromRequest, hasFeature } from '@/lib/auth';
+import { computeOutlierExcludedStats } from '@/lib/invoice-engine';
 
 // GET /api/price-alerts — Detect vendor price changes month-over-month (Business+)
+//
+// IMPORTANT: Averages used for month-over-month comparison EXCLUDE outliers.
+// Without this, a single $50,000 invoice in one month would inflate that
+// month's average ~50× and trigger a false "+5000% price increase" alert.
 export async function GET(req: NextRequest) {
   try {
     const auth = await getUserFromRequest(req);
@@ -13,10 +18,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Price change alerts require Business plan or higher.' }, { status: 403 });
     }
 
-    // Get all invoices with vendor and line items
+    // Get all invoices with vendor and line items. We need `id` for the
+    // outlier-exclusion utility (works on IDs, not indices).
     const invoices = await db.invoice.findMany({
       where: { userId: auth.userId, vendor: { not: null } },
-      select: { vendor: true, total: true, amount: true, lineItems: true, invDate: true, currency: true, createdAt: true },
+      select: { id: true, vendor: true, total: true, amount: true, lineItems: true, invDate: true, currency: true, createdAt: true },
       orderBy: { createdAt: 'asc' },
     });
 
@@ -68,8 +74,12 @@ export async function GET(req: NextRequest) {
       const currentInvs = byMonth.get(currentMonth)!;
       const prevInvs = byMonth.get(prevMonth)!;
 
-      const currentAvgTotal = currentInvs.reduce((s, i) => s + (i.total ?? 0), 0) / currentInvs.length;
-      const prevAvgTotal = prevInvs.reduce((s, i) => s + (i.total ?? 0), 0) / prevInvs.length;
+      // Outlier-excluded averages — prevents a single $50k invoice in one
+      // month from triggering a false +5000% price-increase alert.
+      const currentStats = computeOutlierExcludedStats(currentInvs);
+      const prevStats = computeOutlierExcludedStats(prevInvs);
+      const currentAvgTotal = currentStats.cleanAvg;
+      const prevAvgTotal = prevStats.cleanAvg;
 
       if (prevAvgTotal > 0) {
         const changePercent = ((currentAvgTotal - prevAvgTotal) / prevAvgTotal) * 100;

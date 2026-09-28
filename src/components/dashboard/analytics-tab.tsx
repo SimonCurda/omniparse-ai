@@ -281,6 +281,16 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
     invoiceCount: number;
     totalAmount: number;
     avgAmount: number;
+    rawAvgAmount?: number;
+    outlierCount?: number;
+    outlierAmount?: number;
+    excludedOutliers?: Array<{
+      id: string;
+      amount: number;
+      direction: 'high' | 'low';
+      reason: string;
+      invDate: string | null;
+    }>;
     avgConfidence: number;
     avgProcessingTime: number;
     duplicateCount: number;
@@ -1083,14 +1093,53 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
                                   <p className="font-medium text-foreground">{fmtCurrency(sc.totalAmount, sc.currency || dominantCurrency)}</p>
                                 </div>
                                 <div>
+                                  <p className="text-muted-foreground flex items-center gap-1">
+                                    Avg / Invoice
+                                    {(sc.outlierCount ?? 0) > 0 && (
+                                      <span
+                                        className="inline-flex items-center gap-0.5 px-1 py-0 rounded text-[9px] bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
+                                        title={(sc.excludedOutliers ?? []).map((o) => `${o.direction === 'high' ? '↑' : '↓'} ${fmtCurrency(o.amount, sc.currency)} — ${o.reason}`).join('\n')}
+                                      >
+                                        <AlertTriangle className="h-2.5 w-2.5" />
+                                        {sc.outlierCount} excluded
+                                      </span>
+                                    )}
+                                  </p>
+                                  <p className="font-medium text-foreground">{fmtCurrency(sc.avgAmount, sc.currency || dominantCurrency)}</p>
+                                  {(sc.outlierCount ?? 0) > 0 && (sc.rawAvgAmount ?? 0) !== sc.avgAmount && (
+                                    <p className="text-[10px] text-muted-foreground line-through mt-0.5">
+                                      was {fmtCurrency(sc.rawAvgAmount ?? 0, sc.currency || dominantCurrency)}
+                                    </p>
+                                  )}
+                                </div>
+                                <div>
                                   <p className="text-muted-foreground">Avg Confidence</p>
                                   <p className="font-medium text-foreground">{(sc.avgConfidence * 100).toFixed(1)}%</p>
                                 </div>
-                                <div>
-                                  <p className="text-muted-foreground">Duplicates</p>
-                                  <p className={"font-medium " + (sc.duplicateCount > 0 ? 'text-red-500' : 'text-foreground')}>{sc.duplicateCount}</p>
-                                </div>
                               </div>
+
+                              {/* Outlier detail block */}
+                              {(sc.excludedOutliers ?? []).length > 0 && (
+                                <div className="pt-2 mt-1 border-t border-border/50">
+                                  <p className="text-[10px] font-medium text-amber-600 dark:text-amber-400 mb-1.5 flex items-center gap-1">
+                                    <AlertTriangle className="h-3 w-3" />
+                                    Excluded from average ({sc.excludedOutliers!.length})
+                                  </p>
+                                  <div className="space-y-1">
+                                    {sc.excludedOutliers!.map((o) => (
+                                      <div key={o.id} className="flex items-start gap-2 text-[10px] text-muted-foreground">
+                                        <span className={o.direction === 'high' ? 'text-red-500' : 'text-amber-500'}>{o.direction === 'high' ? '↑' : '↓'}</span>
+                                        <span className="font-mono font-medium text-foreground">{fmtCurrency(o.amount, sc.currency || dominantCurrency)}</span>
+                                        {o.invDate && (
+                                          <span className="text-muted-foreground/70">
+                                            {new Date(o.invDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                                          </span>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
 
                               {/* Pass/Warn/Fail counts */}
                               <div className="flex items-center gap-4 text-xs text-muted-foreground pt-1">
@@ -1106,6 +1155,12 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
                                   <span className="w-2 h-2 rounded-full bg-red-500" />
                                   {sc.failCount} fail
                                 </span>
+                                {sc.duplicateCount > 0 && (
+                                  <span className="flex items-center gap-1 text-red-500">
+                                    <span className="w-2 h-2 rounded-full bg-red-500" />
+                                    {sc.duplicateCount} dup
+                                  </span>
+                                )}
                               </div>
                             </div>
                           );

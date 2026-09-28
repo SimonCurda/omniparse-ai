@@ -72,8 +72,10 @@ export async function POST(req: NextRequest) {
       data: {
         userId: user.id,
         name: name.trim(),
-        minAmount: minAmount !== undefined ? Number(minAmount) : null,
-        maxAmount: maxAmount !== undefined ? Number(maxAmount) : null,
+        // BUG FIX: typeof check (NOT !== undefined) — Number(null)===0
+        // would otherwise corrupt null bounds into 0 bounds.
+        minAmount: typeof minAmount === 'number' ? minAmount : null,
+        maxAmount: typeof maxAmount === 'number' ? maxAmount : null,
         action,
         active: active !== undefined ? Boolean(active) : true,
       },
@@ -122,8 +124,9 @@ export async function PUT(req: NextRequest) {
       where: { id },
       data: {
         ...(name !== undefined ? { name: name.trim() } : {}),
-        ...(minAmount !== undefined ? { minAmount: Number(minAmount) } : {}),
-        ...(maxAmount !== undefined ? { maxAmount: Number(maxAmount) } : {}),
+        // Same bug fix as POST: typeof check, NOT Number()
+        ...(minAmount !== undefined ? { minAmount: typeof minAmount === 'number' ? minAmount : null } : {}),
+        ...(maxAmount !== undefined ? { maxAmount: typeof maxAmount === 'number' ? maxAmount : null } : {}),
         ...(action !== undefined ? { action } : {}),
         ...(active !== undefined ? { active: Boolean(active) } : {}),
       },

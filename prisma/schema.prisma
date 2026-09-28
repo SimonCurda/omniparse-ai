@@ -370,3 +370,23 @@ model AiProviderConfig {
   updatedBy   String   @default("admin")
   updatedAt   DateTime @updatedAt
 }
+
+// ─── Stripe Webhook Idempotency ─────────────────────────────────────────────
+// Each Stripe webhook event has a unique `evt_…` ID. We persist it here so
+// that if Stripe retries an event (or a malicious actor replays a captured
+// webhook payload), we don't double-apply the effect. The UNIQUE constraint
+// on eventId means the second `create` will throw Prisma's P2002, which the
+// webhook handler catches and treats as a no-op.
+model StripeEvent {
+  id          String   @id @default(cuid())
+  eventId     String   @unique // Stripe's `evt_…` ID
+  eventType   String   // e.g. checkout.session.completed
+  status      String   @default("processed") // 'processed' | 'failed'
+  userId      String?
+  payload     Json?
+  error       String?
+  createdAt   DateTime @default(now())
+  @@index([eventType])
+  @@index([userId])
+  @@index([createdAt])
+}

@@ -12,7 +12,7 @@
 
 import { db } from '@/lib/db';
 
-const PLAN_LIMITS: Record<string, number> = {
+export const PLAN_LIMITS: Record<string, number> = {
   free: 15,
   pro: 500,
   plus: 2000,
@@ -21,12 +21,21 @@ const PLAN_LIMITS: Record<string, number> = {
 };
 
 /**
- * Get the start of the current month (server time, UTC).
- * Used to determine if the monthly counter needs resetting.
+ * Get the start of the current month in UTC.
+ *
+ * IMPORTANT: Must use UTC explicitly (Date.UTC + getUTCFullYear/Month) so
+ * the behavior is identical regardless of where the code runs. Vercel
+ * serverless functions run in UTC, but local dev environments may be in
+ * a different timezone — using local-time methods would cause the reset
+ * to trigger at the wrong moment when run locally.
+ *
+ * The DB column is `timestamp without time zone`, and Prisma serializes
+ * JS Date objects to ISO UTC strings. So storing a UTC start-of-month
+ * and comparing against UTC start-of-month is consistent.
  */
 function getStartOfMonth(): Date {
   const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), 1);
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
 }
 
 /**
@@ -156,9 +165,9 @@ export async function getMonthlyParseStatus(
     });
   }
 
-  // Calculate next reset date (1st of next month)
+  // Calculate next reset date (1st of next month, UTC)
   const now = new Date();
-  const nextReset = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const nextReset = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
 
   return {
     count,

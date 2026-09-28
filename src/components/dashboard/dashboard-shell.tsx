@@ -187,6 +187,20 @@ export function DashboardShell() {
   const limit = PLAN_LIMITS[plan] || PLAN_LIMITS.free;
   const planLabel = PLAN_LABELS[plan] || 'Free';
 
+  // Real monthly parse count from /api/usage — NOT invoices.length.
+  const [monthlyCount, setMonthlyCount] = useState<number | null>(null);
+  useEffect(() => {
+    const token = localStorage.getItem('op_token');
+    if (!token) return;
+    fetch('/api/usage', { headers: { Authorization: 'Bearer ' + token } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data && typeof data.count === 'number') setMonthlyCount(data.count);
+      })
+      .catch(() => {});
+  }, [invoices.length]);
+  const usageCount = monthlyCount ?? invoices.length;
+
   // Filter tabs by plan
   const visibleTabs = TAB_ITEMS.filter((tab) => {
     if (!tab.minPlan) return true;
@@ -269,8 +283,8 @@ export function DashboardShell() {
               {plan !== 'free' && <Crown className="h-3 w-3 mr-1" />}
               {planLabel}
             </Badge>
-            <span className="text-xs text-muted-foreground">{invoices.length}/{limit === Infinity ? '∞' : limit}</span>
-            <Progress value={limit === Infinity ? 0 : Math.min(100, (invoices.length / limit) * 100)} className="w-16 h-1" />
+            <span className="text-xs text-muted-foreground">{usageCount}/{limit === Infinity ? '∞' : limit}</span>
+            <Progress value={limit === Infinity ? 0 : Math.min(100, (usageCount / limit) * 100)} className="w-16 h-1" />
           </div>
 
           <Button variant="ghost" size="icon" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} aria-label="Toggle theme">
@@ -293,9 +307,9 @@ export function DashboardShell() {
               <div className="lg:hidden px-2 py-1.5">
                 <div className="flex items-center justify-between mb-1">
                   <Badge variant="secondary" className="text-xs">{planLabel}</Badge>
-                  <span className="text-xs text-muted-foreground">{invoices.length}/{limit === Infinity ? '∞' : limit}</span>
+                  <span className="text-xs text-muted-foreground">{usageCount}/{limit === Infinity ? '∞' : limit}</span>
                 </div>
-                <Progress value={limit === Infinity ? 0 : Math.min(100, (invoices.length / limit) * 100)} className="h-1" />
+                <Progress value={limit === Infinity ? 0 : Math.min(100, (usageCount / limit) * 100)} className="h-1" />
               </div>
               <DropdownMenuSeparator className="lg:hidden" />
               <DropdownMenuItem onClick={logout}>

@@ -559,6 +559,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'File too large. Maximum size is 10MB.' }, { status: 400 });
     }
 
+    // ─── Filename sanitization (defense-in-depth) ──────────────────────
+    // Strip everything except [A-Za-z0-9_.\-] — defends against CRLF header
+    // injection and path traversal. Also reject suspicious extensions.
+    const sanitizedName = (file.name || 'invoice').replace(/[^\w.\-]/g, '_').slice(0, 100);
+    if (/\.(exe|bat|cmd|sh|php|js|html?|svg|swf|jar|apk|dll|so)$/i.test(sanitizedName)) {
+      return NextResponse.json(
+        { error: 'Suspicious filename extension. Upload rejected.' },
+        { status: 400 },
+      );
+    }
+
     const buffer = Buffer.from(await file.arrayBuffer());
     const base64 = buffer.toString('base64');
 
@@ -582,6 +593,34 @@ export async function POST(req: NextRequest) {
         { error: `File content does not match its claimed type. Claimed ${file.type}, but file signature indicates ${detectedType}. Upload rejected for security.` },
         { status: 400 },
       );
+    }
+
+    // ─── PDF JavaScript detection ─────────────────────────────────────
+    // PDFs can contain embedded JavaScript (/JS, /JavaScript, /OpenAction,
+    // /AA entries). When rendered inline, this JS executes in the user's
+    // session context. As defense-in-depth (we also force Content-Disposition:
+    // attachment on the download endpoint), scan for these markers and reject.
+    if (file.type === 'application/pdf') {
+      const pdfText = buffer.toString('latin1');
+      const jsPatterns: Array<{ pattern: RegExp; label: string }> = [
+        { pattern: /\/JS\s*\(/g, label: '/JS' },
+        { pattern: /\/JavaScript\s*\(/g, label: '/JavaScript' },
+        { pattern: /\/JavaScript\s*\//g, label: '/JavaScript (ref)' },
+        { pattern: /\/OpenAction\s*\(/g, label: '/OpenAction' },
+        { pattern: /\/AA\s*\(/g, label: '/AA (additional actions)' },
+      ];
+      const detected = jsPatterns.find((p) => p.pattern.test(pdfText));
+      if (detected) {
+        console.warn(`[parse] PDF with embedded JavaScript detected (${detected.label}). Rejecting upload.`);
+        return NextResponse.json(
+          {
+            error: 'PDF contains embedded JavaScript or auto-launch actions. For security, such PDFs cannot be uploaded. Please remove the embedded scripts and try again.',
+            reason: 'pdf_embedded_js',
+            pattern: detected.label,
+          },
+          { status: 400 },
+        );
+      }
     }
     const dataUri = `data:${file.type};base64,${base64}`;
 
@@ -1008,7 +1047,7 @@ export async function POST(req: NextRequest) {
     const invoice = await db.invoice.create({
       data: {
         userId: auth.userId,
-        filename: file.name,
+        filename: sanitizedName,
         vendor: parsed.vendor as string || null,
         invNumber: (parsed.invoiceNumber as string) || null,
         invDate: (parsed.invoiceDate as string) || null,
@@ -1070,7 +1109,7 @@ export async function POST(req: NextRequest) {
             userId: auth.userId,
             invoiceId: invoice.id,
             action: 'uploaded',
-            details: { filename: file.name, confidence: overallConfidence, flaggedAsDuplicate: true, duplicateCount: duplicates.length },
+            details: { filename: sanitizedName, confidence: overallConfidence, flaggedAsDuplicate: true, duplicateCount: duplicates.length },
           },
         });
         duplicateCheckResult = { isDuplicate: true, duplicateCount: duplicates.length };
@@ -1080,22 +1119,39 @@ export async function POST(req: NextRequest) {
     }
 
     // ---- Approval Workflow ----
+    // Rules are evaluated with PRIORITY: block > flag_for_review > auto_approve.
+    // This prevents a "flag above $10,000" rule from shadowing a "block above
+    // $100,000" rule when an invoice is $200,000 (both match, but block wins).
     let approvalCheckResult: { approvalStatus: string; matchedRuleId: string | null } | null = null;
     if (hasFeature(user.plan, 'approval_workflows')) {
-      const rules = await db.approvalRule.findMany({ where: { userId: auth.userId, active: true } });
+      const rules = await db.approvalRule.findMany({
+        where: { userId: auth.userId, active: true },
+        orderBy: { createdAt: 'desc' },
+      });
       const total = invoice.total ?? 0;
-      let approvalStatus = 'none';
-      let matchedRuleId: string | null = null;
-      for (const rule of rules) {
+
+      const matching = rules.filter((rule) => {
         const min = rule.minAmount ?? -Infinity;
         const max = rule.maxAmount ?? Infinity;
-        if (total >= min && total <= max) {
-          if (rule.action === 'auto_approve') approvalStatus = 'auto_approved';
-          else if (rule.action === 'flag_for_review') { approvalStatus = 'pending_review'; matchedRuleId = rule.id; }
-          else if (rule.action === 'block') { approvalStatus = 'blocked'; matchedRuleId = rule.id; }
-          break;
-        }
+        return total >= min && total <= max;
+      });
+
+      let approvalStatus = 'none';
+      let matchedRuleId: string | null = null;
+      const blockRule = matching.find((r) => r.action === 'block');
+      const flagRule = matching.find((r) => r.action === 'flag_for_review');
+      const autoRule = matching.find((r) => r.action === 'auto_approve');
+      if (blockRule) {
+        approvalStatus = 'blocked';
+        matchedRuleId = blockRule.id;
+      } else if (flagRule) {
+        approvalStatus = 'pending_review';
+        matchedRuleId = flagRule.id;
+      } else if (autoRule) {
+        approvalStatus = 'auto_approved';
+        matchedRuleId = autoRule.id;
       }
+
       if (approvalStatus !== 'none') {
         await db.invoice.update({ where: { id: invoice.id }, data: { approvalStatus, approvalRuleId: matchedRuleId } });
       }
@@ -1109,7 +1165,7 @@ export async function POST(req: NextRequest) {
           userId: auth.userId,
           invoiceId: invoice.id,
           action: 'uploaded',
-          details: { filename: file.name, confidence: overallConfidence },
+          details: { filename: sanitizedName, confidence: overallConfidence },
         },
       });
     }

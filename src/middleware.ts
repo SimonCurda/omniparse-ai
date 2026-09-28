@@ -11,16 +11,35 @@ const SECURITY_HEADERS: Record<string, string> = {
   'X-XSS-Protection': '1; mode=block',
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), browsing-topics=()',
   'Strict-Transport-Security': 'max-age=63072000; includeSubDomains; preload',
-  // Content-Security-Policy: primary XSS defense. Restricts where scripts,
-  // styles, images, fonts, connections, etc. may load from. 'unsafe-inline'
-  // is required for script-src/style-src because Next.js + Tailwind rely on
-  // inline scripts/styles for hydration and styling; future hardening can
-  // switch to per-request nonces. img-src includes data:/blob: to support
-  // in-browser file previews (PDFs/images rendered from base64/blob URLs).
-  // connect-src includes Groq + OpenRouter as defense-in-depth in case
-  // client-side calls are added later (currently all AI calls are server-side).
+  // Content-Security-Policy: primary XSS defense. 'unsafe-inline' is required
+  // for script-src/style-src because Next.js + Tailwind rely on inline scripts
+  // for hydration. Tightened:
+  //   - object-src 'none' (no plugins/Flash/PDF JS)
+  //   - base-uri 'self' (no <base> hijack)
+  //   - form-action 'self' (no form exfiltration)
+  //   - frame-ancestors 'none' (clickjacking defense)
+  //   - upgrade-insecure-requests
+  //   - navigate-to 'self'
   'Content-Security-Policy':
-    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://api.groq.com https://openrouter.ai; object-src 'self' data: blob:; frame-src 'self' data: blob:; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+    "default-src 'self'; " +
+    "script-src 'self' 'unsafe-inline'; " +
+    "style-src 'self' 'unsafe-inline'; " +
+    "img-src 'self' data: blob:; " +
+    "font-src 'self' data:; " +
+    "connect-src 'self' https://api.groq.com https://openrouter.ai; " +
+    "object-src 'none'; " +
+    "base-uri 'self'; " +
+    "form-action 'self'; " +
+    "frame-ancestors 'none'; " +
+    "frame-src 'self' data: blob:; " +
+    "upgrade-insecure-requests; " +
+    "navigate-to 'self';",
+  // COOP/COEP/CORP — process-isolation headers. Make it much harder for a
+  // cross-origin page (e.g. attacker's site in another tab) to interact
+  // with our window object or read its memory.
+  'Cross-Origin-Opener-Policy': 'same-origin',
+  'Cross-Origin-Embedder-Policy': 'credentialless',
+  'Cross-Origin-Resource-Policy': 'same-origin',
 }
 
 /** General API rate limit: 60 requests per minute per IP */

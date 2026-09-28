@@ -17,6 +17,39 @@ import remarkGfm from 'remark-gfm';
 
 const PIE_COLORS = ['#f59e0b', '#10b981', '#6366f1', '#ef4444', '#71717a', '#06b6d4', '#f97316', '#8b5cf6'];
 
+/**
+ * Sanitize URLs before react-markdown renders them as <a href=…>.
+ *
+ * Without this, a markdown link like `[click](javascript:alert(1))` would
+ * render as `<a href="javascript:alert(1)">click</a>` and execute the
+ * script when clicked. We only allow:
+ *   - Relative URLs (starting with /, ./, ../, #)
+ *   - Absolute URLs with safe protocols: http, https, mailto, tel
+ *
+ * Everything else (javascript:, data:, vbscript:, file:, blob:, etc.) is
+ * replaced with #. We also reject URLs containing whitespace (catches
+ * "Total: $1,234" which new URL() would parse with protocol='total:').
+ */
+function sanitizeUrl(url: string | undefined | null): string {
+  if (!url) return '';
+  const trimmed = String(url).trim();
+  // Plain text containing whitespace — not a URL.
+  if (/\s/.test(trimmed)) return trimmed;
+  // Relative URLs.
+  if (trimmed.startsWith('/') || trimmed.startsWith('#') || trimmed.startsWith('?') || trimmed.startsWith('./') || trimmed.startsWith('../')) {
+    return trimmed;
+  }
+  try {
+    const parsed = new URL(trimmed);
+    if (['http:', 'https:', 'mailto:', 'tel:'].includes(parsed.protocol)) {
+      return trimmed;
+    }
+    return '#';
+  } catch {
+    return trimmed;
+  }
+}
+
 function getToken(): string | null {
   return localStorage.getItem('op_token');
 }
@@ -299,7 +332,11 @@ export function ChatTab() {
                     <span className="whitespace-pre-line">{msg.content}</span>
                   ) : (
                     <div className="prose prose-sm prose-invert max-w-none [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5 [&_strong]:text-foreground [&_h1]:text-base [&_h1]:font-semibold [&_h2]:text-sm [&_h2]:font-semibold [&_h3]:text-sm [&_h3]:font-semibold [&_code]:bg-foreground/10 [&_code]:px-1 [&_code]:rounded [&_pre]:bg-foreground/5 [&_pre]:rounded-lg [&_pre]:p-2 [&_pre]:overflow-x-auto [&_blockquote]:border-l-2 [&_blockquote]:border-amber-500/40 [&_blockquote]:pl-3 [&_blockquote]:italic [&_hr]:border-border/30">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        urlTransform={sanitizeUrl}
+                        disallowedElements={['script', 'iframe', 'object', 'embed', 'form', 'input', 'button', 'style', 'link', 'meta', 'base']}
+                      >{msg.content}</ReactMarkdown>
                     </div>
                   )}
                 </div>
