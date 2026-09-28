@@ -241,6 +241,29 @@ function SmartAttachmentPreview({ base64, mime, filename }: { base64: string; mi
     try {
       text = atob(base64);
     } catch {}
+
+    // Detect if this is a raw email source (not the actual attachment).
+    // This happens when the IMAP scanner picks the wrong MIME part and
+    // downloads the message body instead of the PDF/image attachment.
+    const isRawEmail = /^(delivered-to|received|return-path|dkim-signature|arc-|mime-version|content-type|from:|to:|subject:)/im.test(text);
+
+    if (isRawEmail) {
+      return (
+        <div className="rounded-lg border overflow-hidden bg-muted/30">
+          {fileInfo}
+          <div className="p-6 text-center space-y-3">
+            <AlertCircle className="h-8 w-8 mx-auto text-amber-500" />
+            <p className="text-sm font-medium text-foreground">Attachment extraction failed</p>
+            <p className="text-xs text-muted-foreground max-w-md mx-auto">
+              This email was scanned before an attachment-extraction fix was deployed.
+              The raw email body was stored instead of the actual PDF attachment.
+              Please delete this item and re-san the inbox to get the correct PDF.
+            </p>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="rounded-lg border overflow-hidden bg-muted/30">
         {fileInfo}

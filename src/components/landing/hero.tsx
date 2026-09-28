@@ -13,8 +13,12 @@ import { HeroVisual } from './hero-visual';
 const ROTATING_TAGLINES: string[] = [
   'powered by AI',
   'reimagined',
+  'for the next generation',
+  'that detects fraud',
   'at the speed of thought',
+  'with built-in fraud detection',
   'without the busywork',
+  'innovating invoice workflows',
   'in seconds, not hours',
   'that actually gets it right',
   'built for finance teams',

@@ -313,6 +313,14 @@ export async function scanInbox(
             break;
           }
 
+          // Skip if part is empty — ImapFlow would download the entire
+          // raw message (headers + body) instead of just the attachment.
+          if (!attachment.part || attachment.part === '') {
+            console.warn(`[email-scanner] Skipping attachment "${attachment.filename}" — empty part number`);
+            result.skipped++;
+            continue;
+          }
+
           // Download this attachment
           const downloadResult = await client.download(uid, attachment.part, { uid: true });
           const chunks: Buffer[] = [];
@@ -335,6 +343,28 @@ export async function scanInbox(
           ) {
             result.skipped++;
             continue;
+          }
+
+          // ─── Magic byte validation ──────────────────────────────────
+          // Verify the downloaded content actually matches the expected file
+          // type. If we expected a PDF but got plain text (e.g., raw email
+          // source with headers like "Delivered-To:"), the IMAP part number
+          // was wrong and we downloaded the message body instead of the
+          // attachment. Skip it and try the next candidate.
+          const detectedMime = detectMimeFromMagicBytes(attachmentBytes);
+          if (detectedMime === 'text/plain' || detectedMime === 'text/html') {
+            // We got text/HTML but expected a PDF or image — this is the
+            // raw email body, not the actual attachment. Skip it.
+            console.warn(
+              `[email-scanner] Skipping "${attachment.filename}": downloaded content is ${detectedMime} (expected ${attachment.mimeType}). ` +
+              `The IMAP part number may be wrong — got raw email body instead of attachment.`,
+            );
+            result.skipped++;
+            continue;
+          }
+          // If we detected a real file type, update the MIME to match reality.
+          if (detectedMime !== 'application/octet-stream') {
+            attachment.mimeType = detectedMime;
           }
 
           // Save to PendingReview
@@ -551,6 +581,63 @@ function collectCandidates(
   if (Array.isArray(n.parts)) {
     for (const child of n.parts) collectCandidates(child, candidates);
   }
+}
+
+/**
+ * Detect the actual MIME type of a downloaded attachment by inspecting its
+ * magic bytes (file signature). Used to verify that what we downloaded from
+ * IMAP is actually a PDF/image, not the raw email body.
+ *
+ * Returns one of:
+ *   - 'application/pdf'     — starts with %PDF-
+ *   - 'image/jpeg'           — starts with \xFF\xD8\xFF
+ *   - 'image/png'            — starts with \x89PNG\r\n\x1A\n
+ *   - 'image/webp'           — RIFF....WEBP
+ *   - 'text/plain'           — high ratio of printable ASCII (likely email source)
+ *   - 'text/html'            — contains <html, <!doctype, <body, etc.
+ *   - 'application/octet-stream' — unknown / binary
+ */
+function detectMimeFromMagicBytes(buf: Buffer): string {
+  if (buf.length < 4) return 'application/octet-stream';
+
+  // PDF: %PDF- (25 50 44 46 2D)
+  if (buf[0] === 0x25 && buf[1] === 0x50 && buf[2] === 0x44 && buf[3] === 0x46) {
+    return 'application/pdf';
+  }
+  // JPEG: \xFF\xD8\xFF
+  if (buf[0] === 0xFF && buf[1] === 0xD8 && buf[2] === 0xFF) {
+    return 'image/jpeg';
+  }
+  // PNG: \x89PNG\r\n\x1A\n
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47) {
+    return 'image/png';
+  }
+  // WebP: RIFF....WEBP
+  if (buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46 &&
+      buf.length > 11 && buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50) {
+    return 'image/webp';
+  }
+
+  // Check for HTML content (forwarded emails, HTML bodies)
+  const text = buf.slice(0, Math.min(buf.length, 2000)).toString('latin1').toLowerCase();
+  if (text.includes('<!doctype html') || text.includes('<html') || text.includes('<body') ||
+      text.includes('<head') || text.includes('<table') || text.includes('<div') ||
+      text.includes('content-type: text/html') || text.includes('<meta ')) {
+    return 'text/html';
+  }
+
+  // Check for plain text (high ratio of printable ASCII) — catches raw email
+  // source with headers like "Delivered-To:", "Received:", "DKIM-Signature:"
+  let printable = 0;
+  const sampleLen = Math.min(buf.length, 500);
+  for (let i = 0; i < sampleLen; i++) {
+    if ((buf[i] >= 32 && buf[i] <= 126) || buf[i] === 9 || buf[i] === 10 || buf[i] === 13) printable++;
+  }
+  if (printable > sampleLen * 0.85 && buf.length > 20) {
+    return 'text/plain';
+  }
+
+  return 'application/octet-stream';
 }
 
 /**
