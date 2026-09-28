@@ -642,6 +642,119 @@ Additionally, extract these custom fields defined by the user:\n${fields}\nInclu
 
 // ---- 7. INVOICE COMPARISON / BATCH ANALYSIS ----
 
+// ─── Outlier-excluded statistics utility ──────────────────────────────────
+// Shared by analyzeBatch(), detectPatterns(), /api/vendor-scorecard, and
+// /api/price-alerts. Keeps the "what is an outlier?" definition identical
+// across every surface that shows a vendor average.
+//
+// Multi-pass algorithm:
+//   Pass 1: Raw average including all positive-total invoices.
+//   Pass 2: Flag HIGH outliers only (total > rawAvg * 3). Don't flag low yet
+//           — a single huge high outlier would inflate rawAvg so much that
+//           every normal invoice would also get wrongly flagged as low.
+//   Pass 3: Clean average (excluding the high outliers).
+//   Pass 4: Re-flag using clean average — now BOTH directions:
+//             high: total > cleanAvg * 3
+//             low:  total < cleanAvg / 3
+//   Pass 5: Final clean set + stats.
+//
+// Works exclusively on invoice IDs (Set<string>) — immune to the index-
+// mismatch bug class that the previous implementation had.
+
+export interface OutlierStat {
+  cleanAvg: number;
+  cleanTotal: number;
+  cleanCount: number;
+  outlierCount: number;
+  outlierAmount: number;
+  cleanStdDev: number;
+  outlierIds: Set<string>;
+  outliers: Array<{ id: string; amount: number; direction: 'high' | 'low'; reason: string }>;
+  rawAvg: number;
+  sampleCount: number;
+}
+
+export function computeOutlierExcludedStats(
+  invoices: Array<{ id: string; total?: number | null }>,
+): OutlierStat {
+  const withTotal = invoices.filter((i) => typeof i.total === 'number' && i.total! > 0);
+
+  if (withTotal.length === 0) {
+    return {
+      cleanAvg: 0, cleanTotal: 0, cleanCount: 0,
+      outlierCount: 0, outlierAmount: 0, cleanStdDev: 0,
+      outlierIds: new Set<string>(), outliers: [], rawAvg: 0, sampleCount: 0,
+    };
+  }
+
+  // Pass 1: raw average
+  const rawAvg = withTotal.reduce((s, i) => s + i.total!, 0) / withTotal.length;
+
+  // Pass 2: flag HIGH outliers only.
+  const flaggedIds = new Set<string>();
+  for (const inv of withTotal) {
+    if (rawAvg <= 0) continue;
+    if (inv.total! > rawAvg * 3) flaggedIds.add(inv.id);
+  }
+
+  // Pass 3: clean average.
+  const cleanAfterPass2 = withTotal.filter((i) => !flaggedIds.has(i.id));
+  const cleanAvgAfterPass2 = cleanAfterPass2.length > 0
+    ? cleanAfterPass2.reduce((s, i) => s + i.total!, 0) / cleanAfterPass2.length
+    : rawAvg;
+
+  // Pass 4: re-flag using clean average. NOW both directions.
+  for (const inv of withTotal) {
+    if (cleanAvgAfterPass2 <= 0) continue;
+    if (inv.total! > cleanAvgAfterPass2 * 3 || inv.total! < cleanAvgAfterPass2 / 3) {
+      flaggedIds.add(inv.id);
+    }
+  }
+
+  // Pass 5: final clean set. When every invoice got flagged (rare), fall back
+  // to the raw set so we still return a meaningful number.
+  const finalClean = withTotal.filter((i) => !flaggedIds.has(i.id));
+  const useFallback = finalClean.length === 0;
+  const cleanInvs = useFallback ? withTotal : finalClean;
+  const effectiveFlaggedIds = useFallback ? new Set<string>() : flaggedIds;
+
+  const cleanAvg = cleanInvs.reduce((s, i) => s + i.total!, 0) / cleanInvs.length;
+  const cleanTotal = cleanInvs.reduce((s, i) => s + i.total!, 0);
+  const cleanStdDev = cleanInvs.length > 1
+    ? Math.sqrt(cleanInvs.reduce((s, i) => s + Math.pow(i.total! - cleanAvg, 2), 0) / cleanInvs.length)
+    : 0;
+
+  const outliers: OutlierStat['outliers'] = [];
+  let outlierAmount = 0;
+  if (!useFallback) {
+    for (const inv of withTotal) {
+      if (!flaggedIds.has(inv.id)) continue;
+      const t = inv.total!;
+      outlierAmount += t;
+      const isHigh = t > cleanAvg;
+      if (isHigh) {
+        const multiplier = cleanAvg > 0 ? (t / cleanAvg).toFixed(1) : '∞';
+        outliers.push({
+          id: inv.id, amount: t, direction: 'high',
+          reason: `Amount is ${multiplier}× the clean average (${cleanAvg.toFixed(2)}) — flagged as suspiciously high, excluded from the average.`,
+        });
+      } else {
+        const divisor = t > 0 ? (cleanAvg / t).toFixed(1) : '∞';
+        outliers.push({
+          id: inv.id, amount: t, direction: 'low',
+          reason: `Amount is ${divisor}× smaller than the clean average (${cleanAvg.toFixed(2)}) — flagged as suspiciously low, excluded from the average.`,
+        });
+      }
+    }
+  }
+
+  return {
+    cleanAvg, cleanTotal, cleanCount: cleanInvs.length,
+    outlierCount: effectiveFlaggedIds.size, outlierAmount, cleanStdDev,
+    outlierIds: effectiveFlaggedIds, outliers, rawAvg, sampleCount: withTotal.length,
+  };
+}
+
 export function analyzeBatch(invoices: Array<{
   id: string;
   vendor?: string | null;
