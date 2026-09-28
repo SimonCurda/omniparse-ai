@@ -147,6 +147,118 @@ function detectFileType(base64: string): { type: 'pdf' | 'jpeg' | 'png' | 'webp'
   return { type: 'unknown', mime: 'application/octet-stream' };
 }
 
+// ─── Extract attachment from raw email source ──────────────────────────────
+// When the IMAP scanner stored the entire raw email (headers + multipart
+// body) instead of just the PDF attachment, we can still recover the PDF
+// by parsing the MIME structure client-side. This function:
+//   1. Finds the multipart boundary
+//   2. Splits the email into MIME parts
+//   3. Finds the part with a PDF/image content-type or filename
+//   4. Decodes the base64 body of that part
+//   5. Returns { base64, filename } or null if not found
+//
+// This is a lightweight parser — it handles the common case of
+// multipart/mixed emails with a single PDF attachment. It does NOT handle
+// nested multipart structures or exotic encodings, but those are rare for
+// invoice emails.
+
+function extractAttachmentFromRawEmail(rawEmail: string): { base64: string; filename: string } | null {
+  try {
+    // Find the top-level Content-Type header to get the boundary
+    // e.g. Content-Type: multipart/mixed; boundary="CAhN7b68"
+    //   or Content-Type: multipart/mixed; boundary=CAhN7b68
+    const ctMatch = rawEmail.match(/content-type:\s*multipart\/[^;]+;\s*boundary=(?:"([^"]+)"|([^\s\r\n]+))/i);
+    if (!ctMatch) return null;
+    const boundary = ctMatch[1] || ctMatch[2];
+    if (!boundary) return null;
+
+    // Split the email by the boundary delimiter
+    const delimiter = `--${boundary}`;
+    const parts = rawEmail.split(delimiter);
+    if (parts.length < 2) return null;
+
+    // Iterate through the MIME parts (skip the first one — it's the email
+    // headers before the first boundary)
+    for (let i = 1; i < parts.length; i++) {
+      const part = parts[i];
+      if (!part || part.trim() === '--' || part.trim() === '') continue; // closing boundary
+
+      // Each part has its own headers, then a blank line, then the body
+      const headerEnd = part.indexOf('\r\n\r\n') >= 0 ? part.indexOf('\r\n\r\n') : part.indexOf('\n\n');
+      if (headerEnd < 0) continue;
+      const partHeaders = part.slice(0, headerEnd).toLowerCase();
+      const partBody = part.slice(headerEnd + 4).trim();
+
+      // Check if this part is a PDF or image
+      const isPdf = partHeaders.includes('content-type: application/pdf') ||
+                    partHeaders.includes('name="') && partHeaders.match(/name="[^"]*\.pdf"/i) ||
+                    partHeaders.match(/filename=[^\s]*\.pdf/i);
+      const isImage = partHeaders.includes('content-type: image/') ||
+                      partHeaders.match(/name="[^"]*\.(jpg|jpeg|png|webp)"/i) ||
+                      partHeaders.match(/filename=[^\s]*\.(jpg|jpeg|png|webp)/i);
+
+      if (!isPdf && !isImage) continue;
+
+      // Extract the filename
+      let filename = 'attachment';
+      const nameMatch = partHeaders.match(/name="([^"]+)"/i) ||
+                        partHeaders.match(/filename=([^\s;]+)/i) ||
+                        partHeaders.match(/filename="([^"]+)"/i);
+      if (nameMatch) filename = nameMatch[1] || filename;
+      if (isPdf && !filename.toLowerCase().endsWith('.pdf')) filename += '.pdf';
+
+      // Check the Content-Transfer-Encoding — we expect base64
+      const isBase64 = partHeaders.includes('content-transfer-encoding: base64') ||
+                       partHeaders.includes('content-transfer-encoding: base64');
+
+      let base64Data: string;
+      if (isBase64) {
+        // Remove all whitespace/newlines from the body to get pure base64
+        base64Data = partBody.replace(/[\s\r\n]/g, '');
+      } else {
+        // Could be 7bit, 8bit, or quoted-printable — try to decode
+        if (partHeaders.includes('content-transfer-encoding: quoted-printable')) {
+          // Decode quoted-printable
+          const decoded = partBody
+            .replace(/=\r?\n/g, '') // soft line breaks
+            .replace(/=([0-9A-F]{2})/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+          base64Data = btoa(decoded);
+        } else {
+          // Assume 7bit/8bit — direct encode
+          base64Data = btoa(partBody);
+        }
+      }
+
+      // Verify the base64 is valid and the magic bytes match what we expect
+      try {
+        const binary = atob(base64Data.slice(0, 8));
+        const bytes = new Uint8Array(binary.length);
+        for (let j = 0; j < binary.length; j++) bytes[j] = binary.charCodeAt(j);
+
+        if (isPdf) {
+          // %PDF- magic bytes
+          if (bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46) {
+            return { base64: base64Data, filename };
+          }
+        } else if (isImage) {
+          // JPEG / PNG / WebP magic bytes
+          if ((bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF) ||
+              (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47) ||
+              (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46)) {
+            return { base64: base64Data, filename };
+          }
+        }
+      } catch {
+        // Magic byte check failed — continue to next part
+      }
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 // ─── PDF viewer import ─────────────────────────────────────────────────────
 
 import { PdfViewer } from './pdf-viewer';
@@ -248,6 +360,49 @@ function SmartAttachmentPreview({ base64, mime, filename }: { base64: string; mi
     const isRawEmail = /^(delivered-to|received|return-path|dkim-signature|arc-|mime-version|content-type|from:|to:|subject:)/im.test(text);
 
     if (isRawEmail) {
+      // ─── Try to extract the REAL attachment from the raw email ──────
+      // The raw email is a multipart MIME message — the PDF is embedded
+      // as a base64-encoded MIME part. Parse it out and display it.
+      const extracted = extractAttachmentFromRawEmail(text);
+
+      if (extracted) {
+        // We found the real attachment! Render it with the appropriate viewer.
+        const detectedExtracted = detectFileType(extracted.base64);
+        if (detectedExtracted.type === 'pdf') {
+          return (
+            <div className="rounded-lg border overflow-hidden bg-muted/30">
+              <div className="flex items-center justify-between px-3 py-1.5 text-xs text-muted-foreground border-b bg-muted/50">
+                <span className="truncate">{extracted.filename}</span>
+                <span className="shrink-0 ml-2">
+                  {detectedExtracted.mime} · {Math.round((extracted.base64.length * 3) / 4 / 1024)} KB
+                </span>
+              </div>
+              <div className="p-4">
+                <PdfViewer base64={extracted.base64} filename={extracted.filename} />
+              </div>
+            </div>
+          );
+        }
+        if (detectedExtracted.type === 'jpeg' || detectedExtracted.type === 'png' || detectedExtracted.type === 'webp') {
+          return (
+            <div className="rounded-lg border overflow-hidden bg-muted/30">
+              <div className="flex items-center justify-between px-3 py-1.5 text-xs text-muted-foreground border-b bg-muted/50">
+                <span className="truncate">{extracted.filename}</span>
+                <span className="shrink-0 ml-2">
+                  {detectedExtracted.mime} · {Math.round((extracted.base64.length * 3) / 4 / 1024)} KB
+                </span>
+              </div>
+              <img
+                src={`data:${detectedExtracted.mime};base64,${extracted.base64}`}
+                alt={extracted.filename}
+                className="max-w-full max-h-[60vh] mx-auto"
+              />
+            </div>
+          );
+        }
+      }
+
+      // Extraction failed — show the helpful error message
       return (
         <div className="rounded-lg border overflow-hidden bg-muted/30">
           {fileInfo}
@@ -257,7 +412,7 @@ function SmartAttachmentPreview({ base64, mime, filename }: { base64: string; mi
             <p className="text-xs text-muted-foreground max-w-md mx-auto">
               This email was scanned before an attachment-extraction fix was deployed.
               The raw email body was stored instead of the actual PDF attachment.
-              Please delete this item and re-san the inbox to get the correct PDF.
+              Please delete this item and re-scan the inbox to get the correct PDF.
             </p>
           </div>
         </div>

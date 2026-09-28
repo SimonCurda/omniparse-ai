@@ -23,6 +23,7 @@ const ROTATING_TAGLINES: string[] = [
   'that actually gets it right',
   'built for finance teams',
   'with zero setup',
+  'across every currency',
 ];
 
 function RotatingHeadline() {
