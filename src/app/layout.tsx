@@ -34,9 +34,10 @@ export const metadata: Metadata = {
   publisher: "OmniParse AI",
   robots: { index: true, follow: true },
   icons: {
-    // Matches the navbar logo: amber rounded square with "OP" in white bold
-    icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23F59E0B'/><text x='16' y='22' font-family='system-ui,sans-serif' font-size='14' font-weight='bold' fill='white' text-anchor='middle'>OP</text></svg>",
-    apple: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23F59E0B'/><text x='16' y='22' font-family='system-ui,sans-serif' font-size='14' font-weight='bold' fill='white' text-anchor='middle'>OP</text></svg>",
+    // Matches the navbar logo: amber rounded square with "OP" in black bold
+    // (black has better contrast against amber/yellow than white)
+    icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23F59E0B'/><text x='16' y='22' font-family='system-ui,sans-serif' font-size='14' font-weight='bold' fill='%2309090B' text-anchor='middle'>OP</text></svg>",
+    apple: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23F59E0B'/><text x='16' y='22' font-family='system-ui,sans-serif' font-size='14' font-weight='bold' fill='%2309090B' text-anchor='middle'>OP</text></svg>",
   },
   openGraph: {
     title: "OmniParse — AI Invoice Parsing",
