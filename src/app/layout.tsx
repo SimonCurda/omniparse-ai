@@ -34,7 +34,9 @@ export const metadata: Metadata = {
   publisher: "OmniParse AI",
   robots: { index: true, follow: true },
   icons: {
-    icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23F59E0B'/><path d='M8 10h6v2H10v3h4v2h-4v3h4v2H8V10zm10 0h2l2 4 2-4h2v12h-2.5v-7.5L20 19h-.2l-1.3-2.5V22H16V10z' fill='%2309090B'/></svg>",
+    // Matches the navbar logo: amber rounded square with "OP" in white bold
+    icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23F59E0B'/><text x='16' y='22' font-family='system-ui,sans-serif' font-size='14' font-weight='bold' fill='white' text-anchor='middle'>OP</text></svg>",
+    apple: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23F59E0B'/><text x='16' y='22' font-family='system-ui,sans-serif' font-size='14' font-weight='bold' fill='white' text-anchor='middle'>OP</text></svg>",
   },
   openGraph: {
     title: "OmniParse — AI Invoice Parsing",
