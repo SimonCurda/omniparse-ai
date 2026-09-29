@@ -661,7 +661,21 @@ export async function POST(req: NextRequest) {
           });
         }
         if (visionContent.length > 1) {
-          responseText = await geminiVisionCall([{ role: 'user', content: visionContent }]);
+          try {
+            responseText = await geminiVisionCall([{ role: 'user', content: visionContent }]);
+          } catch (visionErr) {
+            // Vision cascade failed entirely — try text extraction as fallback.
+            // Scanned PDFs sometimes have OCR text layer; if so, use text cascade.
+            console.warn('[parse] Vision cascade failed, trying text fallback:', visionErr instanceof Error ? visionErr.message : String(visionErr));
+            if (pdfResult.text.trim()) {
+              responseText = await geminiChatCall(
+                'You are an invoice parser. Extract all fields and return ONLY valid JSON.',
+                [{ role: 'user', content: VLM_PROMPT + '\n\n--- EXTRACTED PDF TEXT (fallback) ---\n' + pdfResult.text }],
+              );
+            } else {
+              throw visionErr; // No text — re-throw the vision error
+            }
+          }
         } else {
           // Images were invalid — try text path as fallback
           if (pdfResult.text.trim()) {
@@ -672,24 +686,24 @@ export async function POST(req: NextRequest) {
         }
       }
       // ── Path B: PDF has extractable text (text-based PDFs) ───────
-      // Send the text to the VISION model cascade (same 4 providers as
-      // images: Mistral → OpenRouter → Groq → Gemini). Vision models are
-      // multimodal — they can read text too. This gives PDFs the same
-      // reliability as image uploads.
+      // Send the text to the TEXT chat cascade (NOT vision). Text models
+      // have much higher rate limits (30k OTPM on Groq vs 2k on vision)
+      // and more available free-tier models. This fixes the "all vision
+      // models unavailable" error that happens when vision providers are
+      // rate-limited but text providers are fine.
       else if (pdfResult.text.trim()) {
         const normalizedText = pdfResult.text
           .replace(/(\d)\s(\d{3}),(\d{2})/g, '$1$2.$3')
           .replace(/(\d)\.(\d{3}),(\d{2})/g, '$1$2.$3')
           .replace(/(\d),(\d{2})\b/g, '$1.$2');
 
-        // Send text to vision model as a text-only message
-        // (vision models accept text — they're multimodal LLMs)
-        responseText = await geminiVisionCall([{
-          role: 'user',
-          content: [
-            { type: 'text', text: VLM_PROMPT + '\n\n--- EXTRACTED PDF TEXT ---\n' + normalizedText },
-          ],
-        }]);
+        // Use text cascade (Mistral small/open-mistral-7b → Groq llama-3.1)
+        // instead of vision cascade (pixtral → Groq vision). Text models
+        // are more reliable and have higher rate limits.
+        responseText = await geminiChatCall(
+          'You are an invoice parser. Extract all fields and return ONLY valid JSON.',
+          [{ role: 'user', content: VLM_PROMPT + '\n\n--- EXTRACTED PDF TEXT ---\n' + normalizedText }],
+        );
       } else {
         // No text and no images — can't process
         return NextResponse.json(
