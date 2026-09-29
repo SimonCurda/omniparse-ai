@@ -92,6 +92,10 @@ interface AppState {
   setActiveDashTab: (tab: string) => void;
   setLegalPage: (page: string | null) => void;
   addInvoice: (invoice: InvoiceRow) => void;
+  /** Re-fetch invoices from /api/invoices. Call after any action that creates
+   *  an invoice outside the normal upload flow (e.g. approving a pending
+   *  review item). Returns a promise so callers can await it. */
+  refreshInvoices: () => Promise<void>;
   logout: () => void;
 }
 
@@ -120,6 +124,43 @@ export const useAppStore = create<AppState>((set) => ({
   setActiveDashTab: (activeDashTab) => set({ activeDashTab }),
   setLegalPage: (legalPage) => set({ legalPage }),
   addInvoice: (invoice) => set((s) => ({ invoices: [invoice, ...s.invoices] })),
+  refreshInvoices: async () => {
+    const token = typeof localStorage !== 'undefined' ? localStorage.getItem('op_token') : null;
+    if (!token) return;
+    try {
+      const res = await fetch('/api/invoices', { headers: { Authorization: 'Bearer ' + token } });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        set({ invoices: data.map((inv: Record<string, unknown>) => ({
+          id: inv.id, filename: inv.filename, vendor: inv.vendor,
+          invNumber: inv.invNumber, invDate: inv.invDate, dueDate: inv.dueDate,
+          amount: inv.amount, vatAmount: inv.vatAmount, total: inv.total,
+          currency: inv.currency, status: inv.status, isDuplicate: Boolean(inv.isDuplicate),
+          confidence: inv.confidence, fieldConfidence: inv.fieldConfidence,
+          createdAt: inv.createdAt,
+          validationResults: inv.validationResults,
+          validationStatus: inv.validationStatus,
+          normalizedVendor: inv.normalizedVendor,
+          normalizedInvDate: inv.normalizedInvDate,
+          normalizedDueDate: inv.normalizedDueDate,
+          normalizedAmount: inv.normalizedAmount,
+          normalizedTotal: inv.normalizedTotal,
+          normalizedCurrency: inv.normalizedCurrency,
+          processingTime: inv.processingTime,
+          lineItems: inv.lineItems,
+          rawExtraction: inv.rawExtraction,
+          customFields: inv.customFields,
+          approvalStatus: inv.approvalStatus,
+          lifecycleStatus: inv.lifecycleStatus,
+          entityId: inv.entityId,
+          updatedAt: inv.updatedAt,
+        })) });
+      }
+    } catch {
+      // Silently fail — the user can manually refresh
+    }
+  },
   logout: () => {
     localStorage.removeItem('op_token');
     set({

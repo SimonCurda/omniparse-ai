@@ -475,6 +475,7 @@ function downloadBlob(base64: string, mime: string, filename: string) {
 }
 
 export function PendingReviewTab() {
+  const { refreshInvoices } = useAppStore();
   const [items, setItems] = useState<PendingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -610,6 +611,11 @@ export function PendingReviewTab() {
       if (res.ok) {
         toast.success(addToTrusted ? 'Approved + sender added to trusted' : 'Invoice approved');
         loadItems(); // reload to move item to 'approved' tab
+        // ─── Refresh the global invoices store ──────────────────────────
+        // The approve route created a new Invoice via /api/parse. The invoices
+        // tab won't show it until we re-fetch from /api/invoices. This also
+        // updates the sidebar usage counter.
+        refreshInvoices();
       } else {
         const err = await res.json().catch(() => ({}));
         toast.error(err.error || 'Failed to approve');
@@ -701,6 +707,8 @@ export function PendingReviewTab() {
       if (res.ok) {
         toast.success('Un-approved — invoice deleted, item back in pending');
         loadItems();
+        // Refresh invoices store — the invoice was deleted from the DB
+        refreshInvoices();
       } else {
         toast.error('Failed to un-approve');
       }
@@ -733,6 +741,10 @@ export function PendingReviewTab() {
         }
         setSelectedIds(new Set());
         loadItems(); // refresh
+        // If any items were approved, new invoices were created — refresh store
+        if (action === 'approve' && (results.approved || 0) > 0) {
+          refreshInvoices();
+        }
       } else {
         toast.error('Bulk action failed');
       }
