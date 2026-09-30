@@ -1,23 +1,35 @@
 'use client';
 
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Code, Copy, Key, Zap, Shield } from 'lucide-react';
 
 export default function ApiDocsPage() {
+  const router = useRouter();
+
+  const goBack = () => {
+    // If there's browser history (user navigated from the dashboard), go back.
+    // Otherwise fall back to the dashboard.
+    if (window.history.length > 1) {
+      router.back();
+    } else {
+      router.push('/');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b border-border bg-background/95 backdrop-blur sticky top-0 z-50">
         <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
+          <button onClick={goBack} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
             <div className="w-8 h-8 rounded-lg bg-amber-500 flex items-center justify-center">
               <span className="text-black font-bold text-sm">OP</span>
             </div>
             <span className="font-semibold text-lg">OmniParse API</span>
-          </Link>
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/"><ArrowLeft className="h-4 w-4 mr-1" /> Back to app</Link>
+          </button>
+          <Button variant="outline" size="sm" onClick={goBack}>
+            <ArrowLeft className="h-4 w-4 mr-1" /> Back to app
           </Button>
         </div>
       </header>
@@ -39,7 +51,7 @@ export default function ApiDocsPage() {
           </h2>
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              1. Generate an API key in <Link href="/" className="text-amber-500 hover:underline">Settings → Developer API</Link>
+              1. Generate an API key in <button onClick={goBack} className="text-amber-500 hover:underline">Settings → Developer API</button>
             </p>
             <p className="text-sm text-muted-foreground">2. Send a POST request with your invoice file:</p>
             <CodeBlock code={`curl -X POST https://omniparse.ai/api/v1/extract \\
