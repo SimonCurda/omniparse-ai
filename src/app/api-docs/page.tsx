@@ -54,7 +54,7 @@ export default function ApiDocsPage() {
               1. Generate an API key in <button onClick={goBack} className="text-amber-500 hover:underline">Settings → Developer API</button>
             </p>
             <p className="text-sm text-muted-foreground">2. Send a POST request with your invoice file:</p>
-            <CodeBlock code={`curl -X POST https://omniparse.ai/api/v1/extract \\
+            <CodeBlock code={`curl -X POST https://omniparse-ai.vercel.app/api/v1/extract \\
   -H "Authorization: Bearer op_live_your_key_here" \\
   -F "file=@invoice.pdf"`} />
             <p className="text-sm text-muted-foreground">3. Get structured JSON back:</p>
@@ -178,7 +178,7 @@ export default function ApiDocsPage() {
               <p className="text-sm text-muted-foreground">
                 Check your current API usage and limits. Uses the same auth as extract.
               </p>
-              <CodeBlock code={`curl https://omniparse.ai/api/usage \\
+              <CodeBlock code={`curl https://omniparse-ai.vercel.app/api/usage \\
   -H "Authorization: Bearer op_live_your_key_here"`} />
             </div>
           </div>
@@ -247,7 +247,7 @@ const FormData = require('form-data');
 const form = new FormData();
 form.append('file', fs.createReadStream('invoice.pdf'));
 
-const res = await fetch('https://omniparse.ai/api/v1/extract', {
+const res = await fetch('https://omniparse-ai.vercel.app/api/v1/extract', {
   method: 'POST',
   headers: {
     'Authorization': 'Bearer op_live_your_key_here',
@@ -266,7 +266,7 @@ console.log(data.vendor, data.total, data.currency);`} />
 
 with open('invoice.pdf', 'rb') as f:
     res = requests.post(
-        'https://omniparse.ai/api/v1/extract',
+        'https://omniparse-ai.vercel.app/api/v1/extract',
         headers={'Authorization': 'Bearer op_live_your_key_here'},
         files={'file': f},
     )
