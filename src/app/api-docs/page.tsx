@@ -53,11 +53,23 @@ export default function ApiDocsPage() {
             <p className="text-sm text-muted-foreground">
               1. Generate an API key in <button onClick={goBack} className="text-amber-500 hover:underline">Settings → Developer API</button>
             </p>
-            <p className="text-sm text-muted-foreground">2. Send a POST request with your invoice file:</p>
+            <p className="text-sm text-muted-foreground">
+              2. Send a POST request with your invoice file. Use the interactive tester at{' '}
+              <a href="/api-test" className="text-amber-500 hover:underline">/api-test</a>{' '}
+              if you don't want to use curl:
+            </p>
+
+            {/* Linux / macOS */}
+            <p className="text-xs font-medium text-foreground pt-2">Linux / macOS (Terminal):</p>
             <CodeBlock code={`curl -X POST https://omniparse-ai.vercel.app/api/v1/extract \\
   -H "Authorization: Bearer op_live_your_key_here" \\
   -F "file=@invoice.pdf"`} />
-            <p className="text-sm text-muted-foreground">3. Get structured JSON back:</p>
+
+            {/* Windows */}
+            <p className="text-xs font-medium text-foreground pt-2">Windows (Command Prompt — all on one line, no backslashes):</p>
+            <CodeBlock code={`curl -X POST https://omniparse-ai.vercel.app/api/v1/extract -H "Authorization: Bearer op_live_your_key_here" -F "file=@invoice.pdf"`} />
+
+            <p className="text-sm text-muted-foreground pt-2">3. Get structured JSON back:</p>
             <CodeBlock code={`{
   "vendor": "Acme Corp",
   "invoice_number": "INV-2026-001",
@@ -132,7 +144,7 @@ export default function ApiDocsPage() {
                       <td className="py-1.5"><code>store</code></td>
                       <td className="py-1.5">String</td>
                       <td className="py-1.5">No</td>
-                      <td className="py-1.5"><code>"true"</code> (default) = save to account, <code>"false"</code> = stateless</td>
+                      <td className="py-1.5"><code>"true"</code> (default) = save to account & appears in Invoices tab, <code>"false"</code> = stateless (not saved)</td>
                     </tr>
                   </tbody>
                 </table>
@@ -178,8 +190,7 @@ export default function ApiDocsPage() {
               <p className="text-sm text-muted-foreground">
                 Check your current API usage and limits. Uses the same auth as extract.
               </p>
-              <CodeBlock code={`curl https://omniparse-ai.vercel.app/api/usage \\
-  -H "Authorization: Bearer op_live_your_key_here"`} />
+              <CodeBlock code={`curl https://omniparse-ai.vercel.app/api/usage -H "Authorization: Bearer op_live_your_key_here"`} />
             </div>
           </div>
         </section>
