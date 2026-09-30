@@ -22,7 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { CreditCard, Loader2, Download, Trash2, Shield, Eye, EyeOff, Plus, X, Sparkles, Lock, Clock, GripVertical, ArrowUp, ArrowDown, Keyboard, LogOut } from 'lucide-react';
+import { CreditCard, Loader2, Download, Trash2, Shield, Eye, EyeOff, Plus, X, Sparkles, Lock, Clock, GripVertical, ArrowUp, ArrowDown, Keyboard, LogOut, Code, Copy, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAppStore } from '@/stores/app-store';
 import { DEFAULT_SHORTCUTS, saveShortcuts } from '@/lib/shortcuts';
@@ -971,6 +971,9 @@ export function SettingsTab() {
         </CardContent>
       </Card>
 
+      {/* Developer API Card */}
+      <DeveloperApiCard plan={plan} />
+
       {/* Keyboard Shortcuts Card */}
       <Card data-glow data-glow-border-only className="glass-card border-border/50">
         <CardHeader>
@@ -1489,5 +1492,189 @@ function KeyboardShortcutsEditor() {
         </Button>
       </div>
     </div>
+  );
+}
+
+// ─── Developer API Card ───────────────────────────────────────────────────
+// Users generate API keys to use the public REST API (/api/v1/extract).
+// Keys are shown ONCE at creation — after that, only the prefix is visible.
+
+function DeveloperApiCard({ plan }: { plan: string }) {
+  const [keys, setKeys] = useState<Array<{
+    id: string;
+    keyPrefix: string;
+    name: string;
+    monthlyCount: number;
+    lastUsedAt: string | null;
+    createdAt: string;
+  }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [newKeyName, setNewKeyName] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [newKeyDialog, setNewKeyDialog] = useState<{ open: boolean; key: string }>({ open: false, key: '' });
+
+  const fetchKeys = useCallback(() => {
+    const token = localStorage.getItem('op_token');
+    if (!token) return;
+    setLoading(true);
+    fetch('/api/api-keys', { headers: { Authorization: 'Bearer ' + token } })
+      .then((r) => (r.ok ? r.json() : { keys: [] }))
+      .then((data) => setKeys(data.keys || []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { fetchKeys(); }, [fetchKeys]);
+
+  const createKey = async () => {
+    if (!newKeyName.trim()) {
+      toast.error('Give your key a name (e.g. "Production")');
+      return;
+    }
+    const token = localStorage.getItem('op_token');
+    if (!token) return;
+    setCreating(true);
+    try {
+      const res = await fetch('/api/api-keys', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newKeyName.trim() }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setNewKeyDialog({ open: true, key: data.key });
+        setNewKeyName('');
+        fetchKeys();
+        toast.success('API key created');
+      } else {
+        const err = await res.json();
+        toast.error(err.error || 'Failed to create key');
+      }
+    } catch {
+      toast.error('Network error');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const revokeKey = async (id: string, name: string) => {
+    if (!confirm(`Revoke API key "${name}"? Any apps using this key will stop working immediately.`)) return;
+    const token = localStorage.getItem('op_token');
+    if (!token) return;
+    try {
+      const res = await fetch(`/api/api-keys?id=${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: 'Bearer ' + token },
+      });
+      if (res.ok) {
+        setKeys((prev) => prev.filter((k) => k.id !== id));
+        toast.success('Key revoked');
+      }
+    } catch {
+      toast.error('Failed to revoke key');
+    }
+  };
+
+  const copyKey = () => {
+    navigator.clipboard.writeText(newKeyDialog.key);
+    toast.success('API key copied to clipboard');
+  };
+
+  const apiLimits: Record<string, string> = {
+    free: '50/month', pro: '2,000/month', plus: '10,000/month',
+    business: '50,000/month', enterprise: 'Unlimited',
+  };
+
+  return (
+    <Card data-glow data-glow-border-only className="glass-card border-border/50">
+      <CardHeader>
+        <CardTitle className="text-lg flex items-center gap-2">
+          <Code className="h-5 w-5 text-amber-500" />
+          Developer API
+          <Badge variant="secondary" className="text-xs ml-auto">{apiLimits[plan] || '50/month'}</Badge>
+        </CardTitle>
+        <CardDescription>
+          Generate API keys to extract invoice data programmatically.{' '}
+          <a href="/api-docs" target="_blank" className="text-amber-500 hover:underline inline-flex items-center gap-0.5">
+            View API docs <ExternalLink className="h-3 w-3" />
+          </a>
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Create new key */}
+        <div className="flex gap-2">
+          <Input
+            placeholder="Key name (e.g. Production, Zapier)"
+            value={newKeyName}
+            onChange={(e) => setNewKeyName(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && createKey()}
+            className="flex-1"
+          />
+          <Button onClick={createKey} disabled={creating || !newKeyName.trim()} size="sm">
+            {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4 mr-1" />}
+            Generate Key
+          </Button>
+        </div>
+
+        {/* List keys */}
+        {loading ? (
+          <div className="flex justify-center py-4">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : keys.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-4">
+            No API keys yet. Generate one to start using the API.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {keys.map((k) => (
+              <div key={k.id} className="flex items-center justify-between p-3 rounded-lg border border-border/50 bg-muted/30">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">{k.name}</span>
+                    <code className="text-xs text-muted-foreground font-mono">{k.keyPrefix}…</code>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {k.monthlyCount} calls this month
+                    {k.lastUsedAt && ` · last used ${new Date(k.lastUsedAt).toLocaleDateString()}`}
+                  </p>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => revokeKey(k.id, k.name)} className="text-red-500 hover:text-red-600">
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* New key dialog (shown once) */}
+        <Dialog open={newKeyDialog.open} onOpenChange={(open) => { setNewKeyDialog({ open, key: '' }); if (!open) fetchKeys(); }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>API Key Created</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-sm text-amber-700 dark:text-amber-400">
+                Copy this key now. For security, it will never be shown again.
+              </div>
+              <div className="flex gap-2">
+                <code className="flex-1 p-3 rounded-lg bg-muted font-mono text-xs break-all">
+                  {newKeyDialog.key}
+                </code>
+                <Button size="sm" onClick={copyKey}>
+                  <Copy className="h-3.5 w-3.5 mr-1" /> Copy
+                </Button>
+              </div>
+              <div className="text-xs text-muted-foreground">
+                <p className="font-medium mb-1">Quick start:</p>
+                <pre className="p-2 rounded bg-muted/50 overflow-x-auto">{`curl -X POST https://your-domain.com/api/v1/extract \\
+  -H "Authorization: Bearer ${newKeyDialog.key.slice(0, 12)}..." \\
+  -F "file=@invoice.pdf"`}</pre>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </CardContent>
+    </Card>
   );
 }

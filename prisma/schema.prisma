@@ -82,6 +82,7 @@ model User {
   emailInboxes     EmailInbox[]
   emailBlocklist   EmailBlocklist[]
   pendingReviews   PendingReview[]
+  apiKeys          ApiKey[]
 }
 
 model Entity {
@@ -389,4 +390,29 @@ model StripeEvent {
   @@index([eventType])
   @@index([userId])
   @@index([createdAt])
+}
+
+// ─── Developer API Keys ────────────────────────────────────────────────────
+// Users generate API keys to use the public REST API (/api/v1/extract).
+// The key itself is stored SHA-256 hashed (like a password) — we only show
+// the full key ONCE at creation time. The `keyPrefix` is stored in plaintext
+// so the UI can show "op_live_abc...***" without decrypting.
+model ApiKey {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // SHA-256 hash of the full key. Never store the full key.
+  keyHash         String   @unique
+  // First 12 chars of the key (e.g. "op_live_abc1") — shown in the UI so
+  // users can identify which key is which without seeing the full key.
+  keyPrefix       String
+  // User-facing label (e.g. "Production", "Zapier", "Testing")
+  name            String
+  // Monthly API call counter (same lazy-reset pattern as parseCount)
+  monthlyCount    Int      @default(0)
+  countResetAt    DateTime?
+  lastUsedAt      DateTime?
+  createdAt       DateTime @default(now())
+  @@index([userId])
+  @@index([keyHash])
 }
