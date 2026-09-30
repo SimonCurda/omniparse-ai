@@ -8,8 +8,8 @@ export default function ApiDocsPage() {
   const router = useRouter();
 
   const goBack = () => {
-    // If there's browser history (user navigated from the dashboard), go back.
-    // Otherwise fall back to the dashboard.
+    // The docs link opens in the same tab, so router.back() returns the
+    // user to the dashboard settings tab where they clicked the link.
     if (window.history.length > 1) {
       router.back();
     } else {

@@ -1595,7 +1595,7 @@ function DeveloperApiCard({ plan }: { plan: string }) {
         </CardTitle>
         <CardDescription>
           Generate API keys to extract invoice data programmatically.{' '}
-          <a href="/api-docs" target="_blank" className="text-amber-500 hover:underline inline-flex items-center gap-0.5">
+          <a href="/api-docs" className="text-amber-500 hover:underline inline-flex items-center gap-0.5">
             View API docs <ExternalLink className="h-3 w-3" />
           </a>
         </CardDescription>
