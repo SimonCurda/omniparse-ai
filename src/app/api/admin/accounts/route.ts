@@ -58,6 +58,7 @@ export async function GET(req: NextRequest) {
             emailInboxes: true,
             pendingReviews: true,
             auditLogs: true,
+            apiKeys: true,
           },
         },
       },
@@ -119,6 +120,13 @@ export async function GET(req: NextRequest) {
         // Cap at 100
         riskScore = Math.min(100, riskScore);
 
+        // Fetch API key usage for this user (sum of monthlyCount across all their keys)
+        const apiKeysData = await db.apiKey.aggregate({
+          where: { userId: user.id },
+          _sum: { monthlyCount: true },
+        });
+        const apiCallsThisMonth = apiKeysData._sum.monthlyCount || 0;
+
         return {
           id: user.id,
           email: user.email,
@@ -135,6 +143,8 @@ export async function GET(req: NextRequest) {
             emailInboxes: user._count.emailInboxes,
             pendingReviews: user._count.pendingReviews,
             auditLogs: user._count.auditLogs,
+            apiKeys: user._count.apiKeys,
+            apiCallsThisMonth,
           },
           abuseRisk: {
             score: riskScore,
