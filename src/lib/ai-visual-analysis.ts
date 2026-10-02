@@ -116,6 +116,25 @@ Respond in this EXACT JSON format (no markdown, no explanation):
     const isAi = analysis.isAiGenerated === true || analysis.isAiEdited === true;
     const confidence = analysis.confidence ?? 0;
 
+    // ─── Contradiction check ──────────────────────────────────────────
+    // The AI model sometimes returns isAiGenerated=true / confidence=0.98
+    // but then writes "no signs of AI generation" in overallAssessment.
+    // This is a model hallucination — trust the detailed text over the
+    // raw confidence score. If the assessment explicitly says the image
+    // looks genuine, downgrade to pass regardless of confidence.
+    const assessmentLower = (analysis.overallAssessment || '').toLowerCase();
+    const saysGenuine = assessmentLower.includes('no signs of ai') ||
+                        assessmentLower.includes('appears genuine') ||
+                        assessmentLower.includes('real-world') ||
+                        assessmentLower.includes('align with a real') ||
+                        assessmentLower.includes('not ai-generated') ||
+                        assessmentLower.includes('not ai generated') ||
+                        assessmentLower.includes('authentic');
+
+    // If the assessment text contradicts the isAiGenerated flag, trust the text
+    const effectiveIsAi = saysGenuine ? false : isAi;
+    const effectiveConfidence = saysGenuine ? Math.min(confidence, 0.3) : confidence;
+
     // Build detail message
     const parts: string[] = [];
 
@@ -139,25 +158,25 @@ Respond in this EXACT JSON format (no markdown, no explanation):
       parts.push(analysis.overallAssessment);
     }
 
-    if (isAi && confidence >= 0.6) {
+    if (effectiveIsAi && effectiveConfidence >= 0.6) {
       checks.push({
         check: 'visual_ai_analysis',
         status: 'fail',
-        detail: `AI-generated or AI-edited image detected (confidence: ${Math.round(confidence * 100)}%). ${parts.join(' ')}`,
+        detail: `AI-generated or AI-edited image detected (confidence: ${Math.round(effectiveConfidence * 100)}%). ${parts.join(' ')}`,
         icon: 'visual',
       });
-    } else if (isAi || confidence >= 0.4) {
+    } else if (effectiveIsAi || effectiveConfidence >= 0.4) {
       checks.push({
         check: 'visual_ai_analysis',
         status: 'warn',
-        detail: `Possible AI involvement detected (confidence: ${Math.round(confidence * 100)}%). ${parts.join(' ')}`,
+        detail: `Possible AI involvement detected (confidence: ${Math.round(effectiveConfidence * 100)}%). ${parts.join(' ')}`,
         icon: 'visual',
       });
     } else {
       checks.push({
         check: 'visual_ai_analysis',
         status: 'pass',
-        detail: `No AI artifacts detected (${Math.round((1 - confidence) * 100)}% likely authentic). ${analysis.overallAssessment || 'Image appears genuine.'}`,
+        detail: `No AI artifacts detected (${Math.round((1 - effectiveConfidence) * 100)}% likely authentic). ${analysis.overallAssessment || 'Image appears genuine.'}`,
         icon: 'visual',
       });
     }
@@ -175,7 +194,7 @@ Respond in this EXACT JSON format (no markdown, no explanation):
     }
 
     return {
-      isSuspicious: isAi && confidence >= 0.6,
+      isSuspicious: effectiveIsAi && effectiveConfidence >= 0.6,
       checks,
     };
   } catch (error) {

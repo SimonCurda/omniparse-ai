@@ -324,6 +324,34 @@ export function runValidationRules(
     }
   }
 
+  // Rule: Total should be >= amount (total = amount + VAT, so it can't be less)
+  // This catches Czech/European decimal comma errors where the AI inconsistently
+  // parses some fields with comma-as-decimal and others with comma-as-thousands.
+  if (typeof data.amount === 'number' && typeof data.total === 'number' && data.amount > 0 && data.total > 0) {
+    if (data.total < data.amount) {
+      results.push({
+        rule: 'total_less_than_amount',
+        severity: 'error',
+        message: `Total (${data.total}) is less than the net amount (${data.amount}). This is impossible — the total should be amount + VAT. Likely a number parsing error with European decimal format (e.g. "473,00" misread as "47,300"). Please verify the values manually.`,
+        field: 'total',
+      });
+    }
+    // Also check if amount + VAT is way off from total (>20% difference)
+    if (typeof data.vatAmount === 'number' && data.vatAmount >= 0) {
+      const expectedTotal = data.amount + data.vatAmount;
+      const diff = Math.abs(expectedTotal - data.total);
+      const diffPercent = (diff / data.total) * 100;
+      if (diffPercent > 20) {
+        results.push({
+          rule: 'total_mismatch',
+          severity: 'warning',
+          message: `Total (${data.total}) doesn't match amount + VAT (${expectedTotal}). Difference: ${diffPercent.toFixed(1)}%. This may indicate inconsistent number parsing — please verify manually.`,
+          field: 'total',
+        });
+      }
+    }
+  }
+
   // Determine overall status
   const hasErrors = results.some((r) => r.severity === 'error');
   const hasWarnings = results.some((r) => r.severity === 'warning');
