@@ -419,6 +419,16 @@ CRITICAL NUMBER PARSING RULES:
 - Always convert to standard float: "12 705,00 Kč" → 12705.00
 - "7 000,00" → 7000.00 (NOT 7.00 — the space means thousands, not decimal)
 - If a number has a space followed by 3 digits and then a comma, it's thousands: "15 300,50" → 15300.50
+
+CRITICAL — CZECH/EUROPEAN DECIMAL COMMA:
+- "473,00" means 473.00 (NOT 47300 — the comma is a DECIMAL separator, not thousands)
+- "1.234,56" means 1234.56 (dot = thousands, comma = decimal)
+- "473,50" means 473.50 (NOT 47350)
+- "100,00 Kč" means 100.00 (NOT 10000)
+- When you see a comma followed by exactly 2 digits at the END of a number, it is ALWAYS a decimal separator: "473,00" → 473.00, "99,50" → 99.50
+- NEVER drop the comma and treat the digits as additional whole numbers. "473,00" is NOT 47300.
+- If a Czech invoice says "Celkem: 473,00 Kč", the total is 473.00, NOT 47300.00.
+
 - ALL numeric fields (amount, vatAmount, total) MUST be returned as numbers, not strings.
 
 CRITICAL: Output ONLY the JSON object. Do NOT explain, do NOT analyze, do NOT write any text before or after the JSON. Do NOT include confidence labels or field names as values — only actual data from the document.
@@ -890,6 +900,36 @@ export async function POST(req: NextRequest) {
           console.warn(`[parse] Converted field "${field}" from string "${strVal}" to number ${num} (cleaned: ${cleaned})`);
         } else {
           console.warn(`[parse] Could not parse number from "${strVal}" (cleaned: ${cleaned})`);
+        }
+      }
+    }
+
+    // ─── Post-parse sanity check: catch Czech/European decimal-comma errors ──
+    // If the AI misread "473,00" as 47300 (dropping the comma instead of
+    // treating it as a decimal), the total will be 100x too big. Detect this:
+    // if total = amount + vatAmount * 100, or total = (amount + vatAmount) * 100,
+    // the AI probably dropped a decimal comma.
+    if (typeof parsed.total === 'number' && typeof parsed.amount === 'number' && typeof parsed.vatAmount === 'number') {
+      const total = parsed.total as number;
+      const amt = parsed.amount as number;
+      const vat = parsed.vatAmount as number;
+      const expectedTotal = amt + vat;
+
+      // If total is ~100x the expected total, the AI dropped a decimal comma
+      if (expectedTotal > 0 && total > 0) {
+        const ratio = total / expectedTotal;
+        if (ratio > 95 && ratio < 105) {
+          // Total is 100x too big — fix it
+          console.warn(`[parse] Decimal comma error detected: total=${total} but amount+vat=${expectedTotal} (ratio ${ratio.toFixed(1)}x). Fixing total to ${expectedTotal}.`);
+          parsed.total = Math.round(expectedTotal * 100) / 100;
+        }
+        // Also check if amount alone is 100x too big relative to total
+        if (amt > 0 && total > 0) {
+          const amtRatio = amt / total;
+          if (amtRatio > 95 && amtRatio < 105 && vat < total) {
+            console.warn(`[parse] Decimal comma error in amount: amount=${amt} but total=${total}. Fixing amount to ${Math.round((total - vat) * 100) / 100}.`);
+            parsed.amount = Math.round((total - vat) * 100) / 100;
+          }
         }
       }
     }
