@@ -5,7 +5,7 @@ import {
   Shield, ShieldAlert, ShieldCheck, Snowflake, Trash2, RefreshCw,
   Search, AlertTriangle, Users, FileText, MessageSquare, Mail, Loader2,
   ArrowUpDown, ArrowUp, ArrowDown, History, EyeOff, Eye, Star,
-  Cpu, CheckCircle2, XCircle, Code, ExternalLink,
+  Cpu, CheckCircle2, XCircle, Code, ExternalLink, Plus, Folder, X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -719,55 +719,7 @@ export default function AdminPage() {
         )}
 
         {/* === LINKS TAB === */}
-        {tab === 'links' && (
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Useful Links</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <a href="https://chatgpt.com/share/6aae75e5-2a3c-83eb-b853-586c2ad00967?ogimg=plain" target="_blank" rel="noopener"
-                className="flex items-center gap-3 p-4 rounded-lg border border-border bg-card hover:bg-muted/30 transition-colors">
-                <ExternalLink className="h-5 w-5 text-amber-500 shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground">ChatGPT Conversation</p>
-                  <p className="text-xs text-muted-foreground truncate">Development notes & context</p>
-                </div>
-              </a>
-              <a href="/api-test"
-                className="flex items-center gap-3 p-4 rounded-lg border border-border bg-card hover:bg-muted/30 transition-colors">
-                <Code className="h-5 w-5 text-amber-500 shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground">API Tester</p>
-                  <p className="text-xs text-muted-foreground truncate">Test extraction API in browser</p>
-                </div>
-              </a>
-              <a href="/api-docs"
-                className="flex items-center gap-3 p-4 rounded-lg border border-border bg-card hover:bg-muted/30 transition-colors">
-                <ExternalLink className="h-5 w-5 text-amber-500 shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground">API Documentation</p>
-                  <p className="text-xs text-muted-foreground truncate">REST API docs & examples</p>
-                </div>
-              </a>
-              {secret && (
-                <a href={`/api/admin/legal-pdf?key=${encodeURIComponent(secret)}`} target="_blank" rel="noopener"
-                  className="flex items-center gap-3 p-4 rounded-lg border border-border bg-card hover:bg-muted/30 transition-colors">
-                  <FileText className="h-5 w-5 text-amber-500 shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground">Legal PDF (Admin)</p>
-                    <p className="text-xs text-muted-foreground truncate">Full legal docs with developer notes</p>
-                  </div>
-                </a>
-              )}
-              <a href="/OmniParse-Legal-Documents-Public.pdf" target="_blank" rel="noopener"
-                className="flex items-center gap-3 p-4 rounded-lg border border-border bg-card hover:bg-muted/30 transition-colors">
-                <FileText className="h-5 w-5 text-amber-500 shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground">Legal PDF (Public)</p>
-                  <p className="text-xs text-muted-foreground truncate">Customer-facing legal documents</p>
-                </div>
-              </a>
-            </div>
-          </div>
-        )}
+        {tab === 'links' && <LinksTab />}
 
         <p className="text-xs text-muted-foreground text-center">
           OmniParse Admin Dashboard · {tab === 'accounts' ? `Sorted by ${sortField} (${sortDir})` : 'Deleted accounts audit trail'}
@@ -861,6 +813,156 @@ function ProviderToggleCard({ label, role, location, dbEnabled, apiKeySet, effec
         </p>
         <p className="text-xs text-muted-foreground mt-1">{notes}</p>
       </div>
+    </div>
+  );
+}
+
+// ─── Links Tab — categorized link manager ─────────────────────────────────
+// Stores links in localStorage. Pre-seeded with the ChatGPT legal conversation
+// in a "Legal" category. Users can add links with name + URL + category,
+// and create new categories on the fly.
+
+interface SavedLink {
+  id: string;
+  name: string;
+  url: string;
+  category: string;
+}
+
+const DEFAULT_LINKS: SavedLink[] = [
+  {
+    id: 'default-legal-chatgpt',
+    name: 'Legal Review Conversation',
+    url: 'https://chatgpt.com/share/6aae75e5-2a3c-83eb-b853-586c2ad00967?ogimg=plain',
+    category: 'Legal',
+  },
+];
+
+function LinksTab() {
+  const [links, setLinks] = useState<SavedLink[]>([]);
+  const [showAdd, setShowAdd] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newUrl, setNewUrl] = useState('');
+  const [newCategory, setNewCategory] = useState('');
+  const [categories, setCategories] = useState<string[]>(['Legal']);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('op_admin_links');
+      if (saved) {
+        const parsed = JSON.parse(saved) as SavedLink[];
+        setLinks(parsed);
+        const cats = Array.from(new Set(parsed.map((l) => l.category)));
+        setCategories(cats.length > 0 ? cats : ['Legal']);
+      } else {
+        setLinks(DEFAULT_LINKS);
+        localStorage.setItem('op_admin_links', JSON.stringify(DEFAULT_LINKS));
+      }
+    } catch {
+      setLinks(DEFAULT_LINKS);
+    }
+  }, []);
+
+  const saveLinks = (updated: SavedLink[]) => {
+    setLinks(updated);
+    try { localStorage.setItem('op_admin_links', JSON.stringify(updated)); } catch {}
+    const cats = Array.from(new Set(updated.map((l) => l.category)));
+    setCategories(cats.length > 0 ? cats : ['Legal']);
+  };
+
+  const addLink = () => {
+    if (!newName.trim() || !newUrl.trim()) { toast.error('Name and URL are required'); return; }
+    const category = newCategory.trim() || 'Uncategorized';
+    const link: SavedLink = { id: `link-${Date.now()}`, name: newName.trim(), url: newUrl.trim(), category };
+    saveLinks([...links, link]);
+    setNewName(''); setNewUrl(''); setNewCategory(''); setShowAdd(false);
+    toast.success('Link added');
+  };
+
+  const deleteLink = (id: string) => {
+    saveLinks(links.filter((l) => l.id !== id));
+    toast.success('Link removed');
+  };
+
+  const grouped = useMemo(() => {
+    const map: Record<string, SavedLink[]> = {};
+    for (const l of links) { if (!map[l.category]) map[l.category] = []; map[l.category].push(l); }
+    return map;
+  }, [links]);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold">Links</h3>
+        <button onClick={() => setShowAdd(!showAdd)}
+          className="px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors inline-flex items-center gap-1">
+          {showAdd ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+          {showAdd ? 'Cancel' : 'Add Link'}
+        </button>
+      </div>
+
+      {showAdd && (
+        <div className="p-4 rounded-lg border border-border bg-card space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <input type="text" placeholder="Link name (e.g. Stripe Dashboard)" value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              className="px-3 py-2 rounded-md border border-border bg-background text-sm" />
+            <input type="text" placeholder="URL (https://...)" value={newUrl}
+              onChange={(e) => setNewUrl(e.target.value)}
+              className="px-3 py-2 rounded-md border border-border bg-background text-sm" />
+          </div>
+          <div className="flex gap-2 items-center">
+            <input type="text" placeholder="Category — type new or pick existing" value={newCategory}
+              onChange={(e) => setNewCategory(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && addLink()}
+              className="flex-1 px-3 py-2 rounded-md border border-border bg-background text-sm" />
+            {categories.length > 0 && (
+              <div className="flex gap-1 flex-wrap">
+                {categories.map((c) => (
+                  <button key={c} onClick={() => setNewCategory(c)}
+                    className={`px-2 py-1 text-xs rounded border transition-colors ${newCategory === c ? 'border-amber-500 bg-amber-500/10 text-amber-500' : 'border-border text-muted-foreground hover:bg-muted/50'}`}>
+                    {c}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <button onClick={addLink} className="w-full py-2 rounded-md bg-amber-500 text-white text-sm font-medium hover:bg-amber-600 transition-colors">
+            Save Link
+          </button>
+        </div>
+      )}
+
+      {Object.entries(grouped).length === 0 ? (
+        <p className="text-sm text-muted-foreground text-center py-8">No links yet. Click &quot;Add Link&quot; to create one.</p>
+      ) : (
+        Object.entries(grouped).map(([category, catLinks]) => (
+          <div key={category} className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Folder className="h-4 w-4 text-amber-500" />
+              <h4 className="text-sm font-medium text-foreground">{category}</h4>
+              <span className="text-xs text-muted-foreground">({catLinks.length})</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pl-6">
+              {catLinks.map((link) => (
+                <div key={link.id} className="flex items-center gap-3 p-3 rounded-lg border border-border bg-card hover:bg-muted/30 transition-colors group">
+                  <a href={link.url} target="_blank" rel="noopener" className="flex items-center gap-2 min-w-0 flex-1">
+                    <ExternalLink className="h-4 w-4 text-amber-500 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{link.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">{link.url}</p>
+                    </div>
+                  </a>
+                  <button onClick={() => deleteLink(link.id)}
+                    className="p-1.5 rounded text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors opacity-0 group-hover:opacity-100">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))
+      )}
     </div>
   );
 }
