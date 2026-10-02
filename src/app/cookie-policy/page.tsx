@@ -51,7 +51,7 @@ export default function CookiePolicyPage() {
           Under the EU ePrivacy Directive (2002/58/EC), as amended by Directive 2009/136/EC, and GDPR:
         </p>
         <ul>
-          <li><strong>Essential storage (op_token, omniparse_cookie_consent, Next.js session cookies):</strong> Exempt from consent requirements as strictly necessary for the provision of the Service explicitly requested by the user (ePrivacy Art. 5(3) exception, as implemented by Czech Act No. 127/2005 Coll. § 89).</li>
+          <li><strong>Essential storage (op_token and the storage item used to remember the user&apos;s consent preference):</strong> This storage is used where strictly necessary for the Service requested by the user or to remember the user&apos;s privacy preference. It is exempt from prior consent only to the extent that the applicable ePrivacy exception for strictly necessary storage applies.</li>
           <li><strong>Non-essential storage (theme, op_shortcuts, op_legal_consent, op_crash_log):</strong> Requires your explicit, informed, prior consent via the cookie banner (GDPR Art. 6(1)(a) + ePrivacy Art. 5(3)). Consent must be as easy to withdraw as to give. You may withdraw consent at any time by (a) clicking the &quot;Essential only&quot; button in the cookie banner re-openable via Settings → Privacy, or (b) clearing your browser&apos;s Local Storage.</li>
           <li>You have the right to be informed about what data is collected and for what purpose (this section).</li>
           <li>You have the right to lodge a complaint with the Czech DPA (ÚOOÚ) if you believe our cookie practices violate applicable law.</li>
@@ -65,7 +65,7 @@ export default function CookiePolicyPage() {
           You have the following options:
         </p>
         <ul>
-          <li><strong>&quot;Accept all&quot;:</strong> Records consent for both essential and all non-essential storage (theme, shortcuts, legal consent, crash logs).</li>
+          <li><strong>&quot;Accept all&quot;:</strong> Accepts all non-essential storage categories currently offered by the Service. Essential storage remains active where it is strictly necessary for the requested Service or to remember your privacy preference.</li>
           <li><strong>&quot;Essential only&quot;:</strong> Records consent for essential storage only; non-essential items are not set, and any previously set non-essential items are cleared.</li>
           <li><strong>&quot;Manage preferences&quot; (planned):</strong> A granular preference-management feature is planned. Until it is implemented, the banner provides the currently available choices described below. The Service does not represent that per-category consent controls are available before that feature is released.</li>
         </ul>

@@ -162,11 +162,20 @@ export default function PrivacyPolicyPage() {
         <ul>
           <li><strong>Right of access (Art. 15):</strong> Request a copy of all personal data we hold about you. Use the &quot;Export my data&quot; feature in Settings, or contact us.</li>
           <li><strong>Right to rectification (Art. 16):</strong> Request correction of inaccurate personal data. Edit your profile from Settings.</li>
-          <li><strong>Right to erasure / &quot;right to be forgotten&quot; (Art. 17):</strong> Request deletion of your personal data. Use the &quot;Delete account&quot; feature in Settings — this deletes all your data within seconds.</li>
+          <li><strong>Right to erasure / &quot;right to be forgotten&quot; (Art. 17):</strong> Request deletion of your personal data. Use the &quot;Delete account&quot; feature in Settings. The deletion request immediately initiates the account-deletion process; active application data is deleted according to the applicable deletion schedule, while backups and legally retained records may persist for limited periods as described in §4.</li>
           <li><strong>Right to restriction of processing (Art. 18):</strong> Request that we limit how we use your data. Contact us to request this.</li>
           <li><strong>Right to data portability (Art. 20):</strong> Receive your data in a structured, machine-readable format. Use the &quot;Export my data&quot; feature in Settings.</li>
           <li><strong>Right to object (Art. 21):</strong> Object to processing based on legitimate interests (e.g. server log collection).</li>
-          <li><strong>Right to withdraw consent (Art. 7(3)):</strong> Withdraw consent at any time via cookie settings, by deleting your invoices and chat history, or by contacting us.</li>
+          <li>
+            <strong>Right to withdraw consent (Art. 7(3)):</strong> Where OmniParse relies on consent
+            for a specific processing activity, you may withdraw that consent at any time using the
+            mechanism provided for that activity or by contacting us. Withdrawal does not affect the
+            lawfulness of processing carried out before withdrawal.
+            <p>
+              Withdrawal of consent does not by itself require deletion of data where another lawful
+              basis for continued processing applies. The right to erasure is described separately above.
+            </p>
+          </li>
           <li><strong>Rights related to automated decision-making and profiling (Art. 22):</strong> OmniParse does <strong>not</strong> engage in solely automated decision-making producing legal or similarly significant effects concerning you. AI extraction and chat responses are tools to assist you; all material decisions (e.g., invoice approval, payment authorization) require your explicit human action. You have the right not to be subject to a decision based solely on automated processing; if you believe any such decision has occurred, contact us immediately.</li>
         </ul>
         <p>
@@ -180,19 +189,15 @@ export default function PrivacyPolicyPage() {
       <section>
         <h2>6. Subprocessors and AI Providers</h2>
         <p>
-          We use the following third-party services to provide the Service. Each processes personal data
-          on our behalf as a subprocessor under GDPR Art. 28. Data Processing Agreements (DPAs) and
-          Standard Contractual Clauses (SCCs) are in place with all <em>active</em> providers (see
-          per-provider status below).
+          We use third-party service providers to provide the Service. Depending on the processing
+          activity and provider, a provider may act as a processor/subprocessor on our behalf or as an
+          independent controller for its own legally defined purposes. Where a provider processes personal
+          data on our behalf, we maintain appropriate contractual data-protection arrangements as required
+          by applicable law. Where personal data is transferred to a third country, we use an applicable
+          GDPR Chapter V transfer mechanism where required.
         </p>
-        <p className="mt-3 p-3 bg-emerald-500/5 border-l-4 border-emerald-500 rounded-r">
-          <strong className="text-emerald-700 dark:text-emerald-500">EU-based AI provider available.</strong>{' '}
-          Mistral AI (Paris, France) processes documents within the EU. Transfers to Mistral
-          are expected to remain within the EEA, subject to Mistral&apos;s applicable terms. We prioritize Mistral for
-          vision extraction and chat when available. When <code>MISTRAL_DISABLE_TRAINING=true</code> is
-          set in our server configuration (default), we send <code>usage_options=&#123;&quot;enable_training&quot;: false&#125;</code> on
-          every Mistral API call to disable training on prompt content (effective on paid Mistral tier;
-          on free tier, Mistral may ignore or reject this parameter).
+        <p>
+          The current provider configuration and applicable processing locations are described below.
         </p>
         <ul>
           <li><strong>Vercel Inc.</strong> (United States, DPF-certified) — Web hosting and serverless function execution. Processes: IP addresses, request metadata. <a href="https://vercel.com/legal/dpa" target="_blank" rel="noopener">Vercel DPA</a>.</li>
@@ -339,7 +344,7 @@ export default function PrivacyPolicyPage() {
         <ul>
           <li><strong>Accountability:</strong> Simon Curda (natural person, Czech Republic) is responsible for personal information under PIPEDA and has designated damr58h@gmail.com as the contact for privacy matters.</li>
           <li><strong>Identifying purposes:</strong> Purposes are described in §2 of this Policy.</li>
-          <li><strong>Consent:</strong> Consent is obtained at signup (Terms acceptance) and via the cookie banner for non-essential storage. Canadian users may withdraw consent at any time by contacting us or by deleting their account.</li>
+          <li><strong>Consent:</strong> Where consent is required under PIPEDA, OmniParse obtains consent through the applicable signup, service or privacy mechanism. Acceptance of the Terms of Service is not, by itself, treated as consent for every separate processing purpose. Consent for non-essential browser storage is obtained through the cookie/storage consent mechanism.</li>
           <li><strong>Limiting collection:</strong> We collect only what is necessary for the Service (see §2).</li>
           <li><strong>Limiting use, disclosure, retention:</strong> Retention periods in §4 apply.</li>
           <li><strong>Accuracy:</strong> Users can correct their data via Settings; AI-extracted data can be edited in the dashboard.</li>
@@ -375,14 +380,14 @@ export default function PrivacyPolicyPage() {
         <h3 className="text-base font-semibold mt-4 mb-2">11.2 Processor Obligations (GDPR Art. 28(3))</h3>
         <p className="text-sm">Pursuant to GDPR Art. 28(3), OmniParse will:</p>
         <ul className="list-disc pl-6 space-y-1 text-sm mt-2">
-          <li>(a) process personal data only on documented instructions from the Customer, including with regard to transfers, unless required by applicable law;</li>
-          <li>(b) ensure that persons authorized to process personal data are subject to a confidentiality obligation under contract or applicable law (see §11.1);</li>
-          <li>(c) implement appropriate technical and organizational measures to ensure a level of security appropriate to the risk (see §11.5);</li>
-          <li>(d) engage subprocessors only under the conditions set out in §11.3 and §11.8;</li>
-          <li>(e) reasonably assist the Customer with data-subject rights requests (see §11.4);</li>
-          <li>(f) assist the Customer with security, breach notification, DPIA and prior-consultation obligations, taking into account the nature of processing and available information (see §11.9);</li>
-          <li>(g) make available information necessary to demonstrate compliance and support audits (see §11.10); and</li>
-          <li>(h) at the Customer&apos;s choice, delete or return personal data after termination, unless applicable law requires storage (see §11.7).</li>
+          <li>(a) process personal data only on documented instructions from the Customer, including with regard to transfers of personal data to a third country or an international organisation, unless processing is required by applicable Union or Member State law;</li>
+          <li>(b) ensure that persons authorised to process personal data are subject to an appropriate obligation of confidentiality under contract or applicable law;</li>
+          <li>(c) implement appropriate technical and organisational measures to ensure a level of security appropriate to the risk, as described in §11.5;</li>
+          <li>(d) comply with the conditions applicable to engaging subprocessors, including the authorisation and notification mechanisms described in §11.3 and §11.8;</li>
+          <li>(e) taking into account the nature of the processing, reasonably assist the Customer through appropriate technical and organisational measures in responding to data-subject rights requests, as described in §11.4;</li>
+          <li>(f) taking into account the nature of the processing and the information available to OmniParse, reasonably assist the Customer with obligations under GDPR Articles 32 to 36, including security measures, personal-data breach notification, data-protection impact assessments and prior consultation where applicable;</li>
+          <li>(g) make available to the Customer information reasonably necessary to demonstrate compliance with the obligations applicable to processors under GDPR Art. 28 and allow for and contribute to audits and inspections as described in §11.10;</li>
+          <li>(h) at the Customer&apos;s choice, delete or return personal data after the end of the provision of the relevant processing services, unless applicable law requires continued storage, as described in §11.7.</li>
         </ul>
         <h3 className="text-base font-semibold mt-4 mb-2">11.3 Subprocessors</h3>
         <p className="text-sm">OmniParse engages the following subprocessors. Customer grants general written authorization for OmniParse to engage these subprocessors; the current list is maintained in this Privacy Policy §6 and material changes will be notified 30 days in advance per §11.8:</p>
@@ -407,62 +412,67 @@ export default function PrivacyPolicyPage() {
           <strong> damr58h@gmail.com</strong> with the subject &quot;DPA — Data Subject Request&quot;.
         </p>
         <h3 className="text-base font-semibold mt-4 mb-2">11.5 Security Measures (GDPR Art. 32)</h3>
-        <p className="text-sm">OmniParse implements the following technical and organizational measures (cross-referenced from Privacy Policy §7):</p>
+        <p className="text-sm">
+          OmniParse implements the following technical and organisational measures, subject to the
+          Service configuration and applicable infrastructure-provider controls:
+        </p>
         <ul className="list-disc pl-6 space-y-1 text-sm mt-2">
-          <li>Encryption in transit (HTTPS/TLS 1.2+) for all connections</li>
-          <li>Encryption at rest: Supabase-managed transparent disk encryption (TDE); AES-256-GCM for IMAP credentials at rest</li>
-          <li>bcrypt password hashing (12 rounds)</li>
-          <li>JWT-based authentication with 7-day expiry</li>
-          <li>Per-request user scoping — no query returns cross-user data</li>
-          <li>File data auto-purge after 30 days</li>
-          <li>Account deletion with cascade (full erasure)</li>
-          <li>Audit log of significant actions (invoice create/approve/delete)</li>
-          <li>Rate limiting on auth endpoints (5 attempts/min/IP)</li>
-          <li>Security headers: CSP, HSTS (2-year preload), X-Frame-Options: DENY, X-Content-Type-Options: nosniff, Referrer-Policy</li>
-          <li>Prompt-injection screening on all chat messages (30+ patterns)</li>
-          <li>Vendor due diligence: subprocessors assessed before engagement and re-assessed at least annually</li>
+          <li>Encryption in transit: HTTPS/TLS 1.2+ for connections to the Service and applicable third-party providers.</li>
+          <li>Encryption at rest: Supabase-managed encryption for database storage. IMAP credentials stored by OmniParse are encrypted using AES-256-GCM before storage.</li>
+          <li>Password security: User passwords are hashed using bcrypt and are not stored in plaintext.</li>
+          <li>Authentication: JWT-based authentication with a configured token-expiry period.</li>
+          <li>Per-user data isolation: Application queries are scoped to the authenticated user&apos;s account, with user-level access controls applied at the application layer.</li>
+          <li>File retention: Uploaded file binaries are automatically purged from active application storage according to the retention schedule in the Privacy Policy.</li>
+          <li>Account deletion: Account deletion triggers deletion of user-owned application data according to the applicable deletion and backup schedule.</li>
+          <li>Audit logging: Significant account and invoice actions are logged for security and operational purposes.</li>
+          <li>Rate limiting: Authentication and AI-related endpoints are subject to rate limits designed to reduce abuse.</li>
+          <li>Security headers: Security headers including CSP, HSTS, X-Frame-Options, X-Content-Type-Options and Referrer-Policy are configured where applicable.</li>
+          <li>Prompt-injection screening: Chat messages are screened against known prompt-injection patterns before being sent to AI providers.</li>
+          <li>Vendor due diligence: Subprocessors are assessed before engagement and periodically thereafter, taking into account the nature and risk of the processing.</li>
         </ul>
         <h3 className="text-base font-semibold mt-4 mb-2">11.6 International Transfers (GDPR Chapter V)</h3>
         <p className="text-sm">
-          Personal data may be transferred to the United States for AI processing by Groq and Google.
-          The EU-US Data Privacy Framework (DPF) adequacy decision of 10 July 2023 remains in force as
-          of the date of this Policy, although it is subject to an ongoing CJEU appeal ("Schrems III").
-          For US recipients self-certified under the DPF, the DPF alone provides a valid transfer
-          mechanism and SCCs are not additionally required. For US recipients NOT DPF-certified,
-          Standard Contractual Clauses (SCCs) consistent with the Schrems II ruling, together with a
-          Transfer Impact Assessment (TIA), are required. <strong>OpenRouter is DISABLED by
-          default</strong> — no personal data is transferred to OpenRouter unless the operator
-          explicitly enables it after completing DPA/SCC review. <strong>SCC status by provider (as of
-          September 18, 2026):</strong>
+          Personal data may be transferred to the United States for processing by Groq and, only if
+          explicitly enabled, by other US-based providers.
         </p>
+        <p className="text-sm">
+          Where a US recipient is covered by an applicable adequacy mechanism, OmniParse may rely on
+          that mechanism. Where an adequacy mechanism does not apply, OmniParse will rely on an
+          appropriate GDPR Chapter V safeguard, such as Standard Contractual Clauses, together with
+          supplementary measures and a Transfer Impact Assessment where appropriate.
+        </p>
+        <p className="text-sm">Provider status as of September 19, 2026:</p>
         <ul className="list-disc pl-6 space-y-1 text-sm mt-2">
-          <li><strong>Groq Inc.</strong> — SCCs confirmed in effect (DPA dated October 15, 2025; EU SCC Module 2 self-executing upon acceptance of Groq Services Agreement). DPA accessible at <a href="https://console.groq.com" target="_blank" rel="noopener">console.groq.com</a>. Governing law: Ireland. Competent authority: Irish Data Protection Commission. 72-hour breach notification. Groq&apos;s DPF certification status is pending verification at <a href="https://www.dataprivacyframework.gov" target="_blank" rel="noopener">dataprivacyframework.gov</a>; SCCs remain in place as a safeguard.</li>
-          <li><strong>Mistral AI</strong> — EU-based (Paris, France). No Chapter V transfer issue; no SCC required. Training opt-out (<code>usage_options.enable_training=false</code>) sent on every request when MISTRAL_DISABLE_TRAINING=true (default).</li>
-          <li><strong>Google LLC</strong> — Google Cloud DPA self-executing upon acceptance of Google Cloud Terms; available at <a href="https://cloud.google.com/terms/data-processing-addendum" target="_blank" rel="noopener">cloud.google.com/terms/data-processing-addendum</a>. Google LLC is DPF-certified (verified September 2026); SCCs serve as fallback should the DPF be invalidated by Schrems III.</li>
-          <li><strong>Vercel Inc.</strong> — Vercel is DPF-certified. DPA available at <a href="https://vercel.com/legal/dpa" target="_blank" rel="noopener">vercel.com/legal/dpa</a>.</li>
-          <li><strong>Stripe Inc.</strong> — Stripe is DPF-certified. DPA available at <a href="https://stripe.com/legal/dpa" target="_blank" rel="noopener">stripe.com/legal/dpa</a>.</li>
-          <li><strong>OpenRouter</strong> — <strong>DISABLED BY DEFAULT</strong>. No personal data is transferred to OpenRouter unless the operator explicitly sets ENABLE_OPENROUTER=true. Before enabling, the operator must complete a DPA with OpenRouter, verify SCCs or DPF certification, switch to paid-tier models (to disable training), and update this Policy.</li>
+          <li><strong>Mistral AI</strong> — EU-based, Paris, France. Processing that remains within the EEA does not constitute a third-country transfer under GDPR Chapter V.</li>
+          <li><strong>Groq Inc.</strong> — US-based. OmniParse relies on the contractual and transfer safeguards applicable under the Groq services agreement and DPA, including EU SCCs where applicable.</li>
+          <li><strong>Google LLC</strong> — disabled by default. Google AI Studio free-tier processing is governed by Google&apos;s applicable AI Studio terms. The Google Cloud Data Processing Addendum applies to the applicable Google Cloud / Vertex AI services and is not treated as automatically covering Google AI Studio free-tier processing.</li>
+          <li><strong>Vercel Inc.</strong> — US-based. The applicable contractual and transfer safeguards are described in Vercel&apos;s data-processing documentation.</li>
+          <li><strong>Stripe Inc.</strong> — US-based. Stripe&apos;s applicable contractual, transfer and controller/processor arrangements depend on the specific payment-processing activity.</li>
+          <li><strong>OpenRouter</strong> — disabled by default. No customer content is transferred to OpenRouter unless the operator explicitly enables it after completing the applicable contractual, data-protection and transfer review.</li>
         </ul>
         <p className="text-sm mt-2">
-          OmniParse has confirmed SCCs with Groq (US-based) and uses Mistral (EU-based) as the primary
-          provider. The cascade prioritizes Mistral first, then Groq — both have appropriate safeguards.
-          Google is covered by the DPF. OpenRouter is disabled by default and not used unless the
-          operator explicitly enables it. Users should be aware that documents may contain personal data
-          of multiple data subjects — the user is responsible for ensuring they have a valid legal basis
-          for processing and transferring such data under GDPR Art. 6 and Chapter V.
+          The cascade prioritizes Mistral first, then Groq — both have the applicable safeguards
+          described above. Google Gemini and OpenRouter are disabled by default and are not used for
+          customer content in the default production configuration.
         </p>
         <h3 className="text-base font-semibold mt-4 mb-2">11.7 Duration and Deletion</h3>
         <p className="text-sm">
-          This DPA continues for the duration of the Customer&apos;s use of the Service. Upon termination,
-          and at the Customer&apos;s choice, OmniParse will delete or return personal data processed on
-          the Customer&apos;s behalf, unless applicable law requires retention. Any retained data will
-          remain protected by confidentiality and security obligations and will not be processed for
-          any other purpose. File binaries are deleted within 30 days, and all other personal data
-          (extracted data, audit logs, chat history, IMAP credentials) is deleted within 90 days,
-          except where longer retention is required by law (e.g., financial records under Czech
-          accounting regulations). Backup copies maintained by Supabase for disaster recovery are
-          deleted within 7 days on a rolling basis. This is consistent with the retention schedule
-          in §4 of this Privacy Policy.
+          This DPA continues for the duration of the Customer&apos;s use of the Service. Following
+          termination of the processing services, OmniParse will, at the Customer&apos;s documented request
+          and where technically available, return or make available for export personal data processed on
+          the Customer&apos;s behalf, or delete such personal data in accordance with the retention and
+          deletion schedule below, unless applicable law requires continued retention.
+        </p>
+        <p className="text-sm">
+          File binaries are deleted from active application storage within 30 days. Other personal data
+          associated with the account is deleted within 90 days of account termination, except where
+          longer retention is required by law or where limited retention is necessary for security, legal
+          or backup purposes. Backup copies are removed according to the applicable backup-rotation
+          schedule.
+        </p>
+        <p className="text-sm">
+          Any personal data retained after termination remains subject to applicable confidentiality,
+          security and purpose-limitation obligations and will not be processed for unrelated purposes.
         </p>
         <h3 className="text-base font-semibold mt-4 mb-2">11.8 Subprocessor Authorization</h3>
         <p className="text-sm">
@@ -554,8 +564,8 @@ export default function PrivacyPolicyPage() {
         <ul>
           <li><strong>Who is processing your data:</strong> The OmniParse customer who uploaded the document is the data controller. OmniParse (Simon Curda, natural person, Czech Republic) acts as a processor on their behalf.</li>
           <li><strong>Purposes:</strong> Extraction of structured data from invoices for accounting, accounts-payable, and vendor-management purposes.</li>
-          <li><strong>Legal basis:</strong> Legitimate interest of the customer in efficient invoice processing (GDPR Art. 6(1)(f)).</li>
-          <li><strong>Recipients:</strong> AI inference providers (Mistral, Groq, OpenRouter, Google) and infrastructure providers (Vercel, Supabase, Stripe) — see §6 above.</li>
+          <li><strong>Legal basis:</strong> The applicable legal basis is determined by the customer as data controller. Legitimate interests under GDPR Art. 6(1)(f) may be applicable for ordinary business invoice-processing activities, but the customer is responsible for determining and documenting the appropriate legal basis for its specific processing.</li>
+          <li><strong>Recipients:</strong> Depending on the customer&apos;s configuration and the Service&apos;s applicable production configuration, personal data may be processed by AI inference providers and infrastructure providers listed in §6. Providers disabled by default are not used for customer content unless the applicable configuration is explicitly changed.</li>
           <li><strong>Retention:</strong> Retention depends on the type of data and the applicable retention schedule in Section 4. When a customer deletes a document, OmniParse will delete or anonymize associated data within the applicable operational deletion period, subject to legally required retention, security records and backup-cycle limitations. The customer account termination schedule is described separately in Section 11.7.</li>
           <li><strong>Your rights:</strong> You have rights of access, rectification, erasure, restriction, portability, and objection. To exercise these rights, contact the customer (the controller) directly; if you cannot reach them, contact us at <strong>damr58h@gmail.com</strong> and we will route your request.</li>
           <li><strong>Right to complain:</strong> You may lodge a complaint with the Czech DPA (ÚOOÚ) or with the supervisory authority of your habitual residence.</li>

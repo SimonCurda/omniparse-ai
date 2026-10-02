@@ -313,12 +313,15 @@ export default function TermsOfServicePage() {
         </p>
         <p>
           We do not warrant that the Service will be uninterrupted, error-free, or free of harmful
-          components. We do not warrant that AI extraction results will be accurate or complete.
-          AI providers (Mistral, Groq) may experience rate limits, model deprecations, or outages
-          that affect availability of AI features. Mistral is EU-based (Paris, France); Groq is
-          US-based. OpenRouter and Google Gemini are <strong>disabled by default</strong> and are
-          not used unless explicitly enabled by the operator after completing their own DPA/SCC
-          review (OpenRouter) or AI Studio terms review (Google Gemini).
+          components. We do not warrant that AI extraction results will be accurate or complete. AI
+          providers, including Mistral and Groq, may experience rate limits, model deprecations, or
+          outages that affect availability of AI features.
+        </p>
+        <p>
+          Mistral AI is based in Paris, France. Groq Inc. is based in the United States. OpenRouter
+          and Google Gemini are <strong>disabled by default</strong> and are not used for customer
+          content unless explicitly enabled by the operator following the applicable contractual,
+          data-protection and transfer review.
         </p>
       </section>
 
@@ -440,7 +443,9 @@ export default function TermsOfServicePage() {
         </p>
         <ul className="list-disc pl-6 space-y-1 text-sm">
           <li><strong>Within 14 days of payment, no AI usage:</strong> Full refund on request (see §14 Right of Withdrawal). Contact damr58h@gmail.com.</li>
-          <li><strong>Within 14 days of payment, AI features used:</strong> Right of withdrawal is forfeited under §1837(j) of the Civil Code (digital content with express consent to start). No refund, but you retain access until the end of the billing period.</li>
+          <li>Within 14 days of payment: Consumers retain any statutory right of withdrawal unless and until the applicable statutory conditions for exclusion or loss of that right have been satisfied.</li>
+          <li>Where the consumer has expressly requested that performance begin during the withdrawal period and has provided the legally required acknowledgment concerning the consequences of doing so, the right of withdrawal may cease or be limited to the extent permitted by applicable law.</li>
+          <li>Nothing in this refund policy limits mandatory statutory consumer rights.</li>
           <li><strong>After 14 days, monthly plan:</strong> No refund of the current month&apos;s charge; subscription remains active until end of billing period. No further charges after cancellation.</li>
           <li><strong>After 14 days, annual plan:</strong> Pro-rata refund of unused full months remaining on the plan, less a reasonable administrative fee of EUR 10. Contact damr58h@gmail.com to request a pro-rata refund.</li>
           <li><strong>Service-impacting outage:</strong> If OmniParse experiences a verified outage exceeding 24 consecutive hours that prevents you from using paid features, contact us for a service-credit or pro-rata refund for the affected period.</li>
@@ -462,12 +467,16 @@ export default function TermsOfServicePage() {
           update these Terms without prior notice, with effect from the &quot;Last updated&quot; date.
         </p>
         <p>
-          <strong>For consumer users:</strong> Pursuant to § 1752 of the Civil Code (Act No. 89/2012
-          Coll.), material changes to these Terms that would worsen your position as a consumer take
-          effect only if you expressly agree to them. Your continued use of the Service after the
-          30-day notice period constitutes such express agreement unless you terminate your account
-          before the change takes effect (in which case the previous version of the Terms continues
-          to apply for any open billing period).
+          <strong>For consumer users:</strong> Material changes to these Terms that adversely affect
+          your rights or obligations will not be treated as expressly accepted solely because you
+          continue using the Service. Where applicable law requires express agreement to a material
+          change, OmniParse will obtain that agreement before the change applies to you.
+        </p>
+        <p>
+          Where applicable law permits changes to continuing contracts subject to notice and a right
+          to terminate, OmniParse will provide the required notice and termination opportunity. If
+          you do not agree to a material change, you may terminate your account before the change
+          takes effect, subject to any applicable statutory rights.
         </p>
         <p>
           The &quot;Last updated&quot; date at the top of this page indicates when these Terms were
@@ -509,11 +518,9 @@ export default function TermsOfServicePage() {
           agree that:
         </p>
         <ul className="list-disc pl-6 space-y-1 text-sm">
-          <li>The Service begins immediately upon your first use of AI features (upload, scan, or chat);</li>
-          <li>You acknowledge that you are losing the 14-day right of withdrawal pursuant to § 1837(j)
-          of the Civil Code by requesting the Service to begin during the withdrawal period;</li>
-          <li>This waiver applies only to the AI processing features. You may still delete your account
-          at any time (Settings → Delete Account) without obligation.</li>
+          <li>The Service may begin immediately upon your first use of AI features (upload, scan, or chat).</li>
+          <li>Where the statutory conditions for exclusion of the right of withdrawal are satisfied, you expressly request that performance begin during the withdrawal period and acknowledge the applicable legal consequences described in §1837(j) of the Czech Civil Code and Article 16(m) of Directive 2011/83/EU.</li>
+          <li>This acknowledgment does not affect any statutory rights that cannot lawfully be waived.</li>
         </ul>
         <p>
           <strong>One-click withdrawal button:</strong> Pursuant to Art. 4(2) of Directive (EU)
@@ -555,7 +562,7 @@ export default function TermsOfServicePage() {
           <li><strong>Court of jurisdiction:</strong> For consumer disputes, the court of the consumer&apos;s domicile; for B2B disputes, the competent courts of the Czech Republic.</li>
           <li><strong>Language:</strong> These Terms are available in English. Communication with the provider may be conducted in English or Czech.</li>
           <li><strong>After-sales obligations:</strong> None beyond the warranties and obligations set out in these Terms.</li>
-          <li><strong>Professional liability insurance:</strong> Not maintained (the operator is a natural person acting in a non-commercial capacity); claims are subject to the liability caps in § 10.</li>
+          <li><strong>Professional liability insurance:</strong> No professional liability insurance is currently maintained. This does not exclude or limit any liability that cannot lawfully be excluded or limited under applicable law.</li>
           <li><strong>Code of conduct:</strong> The provider has not subscribed to any code of conduct under § 1753(1)(i) Civil Code.</li>
         </ul>
         <h3 className="text-base font-semibold mt-4 mb-2">Out-of-Court Dispute Resolution (ADR)</h3>
@@ -610,17 +617,15 @@ export default function TermsOfServicePage() {
           You acknowledge and agree that:
         </p>
         <ul className="list-disc pl-6 space-y-1 text-sm">
-          <li>(a) AI-extracted data and chat responses are provided for informational purposes only;</li>
-          <li>(b) OmniParse does not warrant accuracy, completeness, timeliness, or fitness for any specific purpose;</li>
-          <li>(c) You are solely responsible for verifying all extracted data and chat responses against source documents before any use;</li>
-          <li>(d) If you rely on inaccurate AI output for financial decisions, tax filings, legal actions, vendor payments, or any other purpose, OmniParse is not liable for resulting damages, losses, or penalties;</li>
-          <li>(e) The confidence scores provided are model-generated estimates only and do not guarantee accuracy;</li>
-          <li>(f) Chat responses may contain errors, hallucinations, or be out of context — always cross-reference against the underlying invoice records before acting on them;</li>
-          <li>(g) OmniParse may modify, suspend, or discontinue AI features or change AI providers, with reasonable notice for material changes as described in § 7b.</li>
+          <li>(a) AI-extracted data and chat responses are provided for informational and administrative purposes only;</li>
+          <li>(b) OmniParse does not warrant that AI output will be accurate, complete, timely or suitable for any particular purpose;</li>
+          <li>(c) you are responsible for reviewing AI output against the underlying source documents before relying on it;</li>
+          <li>(d) confidence scores are model-generated estimates intended to assist with prioritising review and are not guarantees of accuracy;</li>
+          <li>(e) AI chat responses may contain errors, hallucinations or information that is incomplete or out of context; and</li>
+          <li>(f) OmniParse may modify, suspend or discontinue AI features or change AI providers, subject to the notice requirements described in these Terms.</li>
         </ul>
         <p>
-          By accepting these Terms, you agree that you will not hold OmniParse, its operator, or its
-          AI providers liable for losses arising from reliance on AI output.
+          Any limitation of liability arising from reliance on AI output is subject to §10 and to any liability that cannot lawfully be excluded or limited.
         </p>
       </section>
 
@@ -657,33 +662,13 @@ export default function TermsOfServicePage() {
         <h2>22. Acceptable Use Policy</h2>
         <p>You agree not to:</p>
         <ul className="list-disc pl-6 space-y-1 text-sm">
-          <li>Upload documents you do not have the right to process (copyright, privacy, or other legal restrictions);</li>
-          <li>Upload documents containing personal data of EU data subjects without a valid legal basis for transfer to US-based AI providers;</li>
-          <li>Use automated scraping, bots, or rate-limit bypass tools to overwhelm the Service;</li>
-          <li>Attempt IDOR (insecure direct object reference), prompt injection, SQL injection, XSS, or other exploits against the Service;</li>
-          <li>Upload child sexual abuse material (CSAM), hate speech, content promoting violence or terrorism, or content that is illegal in your jurisdiction or the operator&apos;s jurisdiction (Czech Republic);</li>
-          <li>Use the Service for fraud, money laundering, tax evasion, or any other illegal activity;</li>
-          <li>Reverse-engineer, decompile, or attempt to extract AI model weights, training data, or proprietary algorithms;</li>
-          <li>Resell or sublicense access to the Service without written permission;</li>
-          <li>Interfere with the proper functioning of the Service, including by introducing viruses, malware, or other malicious code.</li>
-          <li>Create multiple accounts to bypass plan limits or rate limits;</li>
-          <li>Use the Service to burn AI provider quotas in an abusive or automated manner.</li>
+          <li>Upload documents that you do not have the right or lawful authority to process, including where doing so would violate copyright, privacy, confidentiality, contractual or other legal restrictions.</li>
+          <li>Upload documents containing personal data of EU data subjects where you do not have an applicable legal basis for the relevant processing or, where applicable, a lawful transfer mechanism for transfers to third-country AI providers.</li>
+          <li>Use automated scraping, bots, or rate-limit bypass tools to overwhelm the Service.</li>
+          <li>Attempt IDOR (insecure direct object reference), prompt injection, SQL injection, XSS, or other attacks or exploits against the Service.</li>
+          <li>Upload child sexual abuse material (CSAM), content that unlawfully promotes violence or terrorism, or other content whose processing or transmission is prohibited by applicable law in your jurisdiction or the operator&apos;s jurisdiction (Czech Republic).</li>
+          <li>Use the Service for fraud, money laundering, tax evasion, or any other unlawful activity.</li>
         </ul>
-        <p>
-          <strong>Account monitoring and enforcement:</strong> We monitor account activity to detect
-          potential abuse, including excessive API usage, rapid account creation, and unusual patterns
-          of document processing. We reserve the right to:
-        </p>
-        <ul className="list-disc pl-6 space-y-1 text-sm mt-2">
-          <li><strong>Freeze</strong> accounts suspected of abuse — the user can still log in but AI features are blocked;</li>
-          <li><strong>Suspend</strong> accounts suspected of abuse, with prior written notice by email where feasible. For paid accounts, we will provide at least 7 days&apos; notice before suspension unless the violation is urgent (e.g., CSAM, ongoing fraud);</li>
-          <li><strong>Delete</strong> accounts that materially violate this Acceptable Use Policy, including all associated data. For paid accounts, you may appeal a deletion decision within 14 days by emailing damr58h@gmail.com;</li>
-          <li><strong>Report</strong> suspected illegal activity to the relevant authorities (Czech Police, ÚOOÚ, Europol).</li>
-        </ul>
-        <p>
-          If your account is frozen, you will see a message indicating the reason when you attempt to
-          use AI features. To request reinstatement, contact <strong>damr58h@gmail.com</strong>.
-        </p>
       </section>
 
       <section>

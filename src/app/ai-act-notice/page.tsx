@@ -36,13 +36,20 @@ export default function AIActNoticePage() {
       <section>
         <h2>2. System Classification</h2>
         <p>
-          Based on the intended purposes and functionality of the Service, we have assessed OmniParse
-          against the high-risk use cases listed in Annex III of the EU AI Act. <strong>OmniParse is not
-          a high-risk AI system</strong> under Annex III, because invoice OCR/extraction and
-          conversational analytics do not fall within any of the high-risk categories listed (which
-          include biometric identification, critical infrastructure management, education/employment
-          decisions, essential private/public services, law enforcement, migration/border control, and
-          justice/democratic processes).
+          Based on the current intended purpose and functionality of the Service, OmniParse does not
+          currently identify a use case that falls within the high-risk categories listed in Annex III
+          of the EU AI Act.
+        </p>
+        <p>
+          The current Service is intended for invoice extraction, document analysis and conversational
+          assistance. It is not intended to perform biometric identification, employment or education
+          decisions, eligibility decisions for essential public or private services, law-enforcement
+          assessments, migration or border-control decisions, or decisions in the administration of
+          justice or democratic processes.
+        </p>
+        <p>
+          The classification of any future feature depends on its specific intended purpose,
+          functionality and manner of deployment and will be assessed separately where required.
         </p>
         <p>
           The Service is subject to applicable transparency requirements under Article 50 of the EU
@@ -128,7 +135,8 @@ export default function AIActNoticePage() {
         <ul>
           <li><strong>Confidence indicators:</strong> Extractions include heuristic confidence indicators to help prioritize manual review. These are not statistical probabilities.</li>
           <li><strong>Manual review:</strong> Users can review, edit, or delete any extracted data at any time.</li>
-          <li><strong>No autonomous decisions:</strong> The AI does not make decisions, categorize individuals, or take actions on its own. It only extracts and presents data for human review. Invoice approvals, payment authorizations, and vendor categorizations require explicit user action.</li>
+          <li><strong>No autonomous high-impact decisions:</strong> In the current production configuration, AI features do not independently approve payments, execute payments, or make decisions about individuals with legal or similarly significant effects. AI extraction, classification and chat outputs are presented as assistive results for user review. Users remain responsible for reviewing and approving material business actions.</li>
+          <li><strong>Future functionality:</strong> If OmniParse introduces features that independently make or materially influence decisions with legal or similarly significant effects concerning individuals, those features will be separately assessed under applicable GDPR and EU AI Act requirements before deployment.</li>
           <li><strong>Feedback loop:</strong> Users can re-upload documents, correct results, and delete inaccurate data.</li>
           <li><strong>Audit trail:</strong> All user actions (edits, approvals, deletions) are logged in the user&apos;s account audit log for traceability.</li>
         </ul>
@@ -139,7 +147,7 @@ export default function AIActNoticePage() {
         <ul>
           <li><strong>Processing by AI providers:</strong> Documents and chat messages are sent to AI providers for inference. Data may be temporarily processed, cached, or retained by AI providers for security, abuse prevention, monitoring, billing, debugging, or other purposes specified in their applicable terms and data-processing agreements. Retention periods and processing locations vary by provider and service configuration.</li>
           <li><strong>Stored on our side:</strong> We retain uploaded documents for up to 30 days in the active application environment. Backup copies, security logs and data processed by third-party providers may be retained for different periods where necessary for security, legal or operational purposes, as described in our Privacy Policy.</li>
-          <li><strong>Model training — production configuration:</strong> <strong>OmniParse itself does not route customer content through AI API tiers that permit provider training on customer content</strong> when the default configuration is in effect. Specifically: (a) we send <code>usage_options=&#123;&quot;enable_training&quot;: false&#125;</code> on every Mistral API call (effective on paid Mistral tier; on free tier, Mistral may ignore or reject this parameter); (b) OpenRouter (whose free-tier models typically permit training on prompt content) is <strong>disabled by default</strong>; (c) Groq&apos;s data-handling terms are governed by the Groq DPA and SCCs; (d) Google Gemini (AI Studio free tier) data-handling is governed by Google&apos;s AI Studio terms — for stronger guarantees, operators may migrate to Vertex AI (out of scope for this deployment). Operators who change this configuration must update the Privacy Policy and this AI Transparency Notice accordingly.</li>
+          <li><strong>Model training — production configuration:</strong> OmniParse does not intentionally route customer content through AI API configurations that are documented by the provider as permitting provider training on customer content when the default production configuration is in effect. Specifically: (a) OmniParse sends <code>usage_options=&#123;&quot;enable_training&quot;: false&#125;</code> on every Mistral API call when <code>MISTRAL_DISABLE_TRAINING=true</code> (the default). This setting is effective on the applicable paid Mistral tier; on a free tier, Mistral may ignore or reject the parameter, and the parameter itself is not represented as an independent guarantee of provider-level data handling; (b) OpenRouter is disabled by default and is not used for customer content unless the operator explicitly enables it after completing the applicable contractual, data-protection and transfer review; (c) Groq processing is governed by the applicable Groq contractual and data-protection terms; and (d) Google Gemini through the Google AI Studio free-tier endpoint is disabled by default and is not used unless the operator explicitly enables it after reviewing the applicable Google AI Studio terms. Operators who change the default provider configuration are responsible for verifying the applicable provider terms, transfer mechanism, retention and training settings and, where necessary, updating the Privacy Policy and this AI Transparency Notice before processing customer content through the changed configuration.</li>
           <li><strong>Important note on free-tier AI APIs:</strong> Some AI providers may have different data handling terms for free/unpaid API tiers compared to paid tiers. We recommend reviewing the applicable provider terms for details. For production use involving personal data, paid API tiers may provide stronger data protection guarantees.</li>
           <li><strong>Metadata logging:</strong> We log API request metadata (timestamps, success/failure, provider used) for operational purposes. We do not log the content of your documents to server logs.</li>
         </ul>
@@ -182,36 +190,36 @@ export default function AIActNoticePage() {
       <section>
         <h2>10. International Transfers</h2>
         <p>
-          AI processing is performed by Mistral AI (EU-based, Paris, France) and Groq Inc. (US — SCCs
-          confirmed). <strong>OpenRouter (US) and Google Gemini (US) are both disabled by default</strong>
-          and are not used unless the operator explicitly enables them after completing their own
-          DPA/SCC review (OpenRouter) or AI Studio terms review (Google Gemini). Under GDPR Chapter V,
-          transfers to the US require appropriate safeguards. We rely on Standard Contractual Clauses
-          (SCCs) consistent with the Schrems II ruling for non-DPF-certified recipients, together with
-          Transfer Impact Assessments (TIAs) where required. The EU-US Data Privacy Framework (DPF)
-          adequacy decision (10 July 2023) covers DPF-certified US recipients — but note that Google&apos;s
-          AI Studio free-tier endpoint is NOT covered by the Google Cloud DPA (which applies to the
-          Vertex AI path only); this is why Google Gemini is disabled by default in our configuration.
+          AI processing in the default production configuration is performed by Mistral AI (EU-based,
+          Paris, France) and Groq Inc. (US-based).
         </p>
-        <div className="border-l-4 border-emerald-500 bg-emerald-500/5 p-3 my-3 rounded-r">
-          <p className="text-sm">
-            <strong className="text-emerald-700 dark:text-emerald-500">SCC Status by provider (as of September 18, 2026):</strong>
-          </p>
-          <ul className="list-disc pl-5 mt-2 text-sm space-y-1">
-            <li><strong>Mistral AI</strong> — EU-based (Paris, France). Transfers are expected to remain within the EEA, subject to Mistral&apos;s applicable terms. No SCC required. Training opt-out (<code>usage_options.enable_training=false</code>) sent on every request when MISTRAL_DISABLE_TRAINING=true (default).</li>
-            <li><strong>Groq Inc.</strong> — SCCs confirmed in effect (DPA dated October 15, 2025; EU SCC Module 2 self-executing upon acceptance of Groq Services Agreement). DPA accessible at <a href="https://console.groq.com" target="_blank" rel="noopener">console.groq.com</a>. Governing law: Ireland. Competent authority: Irish DPC. 72-hour breach notification.</li>
-            <li><strong>Google LLC (Gemini)</strong> — <strong>DISABLED BY DEFAULT</strong>. Uses AI Studio free-tier endpoint (generativelanguage.googleapis.com). The Google Cloud DPA (cloud.google.com/terms/data-processing-addendum) applies to the Vertex AI path, NOT the AI Studio free tier. Google LLC is DPF-certified, but the AI Studio free-tier data-handling terms are weaker than Vertex AI. Operator must set ENABLE_GOOGLE_GEMINI=true after reviewing AI Studio terms. For EU personal data, migrate to Vertex AI.</li>
-            <li><strong>Vercel Inc.</strong> — DPF-certified. DPA available at <a href="https://vercel.com/legal/dpa" target="_blank" rel="noopener">vercel.com/legal/dpa</a>.</li>
-            <li><strong>Stripe Inc.</strong> — DPF-certified. DPA available at <a href="https://stripe.com/legal/dpa" target="_blank" rel="noopener">stripe.com/legal/dpa</a>.</li>
-            <li><strong>OpenRouter</strong> — <strong>DISABLED BY DEFAULT</strong>. No personal data is transferred to OpenRouter unless the operator explicitly sets ENABLE_OPENROUTER=true. Before enabling, the operator must complete a DPA with OpenRouter, verify SCCs or DPF certification, switch to paid-tier models (to disable training), and update this notice.</li>
-          </ul>
-          <p className="text-sm mt-2">
-            <strong className="text-emerald-700 dark:text-emerald-500">Summary:</strong> AI processing via Mistral (EU) and Groq (US, SCCs confirmed) has appropriate safeguards in place. OpenRouter and Google Gemini are disabled by default and are not used unless the operator explicitly enables them. Users should note that documents may contain personal data of multiple data subjects — the user is responsible for ensuring a valid legal basis for processing and transferring such data.
-          </p>
-        </div>
         <p>
-          Your primary database (Supabase) is hosted in Ireland (EU) — no transfer outside the EU for
-          the primary data store.
+          OpenRouter and Google Gemini through Google AI Studio are disabled by default and are not
+          used unless the operator explicitly enables them after completing the applicable contractual,
+          data-protection and transfer review.
+        </p>
+        <p>
+          Where personal data is transferred to a third country, OmniParse relies on an applicable
+          lawful transfer mechanism under GDPR Chapter V, such as an adequacy decision, Standard
+          Contractual Clauses (SCCs), or another lawful mechanism where applicable.
+        </p>
+        <p>
+          For US recipients, the EU-US Data Privacy Framework (DPF) may provide an applicable transfer
+          mechanism where the recipient is covered by the relevant DPF certification. Where an adequacy
+          mechanism does not apply, OmniParse relies on an appropriate GDPR Chapter V safeguard, such
+          as SCCs, together with supplementary measures or a Transfer Impact Assessment where
+          appropriate.
+        </p>
+        <p>
+          Google AI Studio free-tier processing is subject to Google&apos;s applicable AI Studio terms.
+          The Google Cloud Data Processing Addendum applies to the applicable Google Cloud / Vertex AI
+          services and should not be interpreted as automatically applying to Google AI Studio
+          free-tier processing. This is one reason Google Gemini is disabled by default in the
+          production configuration.
+        </p>
+        <p>
+          The primary database is hosted by Supabase in Ireland (EU). The applicable processing
+          locations and transfer safeguards are described in the Privacy Policy.
         </p>
       </section>
 
