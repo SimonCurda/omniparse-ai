@@ -405,6 +405,10 @@ export default function AdminPage() {
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${tab === 'providers' ? 'border-amber-500 text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
             <Cpu className="h-4 w-4 inline mr-1.5" /> AI Providers
           </button>
+          <button onClick={() => setTab('links')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${tab === 'links' ? 'border-amber-500 text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
+            <ExternalLink className="h-4 w-4 inline mr-1.5" /> Links
+          </button>
           <div className="ml-auto flex items-center gap-2">
             <a href="/api-test" className="px-3 py-1.5 text-xs font-medium rounded-lg border border-border text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors inline-flex items-center gap-1">
               <Code className="h-3.5 w-3.5" /> API Tester
@@ -417,9 +421,6 @@ export default function AdminPage() {
                 <FileText className="h-3.5 w-3.5" /> Legal PDF (Admin)
               </a>
             )}
-            <a href="https://chatgpt.com/share/6aae75e5-2a3c-83eb-b853-586c2ad00967?ogimg=plain" target="_blank" rel="noopener" className="px-3 py-1.5 text-xs font-medium rounded-lg border border-border text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors inline-flex items-center gap-1">
-              <ExternalLink className="h-3.5 w-3.5" /> Links
-            </a>
           </div>
         </div>
 
@@ -713,6 +714,57 @@ export default function AdminPage() {
                   fail, the chat returns an error (no fallback to disabled providers).
                 </p>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* === LINKS TAB === */}
+        {tab === 'links' && (
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold">Useful Links</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <a href="https://chatgpt.com/share/6aae75e5-2a3c-83eb-b853-586c2ad00967?ogimg=plain" target="_blank" rel="noopener"
+                className="flex items-center gap-3 p-4 rounded-lg border border-border bg-card hover:bg-muted/30 transition-colors">
+                <ExternalLink className="h-5 w-5 text-amber-500 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground">ChatGPT Conversation</p>
+                  <p className="text-xs text-muted-foreground truncate">Development notes & context</p>
+                </div>
+              </a>
+              <a href="/api-test"
+                className="flex items-center gap-3 p-4 rounded-lg border border-border bg-card hover:bg-muted/30 transition-colors">
+                <Code className="h-5 w-5 text-amber-500 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground">API Tester</p>
+                  <p className="text-xs text-muted-foreground truncate">Test extraction API in browser</p>
+                </div>
+              </a>
+              <a href="/api-docs"
+                className="flex items-center gap-3 p-4 rounded-lg border border-border bg-card hover:bg-muted/30 transition-colors">
+                <ExternalLink className="h-5 w-5 text-amber-500 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground">API Documentation</p>
+                  <p className="text-xs text-muted-foreground truncate">REST API docs & examples</p>
+                </div>
+              </a>
+              {secret && (
+                <a href={`/api/admin/legal-pdf?key=${encodeURIComponent(secret)}`} target="_blank" rel="noopener"
+                  className="flex items-center gap-3 p-4 rounded-lg border border-border bg-card hover:bg-muted/30 transition-colors">
+                  <FileText className="h-5 w-5 text-amber-500 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground">Legal PDF (Admin)</p>
+                    <p className="text-xs text-muted-foreground truncate">Full legal docs with developer notes</p>
+                  </div>
+                </a>
+              )}
+              <a href="/OmniParse-Legal-Documents-Public.pdf" target="_blank" rel="noopener"
+                className="flex items-center gap-3 p-4 rounded-lg border border-border bg-card hover:bg-muted/30 transition-colors">
+                <FileText className="h-5 w-5 text-amber-500 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground">Legal PDF (Public)</p>
+                  <p className="text-xs text-muted-foreground truncate">Customer-facing legal documents</p>
+                </div>
+              </a>
             </div>
           </div>
         )}
