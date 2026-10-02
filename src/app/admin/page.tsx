@@ -5,7 +5,7 @@ import {
   Shield, ShieldAlert, ShieldCheck, Snowflake, Trash2, RefreshCw,
   Search, AlertTriangle, Users, FileText, MessageSquare, Mail, Loader2,
   ArrowUpDown, ArrowUp, ArrowDown, History, EyeOff, Eye, Star,
-  Cpu, CheckCircle2, XCircle, Code, ExternalLink,
+  Cpu, CheckCircle2, XCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -15,8 +15,6 @@ interface AccountStats {
   emailInboxes: number;
   pendingReviews: number;
   auditLogs: number;
-  apiKeys: number;
-  apiCallsThisMonth: number;
 }
 
 interface AbuseRisk {
@@ -414,6 +412,9 @@ export default function AdminPage() {
             <a href="/api-docs" className="px-3 py-1.5 text-xs font-medium rounded-lg border border-border text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors inline-flex items-center gap-1">
               <ExternalLink className="h-3.5 w-3.5" /> API Docs
             </a>
+            <a href="/OmniParse-Legal-Documents-Admin.pdf" target="_blank" rel="noopener" className="px-3 py-1.5 text-xs font-medium rounded-lg border border-border text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors inline-flex items-center gap-1">
+              <FileText className="h-3.5 w-3.5" /> Legal PDF (Admin)
+            </a>
           </div>
         </div>
 
@@ -461,9 +462,6 @@ export default function AdminPage() {
                       <th className="text-center px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground hidden lg:table-cell" onClick={() => handleSort('inboxes')}>
                         Inboxes <SortIcon field="inboxes" sortField={sortField} sortDir={sortDir} />
                       </th>
-                      <th className="text-center px-4 py-3 font-medium text-muted-foreground hidden xl:table-cell">
-                        API Keys
-                      </th>
                       <th className="text-center px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground hidden lg:table-cell" onClick={() => handleSort('age')}>
                         Age <SortIcon field="age" sortField={sortField} sortDir={sortDir} />
                       </th>
@@ -509,16 +507,6 @@ export default function AdminPage() {
                         <td className="px-4 py-3 text-center font-mono text-xs">{acc.stats.invoices}</td>
                         <td className="px-4 py-3 text-center font-mono text-xs hidden md:table-cell">{acc.stats.chatSessions}</td>
                         <td className="px-4 py-3 text-center font-mono text-xs hidden lg:table-cell">{acc.stats.emailInboxes}</td>
-                        <td className="px-4 py-3 text-center hidden xl:table-cell">
-                          {acc.stats.apiKeys > 0 ? (
-                            <div className="flex flex-col items-center">
-                              <span className="font-mono text-xs font-medium text-foreground">{acc.stats.apiKeys} key{acc.stats.apiKeys > 1 ? 's' : ''}</span>
-                              <span className="text-[10px] text-muted-foreground">{acc.stats.apiCallsThisMonth} calls/mo</span>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
-                          )}
-                        </td>
                         <td className="px-4 py-3 text-center font-mono text-xs hidden lg:table-cell">{acc.ageDays}d</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-center gap-1">
