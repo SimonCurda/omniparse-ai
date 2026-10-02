@@ -417,6 +417,9 @@ export default function AdminPage() {
                 <FileText className="h-3.5 w-3.5" /> Legal PDF (Admin)
               </a>
             )}
+            <a href="https://chatgpt.com/share/6aae75e5-2a3c-83eb-b853-586c2ad00967?ogimg=plain" target="_blank" rel="noopener" className="px-3 py-1.5 text-xs font-medium rounded-lg border border-border text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors inline-flex items-center gap-1">
+              <ExternalLink className="h-3.5 w-3.5" /> Links
+            </a>
           </div>
         </div>
 
