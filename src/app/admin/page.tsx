@@ -405,10 +405,6 @@ export default function AdminPage() {
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${tab === 'providers' ? 'border-amber-500 text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
             <Cpu className="h-4 w-4 inline mr-1.5" /> AI Providers
           </button>
-          <button onClick={() => setTab('links')}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${tab === 'links' ? 'border-amber-500 text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
-            <ExternalLink className="h-4 w-4 inline mr-1.5" /> Links
-          </button>
           <div className="ml-auto flex items-center gap-2">
             <a href="/api-test" className="px-3 py-1.5 text-xs font-medium rounded-lg border border-border text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors inline-flex items-center gap-1">
               <Code className="h-3.5 w-3.5" /> API Tester
@@ -421,6 +417,9 @@ export default function AdminPage() {
                 <FileText className="h-3.5 w-3.5" /> Legal PDF (Admin)
               </a>
             )}
+            <button onClick={() => setTab('links')} className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors inline-flex items-center gap-1 ${tab === 'links' ? 'border-amber-500 bg-amber-500/10 text-amber-500' : 'border-border text-muted-foreground hover:bg-muted/50 hover:text-foreground'}`}>
+              <ExternalLink className="h-3.5 w-3.5" /> Links
+            </button>
           </div>
         </div>
 
