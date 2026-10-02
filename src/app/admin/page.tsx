@@ -5,7 +5,7 @@ import {
   Shield, ShieldAlert, ShieldCheck, Snowflake, Trash2, RefreshCw,
   Search, AlertTriangle, Users, FileText, MessageSquare, Mail, Loader2,
   ArrowUpDown, ArrowUp, ArrowDown, History, EyeOff, Eye, Star,
-  Cpu, CheckCircle2, XCircle,
+  Cpu, CheckCircle2, XCircle, Code, ExternalLink,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -412,9 +412,11 @@ export default function AdminPage() {
             <a href="/api-docs" className="px-3 py-1.5 text-xs font-medium rounded-lg border border-border text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors inline-flex items-center gap-1">
               <ExternalLink className="h-3.5 w-3.5" /> API Docs
             </a>
-            <a href="/OmniParse-Legal-Documents-Admin.pdf" target="_blank" rel="noopener" className="px-3 py-1.5 text-xs font-medium rounded-lg border border-border text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors inline-flex items-center gap-1">
-              <FileText className="h-3.5 w-3.5" /> Legal PDF (Admin)
-            </a>
+            {secret && (
+              <a href={`/api/admin/legal-pdf?key=${encodeURIComponent(secret)}`} target="_blank" rel="noopener" className="px-3 py-1.5 text-xs font-medium rounded-lg border border-border text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors inline-flex items-center gap-1">
+                <FileText className="h-3.5 w-3.5" /> Legal PDF (Admin)
+              </a>
+            )}
           </div>
         </div>
 
