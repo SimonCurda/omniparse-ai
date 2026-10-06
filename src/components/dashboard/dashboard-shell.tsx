@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { useAppStore } from '@/stores/app-store';
+import type { InvoiceRow } from '@/stores/app-store';
 import { loadShortcuts, DEFAULT_SHORTCUTS } from '@/lib/shortcuts';
 
 const PLAN_LIMITS: Record<string, number> = { free: 15, pro: 500, plus: 2000, business: 10000, enterprise: Infinity };
@@ -90,6 +91,9 @@ export function DashboardShell() {
           lifecycleStatus: inv.lifecycleStatus,
           entityId: inv.entityId,
           lineItems: inv.lineItems,
+          labels: Array.isArray(inv.labels) ? (inv.labels as InvoiceRow['labels']) : undefined,
+          rawExtraction: inv.rawExtraction,
+          updatedAt: inv.updatedAt,
         }))))
         .catch(() => {});
 

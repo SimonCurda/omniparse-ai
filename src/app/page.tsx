@@ -62,6 +62,7 @@ export default function Home() {
               createdAt: data.user.createdAt,
               emailVerified: data.user.emailVerified,
               emailVerifiedRequired: data.user.emailVerifiedRequired,
+              debugEnabled: data.user.debugEnabled,
             });
             setInvoices([]);
             setView('dashboard');
@@ -131,6 +132,7 @@ export default function Home() {
                       createdAt: meData.user.createdAt,
                       emailVerified: meData.user.emailVerified,
                       emailVerifiedRequired: meData.user.emailVerifiedRequired,
+                      debugEnabled: meData.user.debugEnabled,
                     });
                   }
                 })
@@ -164,6 +166,7 @@ export default function Home() {
               createdAt: data.user.createdAt,
               emailVerified: data.user.emailVerified,
               emailVerifiedRequired: data.user.emailVerifiedRequired,
+              debugEnabled: data.user.debugEnabled,
             });
           }
         })

@@ -106,6 +106,7 @@ export function AuthView({ mode, onSwitch, onBack }: { mode: 'login' | 'signup';
         name: data.user.name,
         plan: data.user.plan,
         createdAt: data.user.createdAt,
+        debugEnabled: data.user.debugEnabled,
       };
 
       setUser(userProfile);

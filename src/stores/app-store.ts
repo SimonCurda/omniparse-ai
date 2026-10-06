@@ -38,6 +38,7 @@ export interface InvoiceRow {
   lifecycleStatus?: string | null;
   entityId?: string | null;
   lineItems?: unknown[] | null;
+  labels?: Array<{ label: { id: string; name: string; color: string } }>;
 }
 
 export interface UserProfile {
@@ -52,6 +53,7 @@ export interface UserProfile {
   githubId?: boolean;
   emailVerified?: string | null;
   emailVerifiedRequired?: boolean;
+  debugEnabled?: boolean;
 }
 
 export type ArtifactType = "table" | "chart-bar" | "chart-line" | "chart-pie" | "summary";
@@ -155,6 +157,7 @@ export const useAppStore = create<AppState>((set) => ({
           lifecycleStatus: inv.lifecycleStatus,
           entityId: inv.entityId,
           updatedAt: inv.updatedAt,
+          labels: Array.isArray(inv.labels) ? (inv.labels as InvoiceRow['labels']) : undefined,
         })) });
       }
     } catch {
