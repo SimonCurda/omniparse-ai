@@ -51,6 +51,7 @@ export async function GET(req: NextRequest) {
         active: true,
         hidden: true,
         starred: true,
+        debugEnabled: true,
         _count: {
           select: {
             invoices: true,
@@ -129,6 +130,7 @@ export async function GET(req: NextRequest) {
           active: user.active,
           hidden: user.hidden,
           starred: user.starred,
+          debugEnabled: user.debugEnabled,
           stats: {
             invoices: user._count.invoices,
             chatSessions: user._count.chatSessions,

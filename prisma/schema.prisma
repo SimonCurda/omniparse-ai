@@ -63,6 +63,9 @@ model User {
   hidden           Boolean  @default(false)
   // Admin can star/mark accounts for easy spotting between many users
   starred           Boolean  @default(false)
+  // Admin can enable debug mode for specific accounts — shows a "Debug" button
+  // on the upload tab that displays parse diagnostic logs
+  debugEnabled      Boolean  @default(false)
   // Hard monthly parse counter — tracks total invoices PARSED per month,
   // NOT just existing ones. If a Free user parses 15 invoices, deletes
   // them all, they STILL can't parse more this month. Counter resets
@@ -82,6 +85,7 @@ model User {
   emailInboxes     EmailInbox[]
   emailBlocklist   EmailBlocklist[]
   pendingReviews   PendingReview[]
+  parseDebugLogs   ParseDebugLog[]
 }
 
 model Entity {
@@ -389,4 +393,37 @@ model StripeEvent {
   @@index([eventType])
   @@index([userId])
   @@index([createdAt])
+}
+
+// ─── Parse Debug Logs ──────────────────────────────────────────────────────
+model ParseDebugLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  filename  String?
+  fileType  String?
+  logs      Json
+  success   Boolean  @default(false)
+  error     String?
+  createdAt DateTime @default(now())
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// ─── Model Health Monitoring ────────────────────────────────────────────────
+model ModelHealthLog {
+  id              String   @id @default(cuid())
+  provider        String
+  modelName       String
+  status          String
+  statusCode      Int?
+  responseTimeMs  Int?
+  deprecationDate String?
+  replacementModel String?
+  notes           String?
+  checkedAt       DateTime @default(now())
+  @@index([provider])
+  @@index([modelName])
+  @@index([checkedAt])
+  @@index([status])
 }
