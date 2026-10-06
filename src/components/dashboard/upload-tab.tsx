@@ -5,13 +5,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
-import { Upload, FileText, Sparkles, Loader2, AlertCircle, ShieldCheck, ShieldAlert, ShieldX, Timer, CheckCircle, TriangleAlert } from 'lucide-react';
+import { Upload, FileText, Sparkles, Loader2, AlertCircle, ShieldCheck, ShieldAlert, ShieldX, Timer, CheckCircle, TriangleAlert, Bug, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAppStore } from '@/stores/app-store';
 import type { InvoiceRow } from '@/stores/app-store';
 import { ConfidenceMeter } from './confidence-meter';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 function getToken(): string | null {
   return localStorage.getItem('op_token');
@@ -49,6 +50,85 @@ export function UploadTab() {
   const [legalConsent, setLegalConsent] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { setInvoices, invoices, user } = useAppStore();
+
+  // Debug logs — only visible when an admin has flipped user.debugEnabled = true
+  // for this account (see /api/admin/accounts/[id]/debug). When enabled, the
+  // upload tab shows a "Debug Logs" button that opens a dialog listing the
+  // last 20 ParseDebugLog entries for this user. The dialog can also clear
+  // the logs via DELETE /api/parse-debug-logs.
+  const debugEnabled = user?.debugEnabled === true;
+  const [debugLogsOpen, setDebugLogsOpen] = useState(false);
+  const [debugLogs, setDebugLogs] = useState<
+    Array<{
+      id: string;
+      filename: string | null;
+      fileType: string | null;
+      logs: Array<{ timestamp?: string; step?: string; data?: unknown }>;
+      success: boolean;
+      error: string | null;
+      createdAt: string;
+    }>
+  >([]);
+  const [debugLogsLoading, setDebugLogsLoading] = useState(false);
+
+  const openDebugLogs = async () => {
+    setDebugLogsOpen(true);
+    setDebugLogsLoading(true);
+    try {
+      const token = getToken();
+      if (!token) return;
+      const res = await fetch('/api/parse-debug-logs', {
+        headers: { Authorization: 'Bearer ' + token },
+      });
+      const data = await res.json();
+      if (res.ok && Array.isArray(data.logs)) {
+        setDebugLogs(data.logs);
+      } else if (!res.ok) {
+        toast.error(data.error || 'Failed to load debug logs');
+      }
+    } catch {
+      toast.error('Network error loading debug logs');
+    } finally {
+      setDebugLogsLoading(false);
+    }
+  };
+
+  const clearDebugLogs = async () => {
+    setDebugLogsLoading(true);
+    try {
+      const token = getToken();
+      if (!token) return;
+      const res = await fetch('/api/parse-debug-logs', {
+        method: 'DELETE',
+        headers: { Authorization: 'Bearer ' + token },
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setDebugLogs([]);
+        toast.success(`Cleared ${data.deleted ?? 0} log entr${(data.deleted ?? 0) === 1 ? 'y' : 'ies'}`);
+      } else {
+        toast.error(data.error || 'Failed to clear logs');
+      }
+    } catch {
+      toast.error('Network error clearing logs');
+    } finally {
+      setDebugLogsLoading(false);
+    }
+  };
+
+  // Truncate debug log data values so they fit in the dialog without
+  // overwhelming the screen — 200 chars is enough to spot the relevant
+  // fragment without losing the shape of the payload.
+  const truncateData = (val: unknown): string => {
+    if (val == null) return '';
+    let str: string;
+    if (typeof val === 'string') {
+      str = val;
+    } else {
+      try { str = JSON.stringify(val); } catch { str = String(val); }
+    }
+    return str.length > 200 ? str.slice(0, 200) + '…' : str;
+  };
 
   // Load consent from localStorage on mount
   useEffect(() => {
@@ -235,8 +315,25 @@ export function UploadTab() {
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div>
-        <h2 className="text-2xl font-bold">Upload Documents</h2>
-        <p className="text-muted-foreground mt-1">Drop invoices or receipts to extract structured data using AI.</p>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <h2 className="text-2xl font-bold">Upload Documents</h2>
+            <p className="text-muted-foreground mt-1">Drop invoices or receipts to extract structured data using AI.</p>
+          </div>
+          {debugEnabled && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={openDebugLogs}
+              className="gap-1.5"
+              title="View parse diagnostic logs (admin debug mode)"
+            >
+              <Bug className="h-4 w-4" />
+              Debug Logs
+            </Button>
+          )}
+        </div>
       </div>
 
       {showWelcome && invoices.length === 0 && (
@@ -435,6 +532,140 @@ export function UploadTab() {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Debug Logs dialog — only rendered when debugEnabled so the Dialog
+          component is never mounted for non-debug users (defence in depth). */}
+      {debugEnabled && (
+        <Dialog open={debugLogsOpen} onOpenChange={setDebugLogsOpen}>
+          <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Bug className="h-5 w-5 text-amber-500" />
+                Parse Debug Logs
+                <Badge variant="secondary" className="ml-1 text-[10px]">
+                  {debugLogs.length} {debugLogs.length === 1 ? 'entry' : 'entries'}
+                </Badge>
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="flex-1 overflow-y-auto pr-1 -mr-1 space-y-3">
+              {debugLogsLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : debugLogs.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <Bug className="h-10 w-10 text-muted-foreground/30 mb-3" />
+                  <p className="text-sm font-medium text-muted-foreground">No debug logs yet</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Logs are recorded each time you upload a document while debug mode is on.
+                  </p>
+                </div>
+              ) : (
+                debugLogs.map((entry) => (
+                  <div
+                    key={entry.id}
+                    className={
+                      'rounded-lg border p-3 ' +
+                      (entry.success
+                        ? 'border-emerald-500/20 bg-emerald-500/5'
+                        : 'border-red-500/20 bg-red-500/5')
+                    }
+                  >
+                    {/* Header row: filename, success badge, timestamp */}
+                    <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <span className="text-sm font-medium truncate">
+                          {entry.filename || 'Unknown file'}
+                        </span>
+                        {entry.fileType && (
+                          <Badge variant="secondary" className="text-[10px] shrink-0">
+                            {entry.fileType}
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {entry.success ? (
+                          <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 text-[10px] gap-1">
+                            <CheckCircle className="h-3 w-3" /> Success
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="bg-red-500/10 text-red-600 text-[10px] gap-1">
+                            <AlertCircle className="h-3 w-3" /> Failed
+                          </Badge>
+                        )}
+                        <span className="text-[10px] text-muted-foreground">
+                          {new Date(entry.createdAt).toLocaleString('en-US', {
+                            year: 'numeric', month: 'short', day: 'numeric',
+                            hour: '2-digit', minute: '2-digit', second: '2-digit',
+                          })}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Error message (if any) */}
+                    {entry.error && (
+                      <p className="text-xs text-red-500 font-mono bg-red-500/5 border border-red-500/20 rounded p-2 mb-2 break-all">
+                        {entry.error}
+                      </p>
+                    )}
+
+                    {/* Step list */}
+                    {Array.isArray(entry.logs) && entry.logs.length > 0 ? (
+                      <ol className="space-y-1.5">
+                        {entry.logs.map((step, i) => (
+                          <li key={i} className="text-xs">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {step.timestamp && (
+                                <span className="font-mono text-[10px] text-muted-foreground shrink-0">
+                                  {new Date(step.timestamp).toLocaleTimeString('en-US', { hour12: false })}
+                                </span>
+                              )}
+                              <span className="font-medium text-foreground shrink-0">
+                                {step.step || `Step ${i + 1}`}
+                              </span>
+                            </div>
+                            {step.data != null && (
+                              <pre className="mt-0.5 ml-[6.5rem] font-mono text-[11px] text-muted-foreground whitespace-pre-wrap break-all">
+                                {truncateData(step.data)}
+                              </pre>
+                            )}
+                          </li>
+                        ))}
+                      </ol>
+                    ) : (
+                      <p className="text-xs text-muted-foreground italic">No steps recorded.</p>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Footer actions */}
+            <div className="flex items-center justify-between gap-2 pt-3 border-t">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={clearDebugLogs}
+                disabled={debugLogsLoading || debugLogs.length === 0}
+                className="gap-1.5 text-red-600 hover:text-red-700 hover:bg-red-500/10"
+              >
+                <Trash2 className="h-4 w-4" />
+                Clear logs
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => setDebugLogsOpen(false)}
+              >
+                Close
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );

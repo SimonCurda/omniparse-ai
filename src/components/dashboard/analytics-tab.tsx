@@ -13,6 +13,7 @@ import {
   FileText, DollarSign, TrendingUp, TrendingDown, Receipt, BarChart3 as BarChart3Icon,
   AlertTriangle, CheckCircle, Clock, Zap, Users, ShieldAlert, ShieldCheck, Lock,
   Building2, Loader2,
+  ChevronDown, ChevronUp, EyeOff, Eye, Tag,
 } from 'lucide-react';
 import { useAppStore } from '@/stores/app-store';
 import type { InvoiceRow } from '@/stores/app-store';
@@ -319,6 +320,120 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
       .finally(() => setVendorScorecardLoading(false));
   }, [isBusiness]);
 
+  // --- Feature flag: show "Cost Per Invoice" metric ---
+  // Defaults to true (matches the code-level default in src/lib/feature-flags.ts)
+  // so the metric shows immediately on first paint. The flag is then fetched
+  // and the metric is hidden if the admin has flipped it off.
+  const [showCostPerInvoice, setShowCostPerInvoice] = useState(true);
+
+  useEffect(() => {
+    const token = localStorage.getItem('op_token');
+    if (!token) return;
+    fetch('/api/feature-flags', { headers: { Authorization: 'Bearer ' + token } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data && typeof data.show_cost_per_invoice === 'boolean') {
+          setShowCostPerInvoice(data.show_cost_per_invoice);
+        }
+      })
+      .catch(() => { /* leave default on */ });
+  }, []);
+
+  // --- Collapsible Duplicates state ---
+  // Duplicates detected by `analyzeBatch` are shown newest-first by default
+  // (limited to 3). The user can:
+  //   • expand to see all of them ("Show all N (X more)")
+  //   • dismiss an individual duplicate with "I've checked it" — the dismissal
+  //     is persisted to localStorage so it survives reloads. The set of hidden
+  //     duplicate keys is keyed by the sorted join of the duplicate's invoice
+  //     ids, which is stable across re-renders.
+  //   • toggle "Show hidden" to surface previously-dismissed duplicates.
+  const [duplicatesExpanded, setDuplicatesExpanded] = useState(false);
+  const [showHiddenDuplicates, setShowHiddenDuplicates] = useState(false);
+  const [hiddenDuplicateKeys, setHiddenDuplicateKeys] = useState<string[]>([]);
+  const HIDDEN_DUP_KEY = 'op_hidden_duplicates';
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(HIDDEN_DUP_KEY);
+      if (saved) {
+        const arr = JSON.parse(saved);
+        if (Array.isArray(arr)) setHiddenDuplicateKeys(arr.filter((k) => typeof k === 'string'));
+      }
+    } catch { /* localStorage unavailable */ }
+  }, []);
+
+  const hideDuplicate = (key: string) => {
+    setHiddenDuplicateKeys((prev) => {
+      if (prev.includes(key)) return prev;
+      const next = [...prev, key];
+      try { localStorage.setItem(HIDDEN_DUP_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  };
+
+  const unhideDuplicate = (key: string) => {
+    setHiddenDuplicateKeys((prev) => {
+      const next = prev.filter((k) => k !== key);
+      try { localStorage.setItem(HIDDEN_DUP_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  };
+
+  // --- Vendor Scorecard collapse state ---
+  // Show only the top-3 vendors by spend by default — the full list can be
+  // long, and most users only care about the biggest ones.
+  const [vendorScorecardExpanded, setVendorScorecardExpanded] = useState(false);
+
+  // --- Labels breakdown ---
+  // Groups invoices by their assigned labels (see InvoiceRow.labels). Each
+  // label is rendered as a clickable card that expands to show the individual
+  // invoices that share that label, along with per-currency totals and vendor
+  // counts. Unlabelled invoices are excluded from this card.
+  const [expandedLabels, setExpandedLabels] = useState<Set<string>>(new Set());
+
+  const labelGroups = useMemo(() => {
+    const map: Record<string, {
+      id: string;
+      name: string;
+      color: string;
+      invoices: InvoiceRow[];
+      totals: Record<string, number>;
+      vendors: Set<string>;
+    }> = {};
+    for (const inv of invoices) {
+      if (!inv.labels || inv.labels.length === 0) continue;
+      for (const entry of inv.labels) {
+        const lbl = entry?.label;
+        if (!lbl || !lbl.id) continue;
+        if (!map[lbl.id]) {
+          map[lbl.id] = {
+            id: lbl.id,
+            name: lbl.name || 'Untitled',
+            color: lbl.color || '#71717a',
+            invoices: [],
+            totals: {},
+            vendors: new Set(),
+          };
+        }
+        map[lbl.id].invoices.push(inv);
+        const cur = (inv.currency || 'USD').toUpperCase();
+        map[lbl.id].totals[cur] = (map[lbl.id].totals[cur] || 0) + (inv.total ?? 0);
+        if (inv.vendor) map[lbl.id].vendors.add(inv.vendor);
+      }
+    }
+    return Object.values(map).sort((a, b) => b.invoices.length - a.invoices.length);
+  }, [invoices]);
+
+  const toggleLabel = (id: string) => {
+    setExpandedLabels((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   // --- Stats row data ---
   const stats = [
     { label: 'Documents Parsed', value: totalParsed, icon: FileText, color: 'text-amber-500' },
@@ -417,6 +532,126 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
             </CardContent>
           </Card>
 
+          {/* ============ Labels Section ============ */}
+          {/* Shows per-label invoice counts, per-currency totals, and vendor
+              counts. Each label card is clickable to expand and show the
+              individual invoices that share that label. Hidden entirely when
+              the user has no labelled invoices. */}
+          {labelGroups.length > 0 && (
+            <Card data-glow data-glow-border-only className="glass-card border-border/50">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Tag className="h-4 w-4 text-amber-500" />
+                  Labels
+                  <Badge variant="secondary" className="bg-muted text-muted-foreground border-0 text-xs ml-auto">
+                    {labelGroups.length} {labelGroups.length === 1 ? 'label' : 'labels'}
+                  </Badge>
+                </CardTitle>
+                <CardDescription>
+                  Click a label to expand and see the invoices grouped under it.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {labelGroups.map((grp) => {
+                    const isExpanded = expandedLabels.has(grp.id);
+                    const totalStr = Object.entries(grp.totals)
+                      .map(([cur, total]) => fmtCurrency(total, cur))
+                      .join(' + ');
+                    return (
+                      <div
+                        key={grp.id}
+                        className="rounded-lg border bg-muted/30 overflow-hidden"
+                      >
+                        {/* Clickable header */}
+                        <button
+                          type="button"
+                          onClick={() => toggleLabel(grp.id)}
+                          className="w-full text-left p-3 hover:bg-muted/60 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40"
+                          aria-expanded={isExpanded}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span
+                                className="inline-block h-3 w-3 rounded-full shrink-0"
+                                style={{ backgroundColor: grp.color }}
+                                aria-hidden
+                              />
+                              <span className="text-sm font-semibold text-foreground truncate">{grp.name}</span>
+                            </div>
+                            {isExpanded ? (
+                              <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                            )}
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1.5 space-y-0.5">
+                            <div className="flex justify-between">
+                              <span>Invoices</span>
+                              <span className="font-medium text-foreground">{grp.invoices.length}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Total</span>
+                              <span className="font-medium text-foreground">{totalStr || fmtCurrency(0)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Vendors</span>
+                              <span className="font-medium text-foreground">{grp.vendors.size}</span>
+                            </div>
+                          </div>
+                        </button>
+
+                        {/* Expanded invoice list */}
+                        {isExpanded && (
+                          <div className="border-t border-border/50 bg-background/40">
+                            <ScrollArea className="max-h-64">
+                              <div className="divide-y divide-border/40">
+                                {grp.invoices.map((inv) => (
+                                  <div key={inv.id} className="px-3 py-2 text-xs">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <span className="font-medium text-foreground truncate">
+                                        {inv.vendor || 'Unknown'}
+                                      </span>
+                                      <span className="font-mono text-foreground shrink-0">
+                                        {fmtCurrency(inv.total ?? 0, inv.currency)}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center justify-between gap-2 mt-0.5 text-muted-foreground">
+                                      <span className="truncate">
+                                        {inv.invNumber || 'No #'}
+                                      </span>
+                                      <span className="shrink-0">
+                                        {inv.invDate
+                                          ? new Date(inv.invDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+                                          : '—'}
+                                      </span>
+                                    </div>
+                                    {inv.confidence != null && (
+                                      <div className="flex items-center justify-between gap-2 mt-0.5">
+                                        <span className="text-muted-foreground">Confidence</span>
+                                        <span className={
+                                          inv.confidence >= 0.9 ? 'text-emerald-500 font-medium'
+                                          : inv.confidence >= 0.75 ? 'text-amber-500 font-medium'
+                                          : 'text-red-500 font-medium'
+                                        }>
+                                          {(inv.confidence * 100).toFixed(1)}%
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </ScrollArea>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* ============ Cost Metrics Section ============ */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card data-glow data-glow-border-only className="glass-card border-border/50">
@@ -447,12 +682,14 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
                       {metrics.avgProcessingTime.toFixed(1)}s
                     </span>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Cost Per Invoice</span>
-                    <span className="text-sm font-semibold text-emerald-500">
-                      {fmtCurrency(metrics.costPerInvoice, 'USD')}
-                    </span>
-                  </div>
+                  {showCostPerInvoice && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Cost Per Invoice</span>
+                      <span className="text-sm font-semibold text-emerald-500">
+                        {fmtCurrency(metrics.costPerInvoice, 'USD')}
+                      </span>
+                    </div>
+                  )}
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Total Processed</span>
                     <span className="text-sm font-semibold text-foreground">
@@ -728,33 +965,108 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
                   </div>
                 </div>
 
-                {/* Duplicates */}
-                {batchAnalysis.duplicates.length > 0 && (
-                  <div>
-                    <div className="flex items-center gap-2 mb-3">
-                      <AlertTriangle className="h-4 w-4 text-red-500" />
-                      <p className="text-sm font-medium text-foreground">
-                        Duplicates Detected ({batchAnalysis.duplicates.length})
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      {batchAnalysis.duplicates.map((dup, i) => (
-                        <div
-                          key={i}
-                          className="flex items-start gap-3 p-3 bg-red-500/5 border border-red-500/20 rounded-lg"
+                {/* Duplicates — collapsible with per-row "I've checked it"
+                    dismissals persisted to localStorage. Newest 3 are shown
+                    by default; the rest are revealed by "Show all N (X more)".
+                    A "Show hidden" toggle re-surfaces previously-dismissed
+                    duplicates for re-review. */}
+                {batchAnalysis.duplicates.length > 0 && (() => {
+                  // Build a stable key per duplicate so dismissal survives
+                  // reloads even if the array order changes.
+                  const keyed = batchAnalysis.duplicates.map((dup) => ({
+                    ...dup,
+                    key: [...dup.ids].sort().join(','),
+                  }));
+                  const visible = keyed.filter((d) => !hiddenDuplicateKeys.includes(d.key));
+                  const hidden = keyed.filter((d) => hiddenDuplicateKeys.includes(d.key));
+                  const baseList = showHiddenDuplicates ? keyed : visible;
+                  const showCount = duplicatesExpanded ? baseList.length : Math.min(3, baseList.length);
+                  const shown = baseList.slice(0, showCount);
+                  const remaining = baseList.length - shown.length;
+                  return (
+                    <div>
+                      <div className="flex items-center gap-2 mb-3 flex-wrap">
+                        <AlertTriangle className="h-4 w-4 text-red-500" />
+                        <p className="text-sm font-medium text-foreground">
+                          Duplicates Detected ({batchAnalysis.duplicates.length})
+                        </p>
+                        {hidden.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setShowHiddenDuplicates((v) => !v)}
+                            className="ml-auto inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                            title={showHiddenDuplicates ? 'Hide dismissed duplicates' : 'Show dismissed duplicates'}
+                          >
+                            {showHiddenDuplicates ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                            {showHiddenDuplicates ? 'Hide dismissed' : `Show dismissed (${hidden.length})`}
+                          </button>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        {shown.map((dup, i) => {
+                          const isHidden = hiddenDuplicateKeys.includes(dup.key);
+                          return (
+                            <div
+                              key={i}
+                              className={
+                                'flex items-start gap-3 p-3 border rounded-lg ' +
+                                (isHidden
+                                  ? 'bg-muted/30 border-border/50 opacity-60'
+                                  : 'bg-red-500/5 border-red-500/20')
+                              }
+                            >
+                              <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium text-foreground">{dup.vendor}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {fmtCurrency(dup.amount, dup.currency)} &middot; {dup.reason}
+                                </p>
+                              </div>
+                              {isHidden ? (
+                                <button
+                                  type="button"
+                                  onClick={() => unhideDuplicate(dup.key)}
+                                  className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded border border-border/50 hover:bg-muted/60 shrink-0"
+                                  title="Restore this duplicate"
+                                >
+                                  <Eye className="h-3.5 w-3.5" /> Restore
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => hideDuplicate(dup.key)}
+                                  className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded border border-border/50 hover:bg-muted/60 shrink-0"
+                                  title="Mark as reviewed — hides this duplicate"
+                                >
+                                  <EyeOff className="h-3.5 w-3.5" /> I&apos;ve checked it
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                        {shown.length === 0 && (
+                          <p className="text-xs text-muted-foreground italic pl-1">
+                            {showHiddenDuplicates
+                              ? 'No dismissed duplicates to show.'
+                              : 'All duplicates have been dismissed. Use “Show dismissed” to review them again.'}
+                          </p>
+                        )}
+                      </div>
+                      {remaining > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setDuplicatesExpanded((v) => !v)}
+                          className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-amber-500 hover:text-amber-600 transition-colors"
                         >
-                          <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium text-foreground">{dup.vendor}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {fmtCurrency(dup.amount, dup.currency)} &middot; {dup.reason}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
+                          {duplicatesExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                          {duplicatesExpanded
+                            ? 'Show fewer'
+                            : `Show all ${baseList.length} (${remaining} more)`}
+                        </button>
+                      )}
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 {/* Outliers */}
                 {batchAnalysis.outliers.length > 0 && (
@@ -1027,9 +1339,10 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
                   </div>
 
                   {vendorScorecards.length > 0 ? (
+                    <>
                     <ScrollArea className="max-h-96">
                       <div className="space-y-4 pr-4">
-                        {vendorScorecards.map((sc, i) => {
+                        {(vendorScorecardExpanded ? vendorScorecards : vendorScorecards.slice(0, 3)).map((sc, i) => {
                           const relTextColor = sc.reliabilityScore >= 80
                             ? 'text-emerald-500'
                             : sc.reliabilityScore >= 50
@@ -1167,6 +1480,19 @@ export function AnalyticsTab({ invoices }: { invoices: InvoiceRow[] }) {
                         })}
                       </div>
                     </ScrollArea>
+                    {vendorScorecards.length > 3 && (
+                      <button
+                        type="button"
+                        onClick={() => setVendorScorecardExpanded((v) => !v)}
+                        className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-amber-500 hover:text-amber-600 transition-colors"
+                      >
+                        {vendorScorecardExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                        {vendorScorecardExpanded
+                          ? 'Show fewer vendors'
+                          : `Show all ${vendorScorecards.length} vendors (${vendorScorecards.length - 3} more)`}
+                      </button>
+                    )}
+                    </>
                   ) : (
                     <div className="flex flex-col items-center justify-center py-8">
                       <BarChart3Icon className="h-10 w-10 text-muted-foreground/30 mb-3" />

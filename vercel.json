@@ -7,6 +7,14 @@
     {
       "path": "/api/cron/purge-files",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/admin/model-health-check?key=${CRON_SECRET}",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/retry-pending?key=${CRON_SECRET}",
+      "schedule": "0 4 * * *"
     }
   ],
   "headers": [

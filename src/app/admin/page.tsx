@@ -5,7 +5,7 @@ import {
   Shield, ShieldAlert, ShieldCheck, Snowflake, Trash2, RefreshCw,
   Search, AlertTriangle, Users, FileText, MessageSquare, Mail, Loader2,
   ArrowUpDown, ArrowUp, ArrowDown, History, EyeOff, Eye, Star,
-  Cpu, CheckCircle2, XCircle,
+  Cpu, CheckCircle2, XCircle, Bug, Activity,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -33,6 +33,7 @@ interface Account {
   active: boolean;
   hidden: boolean;
   starred: boolean;
+  debugEnabled?: boolean;
   stats: AccountStats;
   abuseRisk: AbuseRisk;
 }
@@ -74,6 +75,43 @@ interface Summary {
   frozenAccounts: number;
 }
 
+interface FeatureFlag {
+  flag: string;
+  label: string;
+  description: string;
+  defaultEnabled: boolean;
+  dbEnabled: boolean;
+  effectiveEnabled: boolean;
+  inDb: boolean;
+  updatedAt: string | null;
+  updatedBy: string | null;
+}
+
+interface ModelHealthRow {
+  provider: string;
+  modelName: string;
+  status: string;
+  statusCode: number | null;
+  responseTimeMs: number | null;
+  notes: string | null;
+  checkedAt: string | null;
+}
+
+interface ModelHealthAlert {
+  provider: string;
+  modelName: string;
+  fromStatus: string;
+  toStatus: string;
+  checkedAt: string;
+  statusCode: number | null;
+}
+
+interface ModelHealthPayload {
+  latest: ModelHealthRow[];
+  deprecations: ModelHealthRow[];
+  alertHistory: ModelHealthAlert[];
+}
+
 type SortField = 'risk' | 'invoices' | 'chat' | 'inboxes' | 'age' | 'email' | 'plan';
 type SortDir = 'asc' | 'desc';
 
@@ -91,10 +129,15 @@ export default function AdminPage() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'high' | 'medium' | 'low' | 'frozen'>('all');
-  const [tab, setTab] = useState<'accounts' | 'hidden' | 'deleted' | 'providers'>('accounts');
+  const [tab, setTab] = useState<'accounts' | 'hidden' | 'deleted' | 'providers' | 'flags' | 'modelhealth'>('accounts');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [providersLoading, setProvidersLoading] = useState(false);
+  const [featureFlags, setFeatureFlags] = useState<FeatureFlag[]>([]);
+  const [featureFlagsLoading, setFeatureFlagsLoading] = useState(false);
+  const [modelHealth, setModelHealth] = useState<ModelHealthPayload | null>(null);
+  const [modelHealthLoading, setModelHealthLoading] = useState(false);
+  const [modelHealthRunning, setModelHealthRunning] = useState(false);
   const [sortField, setSortField] = useState<SortField>('risk');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 
@@ -133,6 +176,138 @@ export default function AdminPage() {
       fetchProviders();
     }
   }, [tab, fetchProviders]);
+
+  // --- Feature flags fetch ---
+  // GET /api/admin/feature-flags?key=CRON_SECRET returns the full list of
+  // known flags with their DB state + metadata for rendering the admin UI.
+  const fetchFeatureFlags = useCallback(async () => {
+    if (!secret) return;
+    setFeatureFlagsLoading(true);
+    try {
+      const res = await fetch(`/api/admin/feature-flags?key=${encodeURIComponent(secret)}`);
+      const data = await res.json();
+      if (res.ok) {
+        setFeatureFlags(data.flags || []);
+      } else {
+        toast.error(data.error || 'Failed to load feature flags');
+      }
+    } catch {
+      toast.error('Network error');
+    } finally {
+      setFeatureFlagsLoading(false);
+    }
+  }, [secret]);
+
+  useEffect(() => {
+    if (tab === 'flags') fetchFeatureFlags();
+  }, [tab, fetchFeatureFlags]);
+
+  const handleToggleFlag = async (flag: string, nextEnabled: boolean) => {
+    // Optimistically flip the local row so the toggle feels instant; revert
+    // on error.
+    const prev = featureFlags;
+    setFeatureFlags((cur) =>
+      cur.map((f) =>
+        f.flag === flag
+          ? { ...f, dbEnabled: nextEnabled, effectiveEnabled: nextEnabled, updatedAt: new Date().toISOString(), updatedBy: 'admin' }
+          : f,
+      ),
+    );
+    try {
+      const res = await fetch(`/api/admin/feature-flags?key=${encodeURIComponent(secret)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ flag, enabled: nextEnabled }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setFeatureFlags(prev);
+        toast.error(data.error || 'Failed to toggle flag');
+      } else {
+        toast.success(`${flag} ${nextEnabled ? 'enabled' : 'disabled'}`);
+      }
+    } catch {
+      setFeatureFlags(prev);
+      toast.error('Network error');
+    }
+  };
+
+  // --- Model health fetch ---
+  // GET /api/admin/model-health?key=CRON_SECRET returns the latest probe row
+  // per (provider, model), the list of decommissioned models, and the recent
+  // alert history (status transitions within the last 30 days).
+  const fetchModelHealth = useCallback(async () => {
+    if (!secret) return;
+    setModelHealthLoading(true);
+    try {
+      const res = await fetch(`/api/admin/model-health?key=${encodeURIComponent(secret)}`);
+      const data = await res.json();
+      if (res.ok) {
+        setModelHealth({
+          latest: Array.isArray(data.latest) ? data.latest : [],
+          deprecations: Array.isArray(data.deprecations) ? data.deprecations : [],
+          alertHistory: Array.isArray(data.alertHistory) ? data.alertHistory : [],
+        });
+      } else {
+        toast.error(data.error || 'Failed to load model health');
+      }
+    } catch {
+      toast.error('Network error');
+    } finally {
+      setModelHealthLoading(false);
+    }
+  }, [secret]);
+
+  useEffect(() => {
+    if (tab === 'modelhealth') fetchModelHealth();
+  }, [tab, fetchModelHealth]);
+
+  const runHealthCheckNow = async () => {
+    if (modelHealthRunning) return;
+    setModelHealthRunning(true);
+    try {
+      const res = await fetch(`/api/admin/model-health?key=${encodeURIComponent(secret)}`, { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success('Health check complete');
+        // Refresh the data so the new probe rows show up.
+        fetchModelHealth();
+      } else {
+        toast.error(data.error || 'Health check failed');
+      }
+    } catch {
+      toast.error('Network error');
+    } finally {
+      setModelHealthRunning(false);
+    }
+  };
+
+  // --- Admin debug toggle for an account ---
+  // POST /api/admin/accounts/[id]/debug?key=CRON_SECRET with
+  // body { enabled: boolean }. Flips user.debugEnabled which surfaces the
+  // "Debug Logs" button on the upload tab for that user.
+  const handleToggleDebug = async (acc: Account) => {
+    const next = !acc.debugEnabled;
+    setActionLoading(acc.id + ':debug');
+    try {
+      const res = await fetch(`/api/admin/accounts/${acc.id}/debug?key=${encodeURIComponent(secret)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: next }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(data.message || `Debug mode ${next ? 'enabled' : 'disabled'}`);
+        fetchAccounts();
+      } else {
+        toast.error(data.error || 'Failed to toggle debug mode');
+      }
+    } catch {
+      toast.error('Network error');
+    } finally {
+      setActionLoading(null);
+    }
+  };
 
   const fetchAccounts = useCallback(async () => {
     if (!secret) return;
@@ -405,6 +580,14 @@ export default function AdminPage() {
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${tab === 'providers' ? 'border-amber-500 text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
             <Cpu className="h-4 w-4 inline mr-1.5" /> AI Providers
           </button>
+          <button onClick={() => setTab('flags')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${tab === 'flags' ? 'border-amber-500 text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
+            <ShieldCheck className="h-4 w-4 inline mr-1.5" /> Feature Flags
+          </button>
+          <button onClick={() => setTab('modelhealth')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${tab === 'modelhealth' ? 'border-amber-500 text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
+            <Activity className="h-4 w-4 inline mr-1.5" /> Model Health
+          </button>
         </div>
 
         {/* === ACCOUNTS TAB === */}
@@ -508,6 +691,7 @@ export default function AdminPage() {
                                   <button onClick={() => handleUnfreeze(acc.id, acc.email)} title="Unfreeze" className="p-1.5 rounded hover:bg-emerald-500/20 text-emerald-500"><ShieldCheck className="h-4 w-4" /></button>
                                 )}
                                 <button onClick={() => handleHide(acc.id, acc.email)} title="Hide from active view" className="p-1.5 rounded hover:bg-muted text-muted-foreground"><EyeOff className="h-4 w-4" /></button>
+                                <button onClick={() => handleToggleDebug(acc)} title={acc.debugEnabled ? 'Disable debug mode (hides Debug Logs button on upload tab)' : 'Enable debug mode (shows Debug Logs button on upload tab)'} className={`p-1.5 rounded hover:bg-amber-500/20 ${acc.debugEnabled ? 'text-amber-500' : 'text-muted-foreground'}`}><Bug className="h-4 w-4" /></button>
                                 <button onClick={() => handleDelete(acc.id, acc.email)} title="Delete" className="p-1.5 rounded hover:bg-red-500/20 text-red-500"><Trash2 className="h-4 w-4" /></button>
                               </>
                             )}
@@ -697,6 +881,283 @@ export default function AdminPage() {
                   fail, the chat returns an error (no fallback to disabled providers).
                 </p>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* === FEATURE FLAGS TAB === */}
+        {tab === 'flags' && (
+          <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold">Feature Flags</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Toggle feature flags instantly — no redeploy needed. Changes take effect within 30 seconds
+                  (config cache). A flag only takes effect if the underlying code path exists.
+                </p>
+              </div>
+              <button onClick={fetchFeatureFlags} disabled={featureFlagsLoading}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs hover:bg-muted/50 disabled:opacity-50 shrink-0">
+                {featureFlagsLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} Refresh
+              </button>
+            </div>
+
+            {featureFlagsLoading && featureFlags.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
+                Loading feature flags...
+              </div>
+            ) : featureFlags.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <ShieldCheck className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                No feature flags configured.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {featureFlags.map((f) => (
+                  <div
+                    key={f.flag}
+                    className={
+                      'rounded-xl border p-4 ' +
+                      (f.effectiveEnabled
+                        ? 'bg-emerald-500/5 border-emerald-500/20'
+                        : 'bg-muted/5 border-border')
+                    }
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="min-w-0">
+                        <h4 className="font-semibold text-sm">{f.label}</h4>
+                        <code className="text-[11px] text-muted-foreground">{f.flag}</code>
+                      </div>
+                      <button
+                        onClick={() => handleToggleFlag(f.flag, !f.dbEnabled)}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 cursor-pointer hover:opacity-80 ${
+                          f.dbEnabled ? 'bg-emerald-500' : 'bg-muted-foreground/20'
+                        }`}
+                        title={`Click to ${f.dbEnabled ? 'disable' : 'enable'}`}
+                      >
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${f.dbEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                      </button>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground">{f.description}</p>
+                      <div className="flex items-center gap-2 flex-wrap pt-1">
+                        {f.effectiveEnabled ? (
+                          <span className="text-xs font-medium text-emerald-600 flex items-center gap-1">
+                            <CheckCircle2 className="h-3 w-3" /> Enabled
+                          </span>
+                        ) : (
+                          <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                            <XCircle className="h-3 w-3" /> Disabled
+                          </span>
+                        )}
+                        <span className="text-[10px] text-muted-foreground">
+                          default: {f.defaultEnabled ? 'on' : 'off'}
+                        </span>
+                        {f.updatedAt && (
+                          <span className="text-[10px] text-muted-foreground ml-auto">
+                            updated {new Date(f.updatedAt).toLocaleDateString()} by {f.updatedBy || '—'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* === MODEL HEALTH TAB === */}
+        {tab === 'modelhealth' && (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-border bg-card p-6">
+              <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
+                <h3 className="text-lg font-semibold">AI Model Health</h3>
+                <div className="flex items-center gap-2">
+                  <button onClick={fetchModelHealth} disabled={modelHealthLoading}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs hover:bg-muted/50 disabled:opacity-50">
+                    {modelHealthLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} Refresh
+                  </button>
+                  <button onClick={runHealthCheckNow} disabled={modelHealthRunning}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 text-white text-xs hover:bg-amber-600 disabled:opacity-50">
+                    {modelHealthRunning ? <Loader2 className="h-3 w-3 animate-spin" /> : <Activity className="h-3 w-3" />} Run Check Now
+                  </button>
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground mb-4">
+                Probes each AI model endpoint with a 1-token request and records the status. Decommissioned
+                models are surfaced here so they can be removed from the cascade. A daily cron at 06:00 UTC
+                also runs this check and emails alerts on status transitions.
+              </p>
+
+              {/* Summary cards */}
+              {(() => {
+                const rows = modelHealth?.latest ?? [];
+                const counts = {
+                  ok: rows.filter((r) => r.status === 'ok').length,
+                  decommissioned: rows.filter((r) => r.status === 'decommissioned').length,
+                  rate_limited: rows.filter((r) => r.status === 'rate_limited').length,
+                  error: rows.filter((r) => r.status === 'error').length,
+                  unknown: rows.filter((r) => r.status === 'unknown' || !r.status).length,
+                };
+                const summaryItems = [
+                  { label: 'OK', value: counts.ok, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
+                  { label: 'Decommissioned', value: counts.decommissioned, color: 'text-red-500', bg: 'bg-red-500/10' },
+                  { label: 'Rate Limited', value: counts.rate_limited, color: 'text-amber-500', bg: 'bg-amber-500/10' },
+                  { label: 'Errors', value: counts.error, color: 'text-orange-500', bg: 'bg-orange-500/10' },
+                  { label: 'Deprecations', value: (modelHealth?.deprecations ?? []).length, color: 'text-red-500', bg: 'bg-red-500/5' },
+                ];
+                return (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
+                    {summaryItems.map((s) => (
+                      <div key={s.label} className={`rounded-lg border border-border p-3 ${s.bg}`}>
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{s.label}</p>
+                        <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+
+              {/* Model list */}
+              {modelHealthLoading && !modelHealth ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
+                  Loading model health...
+                </div>
+              ) : (
+                <div className="rounded-lg border border-border overflow-hidden overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border bg-muted/50">
+                        <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Provider</th>
+                        <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Model</th>
+                        <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">Status</th>
+                        <th className="text-center px-4 py-2.5 font-medium text-muted-foreground hidden md:table-cell">HTTP</th>
+                        <th className="text-center px-4 py-2.5 font-medium text-muted-foreground hidden md:table-cell">Latency</th>
+                        <th className="text-left px-4 py-2.5 font-medium text-muted-foreground hidden lg:table-cell">Checked At</th>
+                        <th className="text-left px-4 py-2.5 font-medium text-muted-foreground hidden lg:table-cell">Notes</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(modelHealth?.latest ?? []).length === 0 && (
+                        <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">No probes recorded yet. Click "Run Check Now" to start.</td></tr>
+                      )}
+                      {(modelHealth?.latest ?? []).map((row, i) => {
+                        const color =
+                          row.status === 'ok' ? 'text-emerald-500'
+                          : row.status === 'decommissioned' ? 'text-red-500'
+                          : row.status === 'rate_limited' ? 'text-amber-500'
+                          : row.status === 'error' ? 'text-orange-500'
+                          : 'text-muted-foreground';
+                        const bg =
+                          row.status === 'ok' ? 'bg-emerald-500/10'
+                          : row.status === 'decommissioned' ? 'bg-red-500/10'
+                          : row.status === 'rate_limited' ? 'bg-amber-500/10'
+                          : row.status === 'error' ? 'bg-orange-500/10'
+                          : 'bg-muted';
+                        return (
+                          <tr key={i} className="border-b border-border last:border-0 hover:bg-muted/30">
+                            <td className="px-4 py-2.5 font-medium capitalize">{row.provider}</td>
+                            <td className="px-4 py-2.5 font-mono text-xs">{row.modelName}</td>
+                            <td className="px-4 py-2.5 text-center">
+                              <span className={`inline-block text-[10px] font-bold uppercase px-2 py-0.5 rounded ${bg} ${color}`}>
+                                {row.status || 'unknown'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-2.5 text-center text-xs font-mono hidden md:table-cell">
+                              {row.statusCode != null ? row.statusCode : '—'}
+                            </td>
+                            <td className="px-4 py-2.5 text-center text-xs font-mono hidden md:table-cell">
+                              {row.responseTimeMs != null ? `${row.responseTimeMs}ms` : '—'}
+                            </td>
+                            <td className="px-4 py-2.5 text-xs text-muted-foreground hidden lg:table-cell">
+                              {row.checkedAt ? new Date(row.checkedAt).toLocaleString('en-US', { dateStyle: 'short', timeStyle: 'short' }) : 'never'}
+                            </td>
+                            <td className="px-4 py-2.5 text-xs text-muted-foreground hidden lg:table-cell max-w-[220px] truncate" title={row.notes || ''}>
+                              {row.notes || '—'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Upcoming deprecations */}
+              {modelHealth && modelHealth.deprecations.length > 0 && (
+                <div className="mt-4">
+                  <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-red-500" />
+                    Upcoming Deprecations ({modelHealth.deprecations.length})
+                  </h4>
+                  <div className="space-y-2">
+                    {modelHealth.deprecations.map((d, i) => (
+                      <div key={i} className="flex items-center gap-3 p-3 bg-red-500/5 border border-red-500/20 rounded-lg text-sm">
+                        <XCircle className="h-4 w-4 text-red-500 shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <span className="font-medium capitalize">{d.provider}</span>
+                          <span className="text-muted-foreground mx-1">·</span>
+                          <span className="font-mono text-xs">{d.modelName}</span>
+                          {d.notes && <p className="text-xs text-muted-foreground mt-0.5">{d.notes}</p>}
+                        </div>
+                        {d.checkedAt && (
+                          <span className="text-[10px] text-muted-foreground shrink-0">
+                            last seen {new Date(d.checkedAt).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Alert history */}
+              {modelHealth && modelHealth.alertHistory.length > 0 && (
+                <div className="mt-4">
+                  <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                    <History className="h-4 w-4 text-amber-500" />
+                    Alert History (last 30 days, max 50)
+                  </h4>
+                  <div className="rounded-lg border border-border overflow-hidden overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-border bg-muted/50">
+                          <th className="text-left px-3 py-2 font-medium text-muted-foreground">Provider</th>
+                          <th className="text-left px-3 py-2 font-medium text-muted-foreground">Model</th>
+                          <th className="text-left px-3 py-2 font-medium text-muted-foreground">Transition</th>
+                          <th className="text-center px-3 py-2 font-medium text-muted-foreground hidden md:table-cell">HTTP</th>
+                          <th className="text-left px-3 py-2 font-medium text-muted-foreground">When</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {modelHealth.alertHistory.map((a, i) => (
+                          <tr key={i} className="border-b border-border last:border-0 hover:bg-muted/30">
+                            <td className="px-3 py-2 capitalize">{a.provider}</td>
+                            <td className="px-3 py-2 font-mono">{a.modelName}</td>
+                            <td className="px-3 py-2">
+                              <span className="font-medium text-muted-foreground">{a.fromStatus || '—'}</span>
+                              <span className="mx-1 text-muted-foreground">→</span>
+                              <span className={
+                                a.toStatus === 'ok' ? 'text-emerald-500 font-medium'
+                                : a.toStatus === 'decommissioned' ? 'text-red-500 font-medium'
+                                : a.toStatus === 'error' ? 'text-orange-500 font-medium'
+                                : 'text-amber-500 font-medium'
+                              }>{a.toStatus}</span>
+                            </td>
+                            <td className="px-3 py-2 text-center font-mono hidden md:table-cell">{a.statusCode ?? '—'}</td>
+                            <td className="px-3 py-2 text-muted-foreground">
+                              {new Date(a.checkedAt).toLocaleString('en-US', { dateStyle: 'short', timeStyle: 'short' })}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
