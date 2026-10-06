@@ -24,10 +24,16 @@ export async function GET(req: NextRequest) {
       normalizedCurrency: true, processingTime: true, customFields: true,
       approvalStatus: true, approvalRuleId: true, lifecycleStatus: true,
       entityId: true, createdAt: true, updatedAt: true,
+      labels: { include: { label: { select: { id: true, name: true, color: true } } } },
     },
   });
 
-  return NextResponse.json(invoices);
+  return NextResponse.json(
+    invoices.map((inv) => ({
+      ...inv,
+      labels: inv.labels.map((a) => ({ id: a.label.id, name: a.label.name, color: a.label.color })),
+    })),
+  );
 }
 
 export async function DELETE(req: NextRequest) {

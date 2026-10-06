@@ -86,6 +86,27 @@ model User {
   emailBlocklist   EmailBlocklist[]
   pendingReviews   PendingReview[]
   parseDebugLogs   ParseDebugLog[]
+  labels           Label[]
+}
+
+// ─── User Labels ─────────────────────────────────────────────────────────────
+// User-defined colored tags (e.g. "Urgent", "Paid", "Follow-up") that can be
+// attached to invoices for organization. Max 50 labels per user; names are
+// case-insensitively unique per user.
+model Label {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Stored canonical (lowercased) name — enforced unique per user via @@unique.
+  // The original casing is preserved in `name`.
+  name      String
+  // Color token (one of: amber, blue, emerald, red, purple, pink)
+  color     String   @default("amber")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  invoices  InvoiceLabel[]
+  @@index([userId])
+  @@unique([userId, name])
 }
 
 model Entity {
@@ -175,11 +196,28 @@ model Invoice {
   approvalNote      String?
   // Invoice lifecycle status (Pro+: pending/approved/exported; Plus+: custom statuses)
   lifecycleStatus   String   @default("pending")
+  labels            InvoiceLabel[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   @@index([userId])
   @@index([approvalStatus])
   @@index([vendor])
+}
+
+// ─── Invoice ↔ Label join table ──────────────────────────────────────────────
+// Many-to-many relationship: an invoice can have many labels, a label can be
+// on many invoices. @@unique prevents the same label from being assigned twice
+// to the same invoice (idempotent assign).
+model InvoiceLabel {
+  id        String   @id @default(cuid())
+  invoiceId String
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  labelId   String
+  label     Label    @relation(fields: [labelId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  @@index([invoiceId])
+  @@index([labelId])
+  @@unique([invoiceId, labelId])
 }
 
 model ApprovalRule {
@@ -426,4 +464,15 @@ model ModelHealthLog {
   @@index([modelName])
   @@index([checkedAt])
   @@index([status])
+}
+
+// ─── Feature Flags ───────────────────────────────────────────────────────────
+// Admin-toggleable feature flags (persisted in DB so toggles survive redeploys
+// without an env-var change). See src/lib/feature-flags.ts for the in-memory
+// cache layer in front of this table.
+model FeatureFlag {
+  flag      String   @id  // e.g. "show_cost_per_invoice"
+  enabled   Boolean  @default(false)
+  updatedBy String   @default("admin")
+  updatedAt DateTime @updatedAt
 }

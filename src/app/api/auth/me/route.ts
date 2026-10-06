@@ -10,7 +10,7 @@ export async function GET(req: Request) {
 
   const user = await db.user.findUnique({
     where: { id: auth.userId },
-    select: { id: true, email: true, name: true, plan: true, createdAt: true, googleId: true, githubId: true, password: true, emailVerified: true },
+    select: { id: true, email: true, name: true, plan: true, createdAt: true, googleId: true, githubId: true, password: true, emailVerified: true, debugEnabled: true },
   });
 
   if (!user) {
@@ -31,6 +31,7 @@ export async function GET(req: Request) {
       githubId: !!user.githubId,
       emailVerified: user.emailVerified,
       emailVerifiedRequired: !isEmailVerified(user.emailVerified, user.createdAt),
+      debugEnabled: user.debugEnabled === true,
     },
   });
 }

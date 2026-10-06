@@ -53,6 +53,7 @@ export async function POST(req: NextRequest) {
         name: user.name,
         plan: user.plan,
         createdAt: user.createdAt,
+        debugEnabled: (user as { debugEnabled?: boolean }).debugEnabled === true,
       },
       token,
     });
