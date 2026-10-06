@@ -74,6 +74,25 @@ function detectFileTypeFromMagicBytes(buf: Buffer): string {
 }
 
 /**
+ * Recursively strip NUL (\u0000) bytes from any string value nested inside
+ * objects or arrays. SQLite (and therefore Prisma) rejects strings that
+ * contain NUL bytes with a "database disk image is malformed" error.
+ * Vision models occasionally emit NUL bytes (especially when OCR'ing
+ * scanned PDFs with embedded font subsets), so we sanitize the entire
+ * parsed payload before persisting it.
+ */
+function stripNullBytes(value: unknown): unknown {
+  if (typeof value === 'string') return value.replace(/\u0000/g, '');
+  if (Array.isArray(value)) return value.map(stripNullBytes);
+  if (value && typeof value === 'object') {
+    const result: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(value)) result[key] = stripNullBytes(val);
+    return result;
+  }
+  return value;
+}
+
+/**
  * Extract invoice fields from prose text (last resort when the AI model
  * doesn't output JSON but writes its analysis as text).
  *
@@ -488,6 +507,27 @@ function extractPdfMetadata(buffer: Buffer): Record<string, unknown> | null {
 export async function POST(req: NextRequest) {
   const startTime = Date.now();
 
+  // ─── Debug log collector ───────────────────────────────────────────────
+  // Users with `debugEnabled` get a full trace of every step of the parse
+  // pipeline (PDF extraction, cascade calls, AI response, post-processing)
+  // persisted to ParseDebugLog. This is invaluable for diagnosing "the AI
+  // returned nothing" tickets without asking the user to re-upload.
+  let debugEnabled = false;
+  let debugAuthUserId: string | null = null;
+  const debugLogs: Array<{ timestamp: string; step: string; data: unknown }> = [];
+  const addDebugLog = (step: string, data: unknown) => {
+    if (debugEnabled) {
+      debugLogs.push({ timestamp: new Date().toISOString(), step, data });
+      console.warn(`[parse-debug] ${step}:`, typeof data === 'string' ? data.slice(0, 200) : data);
+    }
+  };
+  let debugFileName: string | null = null;
+  let debugFileType: string | null = null;
+  let _debugLogSaved = false;
+
+  // Hoisted so the catch block can read it for the pending_retry fallback.
+  let buffer: Buffer | undefined;
+
   try {
     const auth = await getUserFromRequest(req);
     if (!auth) {
@@ -497,6 +537,10 @@ export async function POST(req: NextRequest) {
     // Check plan limits
     const user = await db.user.findUnique({ where: { id: auth.userId } });
     if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+
+    debugEnabled = user.debugEnabled === true;
+    debugAuthUserId = auth.userId;
+    addDebugLog('parse_start', { debugEnabled });
 
     // Frozen account check — admin can freeze accounts for abuse prevention
     if (!user.active) {
@@ -570,7 +614,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const buffer = Buffer.from(await file.arrayBuffer());
+    debugFileName = sanitizedName;
+    debugFileType = file.type;
+    addDebugLog('file_received', { filename: sanitizedName, fileType: file.type, fileSize: file.size });
+
+    buffer = Buffer.from(await file.arrayBuffer());
     const base64 = buffer.toString('base64');
 
     // ─── Magic byte validation ────────────────────────────────────────
@@ -622,7 +670,23 @@ export async function POST(req: NextRequest) {
         );
       }
     }
-    const dataUri = `data:${file.type};base64,${base64}`;
+
+    // ─── Image resizing for vision models ──────────────────────────────
+    // Vision providers reject payloads over ~2MB and time out on huge
+    // images. resizeForVisionAI downsamples to a max long edge of 1568px
+    // and re-encodes as JPEG q85 — well under every provider's limit.
+    // For PDFs we keep the raw buffer (the PDF extractor handles images).
+    let visionBuffer: Buffer = buffer;
+    let visionMimeType = file.type;
+    if (file.type.startsWith('image/')) {
+      const { resizeForVisionAI } = await import('@/lib/image-resize');
+      const resized = await resizeForVisionAI(buffer, file.type);
+      visionBuffer = resized.buffer;
+      visionMimeType = resized.mimeType;
+      addDebugLog('image_resized', { originalSize: buffer.length, resizedSize: visionBuffer.length, mimeType: visionMimeType });
+    }
+    const visionBase64 = visionBuffer.toString('base64');
+    const dataUri = `data:${visionMimeType};base64,${visionBase64}`;
 
     // ── Metadata extraction for tampering detection ──
     let fileMetadata: Record<string, unknown> | ImageMetadata | null = null;
@@ -641,6 +705,13 @@ export async function POST(req: NextRequest) {
 
     if (file.type === 'application/pdf') {
       const pdfResult = await extractPdfContent(buffer);
+      addDebugLog('pdf_extraction_result', {
+        source: pdfResult.source,
+        textLength: pdfResult.text?.length ?? 0,
+        textPreview: pdfResult.text?.slice(0, 500) ?? '',
+        imageCount: pdfResult.images?.length ?? 0,
+        errors: pdfResult.errors,
+      });
 
       // ── Path A: PDF has extractable images (scanned PDFs) ────────
       // Send images directly to vision model.
@@ -663,15 +734,25 @@ export async function POST(req: NextRequest) {
         if (visionContent.length > 1) {
           try {
             responseText = await geminiVisionCall([{ role: 'user', content: visionContent }]);
+            addDebugLog('pdf_vision_success', { responseLength: responseText.length });
           } catch (visionErr) {
             // Vision cascade failed entirely — try text extraction as fallback.
             // Scanned PDFs sometimes have OCR text layer; if so, use text cascade.
+            addDebugLog('pdf_vision_failed', { error: visionErr instanceof Error ? visionErr.message : String(visionErr) });
             console.warn('[parse] Vision cascade failed, trying text fallback:', visionErr instanceof Error ? visionErr.message : String(visionErr));
             if (pdfResult.text.trim()) {
-              responseText = await geminiChatCall(
-                'You are an invoice parser. Extract all fields and return ONLY valid JSON.',
-                [{ role: 'user', content: VLM_PROMPT + '\n\n--- EXTRACTED PDF TEXT (fallback) ---\n' + pdfResult.text }],
-              );
+              const textPrompt = VLM_PROMPT + '\n\n--- EXTRACTED PDF TEXT (fallback) ---\n' + pdfResult.text;
+              addDebugLog('text_cascade_start', { promptLength: textPrompt.length, trigger: 'vision_failed' });
+              try {
+                responseText = await geminiChatCall(
+                  'You are an invoice parser. Extract all fields and return ONLY valid JSON.',
+                  [{ role: 'user', content: textPrompt }],
+                );
+                addDebugLog('text_cascade_success', { responseLength: responseText.length, responsePreview: responseText.slice(0, 300) });
+              } catch (textErr) {
+                addDebugLog('text_cascade_failed', { error: textErr instanceof Error ? textErr.message : String(textErr) });
+                throw visionErr; // No text — re-throw the vision error
+              }
             } else {
               throw visionErr; // No text — re-throw the vision error
             }
@@ -679,7 +760,10 @@ export async function POST(req: NextRequest) {
         } else {
           // Images were invalid — try text path as fallback
           if (pdfResult.text.trim()) {
-            responseText = await geminiChatCall('You are an invoice parser. Extract all fields and return ONLY valid JSON.', [{ role: 'user', content: pdfResult.text }]);
+            const textPrompt = VLM_PROMPT + '\n\n--- EXTRACTED PDF TEXT ---\n' + pdfResult.text;
+            addDebugLog('text_cascade_start', { promptLength: textPrompt.length, trigger: 'invalid_images' });
+            responseText = await geminiChatCall('You are an invoice parser. Extract all fields and return ONLY valid JSON.', [{ role: 'user', content: textPrompt }]);
+            addDebugLog('text_cascade_success', { responseLength: responseText.length, responsePreview: responseText.slice(0, 300) });
           } else {
             return NextResponse.json({ error: 'Could not extract usable content from this PDF.', diagnostics: pdfResult.errors }, { status: 400 });
           }
@@ -700,16 +784,85 @@ export async function POST(req: NextRequest) {
         // Use text cascade (Mistral small/open-mistral-7b → Groq llama-3.1)
         // instead of vision cascade (pixtral → Groq vision). Text models
         // are more reliable and have higher rate limits.
-        responseText = await geminiChatCall(
-          'You are an invoice parser. Extract all fields and return ONLY valid JSON.',
-          [{ role: 'user', content: VLM_PROMPT + '\n\n--- EXTRACTED PDF TEXT ---\n' + normalizedText }],
-        );
+        const textPrompt = VLM_PROMPT + '\n\n--- EXTRACTED PDF TEXT ---\n' + normalizedText;
+        addDebugLog('text_cascade_start', { promptLength: textPrompt.length });
+        try {
+          responseText = await geminiChatCall(
+            'You are an invoice parser. Extract all fields and return ONLY valid JSON.',
+            [{ role: 'user', content: textPrompt }],
+          );
+          addDebugLog('text_cascade_success', { responseLength: responseText.length, responsePreview: responseText.slice(0, 300) });
+        } catch (textErr) {
+          // Text cascade failed — try the vision cascade with a text-only
+          // payload (no image). Some vision providers accept pure-text
+          // turns and have different rate-limit pools than the text
+          // providers, so this often recovers a parse that would otherwise
+          // hard-fail.
+          addDebugLog('text_cascade_failed', { error: textErr instanceof Error ? textErr.message : String(textErr) });
+          addDebugLog('vision_text_fallback_start', {});
+          const visionTextContent = [
+            { type: 'text' as const, text: VLM_PROMPT },
+            { type: 'text' as const, text: '--- EXTRACTED PDF TEXT ---\n' + normalizedText },
+          ];
+          try {
+            responseText = await geminiVisionCall([{ role: 'user', content: visionTextContent }]);
+            addDebugLog('vision_text_fallback_success', { responseLength: responseText.length, responsePreview: responseText.slice(0, 300) });
+          } catch (visionErr) {
+            addDebugLog('vision_text_fallback_failed', { error: visionErr instanceof Error ? visionErr.message : String(visionErr) });
+            throw textErr;
+          }
+        }
       } else {
-        // No text and no images — can't process
-        return NextResponse.json(
-          { error: 'Could not extract any text or images from this PDF.', hint: 'Try uploading a photo/screenshot (JPG or PNG) instead.', diagnostics: pdfResult.errors },
-          { status: 400 },
-        );
+        // No text and no images — try direct PDF-to-vision (send raw PDF
+        // bytes as a base64 application/pdf data URI). Several vision
+        // providers (Gemini, OpenAI) accept PDFs directly and will render
+        // the pages server-side. If that also fails we fall back to
+        // rendering the first page to a PNG with pdfjs-dist + canvas.
+        addDebugLog('no_text_no_images', { source: pdfResult.source, errors: pdfResult.errors });
+        let pdfVisionSucceeded = false;
+        try {
+          const pdfBase64 = buffer.toString('base64');
+          const pdfVisionContent: Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }> = [
+            { type: 'text', text: VLM_PROMPT },
+            { type: 'image_url', image_url: { url: `data:application/pdf;base64,${pdfBase64}` } },
+          ];
+          addDebugLog('direct_pdf_to_vision_start', { pdfBytes: buffer.length });
+          responseText = await geminiVisionCall([{ role: 'user', content: pdfVisionContent }]);
+          addDebugLog('direct_pdf_to_vision_success', { responseLength: responseText.length, responsePreview: responseText.slice(0, 300) });
+          pdfVisionSucceeded = true;
+        } catch (visionErr) {
+          addDebugLog('direct_pdf_to_vision_failed', { error: visionErr instanceof Error ? visionErr.message : String(visionErr) });
+        }
+
+        if (!pdfVisionSucceeded) {
+          // Fall back to rendering the first page to a PNG image, then
+          // sending that to the vision cascade.
+          try {
+            const { renderPdfFirstPageToPng } = await import('@/lib/pdf-to-image');
+            const imgBuf = await renderPdfFirstPageToPng(buffer);
+            if (imgBuf) {
+              addDebugLog('pdf_to_image_render_success', { imageBytes: imgBuf.length });
+              const imgContent: Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }> = [
+                { type: 'text', text: VLM_PROMPT },
+                { type: 'image_url', image_url: { url: `data:image/png;base64,${imgBuf.toString('base64')}` } },
+              ];
+              responseText = await geminiVisionCall([{ role: 'user', content: imgContent }]);
+              addDebugLog('pdf_to_image_vision_success', { responseLength: responseText.length, responsePreview: responseText.slice(0, 300) });
+            } else {
+              addDebugLog('pdf_to_image_render_empty', {});
+              return NextResponse.json(
+                { error: 'Could not extract any text or images from this PDF.', hint: 'Try uploading a photo/screenshot (JPG or PNG) instead.', diagnostics: pdfResult.errors },
+                { status: 400 },
+              );
+            }
+          } catch (renderErr) {
+            addDebugLog('pdf_to_image_fallback_failed', { error: renderErr instanceof Error ? renderErr.message : String(renderErr) });
+            return NextResponse.json(
+              { error: 'Could not extract any text or images from this PDF.', hint: 'Try uploading a photo/screenshot (JPG or PNG) instead.', diagnostics: pdfResult.errors },
+              { status: 400 },
+            );
+          }
+        }
       }
     } else {
       // Image files: send to vision model
@@ -717,12 +870,22 @@ export async function POST(req: NextRequest) {
         { type: 'text' as const, text: VLM_PROMPT },
         { type: 'image_url' as const, image_url: { url: dataUri } },
       ];
-      responseText = await geminiVisionCall([{ role: 'user', content }]);
+      addDebugLog('image_vision_start', { mimeType: visionMimeType, dataUriBytes: visionBase64.length });
+      try {
+        responseText = await geminiVisionCall([{ role: 'user', content }]);
+        addDebugLog('image_vision_success', { responseLength: responseText.length, responsePreview: responseText.slice(0, 300) });
+      } catch (visionErr) {
+        addDebugLog('image_vision_failed', { error: visionErr instanceof Error ? visionErr.message : String(visionErr) });
+        throw visionErr;
+      }
     }
 
     if (!responseText) {
+      addDebugLog('empty_ai_response', {});
       return NextResponse.json({ error: 'AI returned an empty response. The document may be unreadable.' }, { status: 500 });
     }
+
+    addDebugLog('raw_ai_response', { length: responseText.length, preview: responseText.slice(0, 500) });
 
     // ─── Clean the AI response before parsing as JSON ────────────────────
     // The vision model (qwen3.6-27b) is a reasoning model and may leak its
@@ -956,11 +1119,95 @@ export async function POST(req: NextRequest) {
 
     // Extract per-field confidence
     const fieldConfidence = parsed.fieldConfidence as Record<string, number> | undefined;
-    const overallConfidence = typeof parsed.confidence === 'number'
+    let overallConfidence = typeof parsed.confidence === 'number'
       ? Math.min(1, Math.max(0, parsed.confidence))
       : (fieldConfidence
         ? Object.values(fieldConfidence).reduce((a, b) => a + b, 0) / Object.values(fieldConfidence).length
         : 0.8);
+
+    // ─── All-nulls fallback ──────────────────────────────────────────────
+    // If the AI returned confidence === 0 AND every primary field is null,
+    // the text extraction likely produced garbage that confused the model.
+    // For PDFs, render the first page to a PNG and re-run the vision
+    // cascade — this usually recovers a real parse from scanned PDFs
+    // whose embedded text layer is corrupt or empty.
+    if (file.type === 'application/pdf' && overallConfidence === 0) {
+      const allFieldsNull =
+        parsed.vendor == null &&
+        parsed.invoiceNumber == null &&
+        parsed.invoiceDate == null &&
+        parsed.total == null &&
+        parsed.amount == null;
+      if (allFieldsNull) {
+        addDebugLog('all_nulls_fallback_start', {});
+        try {
+          const { renderPdfFirstPageToPng } = await import('@/lib/pdf-to-image');
+          const imgBuf = await renderPdfFirstPageToPng(buffer);
+          if (imgBuf) {
+            addDebugLog('all_nulls_fallback_rendered', { imageBytes: imgBuf.length });
+            const fallbackContent: Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }> = [
+              { type: 'text', text: VLM_PROMPT },
+              { type: 'image_url', image_url: { url: `data:image/png;base64,${imgBuf.toString('base64')}` } },
+            ];
+            const fallbackResponse = await geminiVisionCall([{ role: 'user', content: fallbackContent }]);
+            addDebugLog('all_nulls_fallback_response', { responseLength: fallbackResponse.length, responsePreview: fallbackResponse.slice(0, 300) });
+
+            // Extract JSON from the fallback response (reuse the same
+            // cleaning strategy as the primary path).
+            let cleanFallback = fallbackResponse;
+            const fenceMatch2 = cleanFallback.match(/```(?:json)?\s*([\s\S]*?)```/);
+            if (fenceMatch2) {
+              cleanFallback = fenceMatch2[1].trim();
+            } else {
+              const jsonStartMatch2 = cleanFallback.match(/\{\s*"vendor"\s*:/);
+              if (jsonStartMatch2 && jsonStartMatch2.index !== undefined) {
+                const lastBrace2 = cleanFallback.lastIndexOf('}');
+                if (lastBrace2 > jsonStartMatch2.index) {
+                  cleanFallback = cleanFallback.slice(jsonStartMatch2.index, lastBrace2 + 1);
+                }
+              } else {
+                const firstBrace2 = cleanFallback.indexOf('{');
+                const lastBrace2 = cleanFallback.lastIndexOf('}');
+                if (firstBrace2 >= 0 && lastBrace2 > firstBrace2) {
+                  cleanFallback = cleanFallback.slice(firstBrace2, lastBrace2 + 1);
+                }
+              }
+            }
+            cleanFallback = cleanFallback.replace(/```json\s*/g, '').replace(/```\s*$/g, '').trim();
+
+            try {
+              const fallbackParsed = JSON.parse(cleanFallback) as Record<string, unknown>;
+              // Only adopt the fallback if it produced at least one
+              // real field — otherwise we'd be replacing one empty
+              // parse with another.
+              const fbVendor = fallbackParsed.vendor;
+              const fbInvNum = fallbackParsed.invoiceNumber;
+              const fbTotal = fallbackParsed.total;
+              if (fbVendor != null || fbInvNum != null || fbTotal != null) {
+                parsed = fallbackParsed;
+                // Recompute confidence from the fallback payload.
+                const fc = parsed.fieldConfidence as Record<string, number> | undefined;
+                if (typeof parsed.confidence === 'number') {
+                  overallConfidence = Math.min(1, Math.max(0, parsed.confidence as number));
+                } else if (fc) {
+                  const vals = Object.values(fc);
+                  overallConfidence = vals.reduce((a, b) => a + b, 0) / vals.length;
+                }
+                addDebugLog('all_nulls_fallback_used', { vendor: parsed.vendor, total: parsed.total, confidence: overallConfidence });
+              } else {
+                addDebugLog('all_nulls_fallback_empty', {});
+              }
+            } catch (parseErr) {
+              addDebugLog('all_nulls_fallback_parse_failed', { error: parseErr instanceof Error ? parseErr.message : String(parseErr) });
+            }
+          } else {
+            addDebugLog('all_nulls_fallback_no_image', {});
+          }
+        } catch (fallbackErr) {
+          addDebugLog('all_nulls_fallback_failed', { error: fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr) });
+        }
+      }
+    }
 
     // ---- QUICK WIN #1: Validation Rules Engine ----
     const validationResults = runValidationRules(
@@ -1057,19 +1304,40 @@ export async function POST(req: NextRequest) {
     else if (varianceChecks.some((v) => v.status === 'warn') && validationStatus === 'pass') validationStatus = 'warning';
     if (tamperingCheck.isSuspicious) validationStatus = 'fail';
 
+    // ─── NULL byte sanitization ──────────────────────────────────────────
+    // Vision models occasionally emit NUL (\u0000) bytes — typically when
+    // OCR'ing scanned PDFs with embedded subset fonts. SQLite rejects NUL
+    // bytes inside TEXT columns with "database disk image is malformed",
+    // which would crash the entire parse. stripNullBytes walks the parsed
+    // payload recursively and removes them from every string value.
+    parsed = stripNullBytes(parsed) as Record<string, unknown>;
+    const sanitizedVendor = (parsed.vendor as string) || null;
+    const sanitizedInvNumber = (parsed.invoiceNumber as string) || null;
+    const sanitizedInvDate = (parsed.invoiceDate as string) || null;
+    const sanitizedDueDate = (parsed.dueDate as string) || null;
+    const sanitizedCurrency = (parsed.currency as string) || 'USD';
+
+    addDebugLog('ai_response_parsed', {
+      vendor: sanitizedVendor,
+      invNumber: sanitizedInvNumber,
+      invDate: sanitizedInvDate,
+      total: parsed.total,
+      confidence: overallConfidence,
+    });
+
     // Save to database
     const invoice = await db.invoice.create({
       data: {
         userId: auth.userId,
         filename: sanitizedName,
-        vendor: parsed.vendor as string || null,
-        invNumber: (parsed.invoiceNumber as string) || null,
-        invDate: (parsed.invoiceDate as string) || null,
-        dueDate: (parsed.dueDate as string) || null,
+        vendor: sanitizedVendor,
+        invNumber: sanitizedInvNumber,
+        invDate: sanitizedInvDate,
+        dueDate: sanitizedDueDate,
         amount: typeof parsed.amount === 'number' ? parsed.amount : null,
         vatAmount: typeof parsed.vatAmount === 'number' ? parsed.vatAmount : null,
         total: typeof parsed.total === 'number' ? parsed.total : null,
-        currency: (parsed.currency as string) || 'USD',
+        currency: sanitizedCurrency,
         status: validationStatus === 'fail' ? 'review' : validationStatus === 'warning' ? 'review' : overallConfidence >= 0.85 ? 'done' : 'review',
         confidence: overallConfidence,
         fieldConfidence: fieldConfidence ? JSON.parse(JSON.stringify(fieldConfidence)) : Prisma.JsonNull,
@@ -1184,6 +1452,28 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // ─── Persist debug logs (success path) ──────────────────────────────
+    // We save the trace only AFTER all the post-parse side effects
+    // (duplicate check, approval rules, audit log) have completed, so a
+    // late failure doesn't double-write. _debugLogSaved gates the finally
+    // block from adding a duplicate "early return" entry.
+    if (debugEnabled && debugAuthUserId && debugLogs.length > 0) {
+      try {
+        await db.parseDebugLog.create({
+          data: {
+            userId: debugAuthUserId,
+            filename: debugFileName ?? undefined,
+            fileType: debugFileType ?? undefined,
+            logs: JSON.parse(JSON.stringify(debugLogs)),
+            success: true,
+          },
+        });
+        _debugLogSaved = true;
+      } catch (logErr) {
+        console.warn('[parse-debug] Failed to save success debug log:', logErr instanceof Error ? logErr.message : String(logErr));
+      }
+    }
+
     return NextResponse.json({
       id: invoice.id,
       filename: invoice.filename,
@@ -1222,6 +1512,86 @@ export async function POST(req: NextRequest) {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error during AI processing';
+    console.error('[parse] Error:', message);
+    addDebugLog('parse_failed', { error: message });
+
+    // ─── Graceful degradation: save as pending_retry ────────────────────
+    // Instead of returning a hard 500 to the user (which forces them to
+    // re-upload the file later when the AI service is back), persist the
+    // raw file as a pending_retry invoice. A background reaper will pick
+    // these up and re-run the parse once the providers recover.
+    //
+    // We do this BEFORE saving debug logs so the pending_retry_saved
+    // entry is included in the persisted trace.
+    let pendingRetryResponse: NextResponse | null = null;
+    if (debugAuthUserId && debugFileName && debugFileType) {
+      try {
+        const pendingInvoice = await db.invoice.create({
+          data: {
+            userId: debugAuthUserId,
+            filename: debugFileName,
+            status: 'pending_retry',
+            confidence: 0,
+            currency: 'USD',
+            fileData: buffer?.toString('base64') || null,
+            fileType: debugFileType,
+            fileDataExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+            errorMessage: message.slice(0, 500),
+          },
+        });
+        addDebugLog('pending_retry_saved', { invoiceId: pendingInvoice.id });
+        pendingRetryResponse = NextResponse.json({
+          id: pendingInvoice.id,
+          filename: pendingInvoice.filename,
+          status: 'pending_retry',
+          message: 'Your document has been saved. We\'ll process it automatically when service is restored.',
+        });
+      } catch (saveErr) {
+        addDebugLog('pending_retry_save_failed', { error: saveErr instanceof Error ? saveErr.message : String(saveErr) });
+        console.error('[parse] Failed to save pending_retry invoice:', saveErr instanceof Error ? saveErr.message : String(saveErr));
+      }
+    }
+
+    // ─── Persist debug logs (failure path) ──────────────────────────────
+    if (debugEnabled && debugAuthUserId && debugLogs.length > 0 && !_debugLogSaved) {
+      try {
+        await db.parseDebugLog.create({
+          data: {
+            userId: debugAuthUserId,
+            filename: debugFileName ?? undefined,
+            fileType: debugFileType ?? undefined,
+            logs: JSON.parse(JSON.stringify(debugLogs)),
+            success: false,
+            error: message.slice(0, 500),
+          },
+        });
+        _debugLogSaved = true;
+      } catch (logErr) {
+        console.warn('[parse-debug] Failed to save failure debug log:', logErr instanceof Error ? logErr.message : String(logErr));
+      }
+    }
+
+    if (pendingRetryResponse) return pendingRetryResponse;
     return NextResponse.json({ error: message }, { status: 500 });
+  } finally {
+    // ─── Safety net for early returns ────────────────────────────────────
+    // If we bailed out before the success/catch blocks had a chance to
+    // persist the trace (e.g. a 4xx return from inside the try block,
+    // or a thrown error inside the catch's pending_retry branch), make
+    // one last attempt to save whatever debug logs we collected.
+    if (debugEnabled && debugAuthUserId && debugLogs.length > 0 && !_debugLogSaved) {
+      try {
+        await db.parseDebugLog.create({
+          data: {
+            userId: debugAuthUserId,
+            filename: debugFileName ?? undefined,
+            fileType: debugFileType ?? undefined,
+            logs: JSON.parse(JSON.stringify(debugLogs)),
+            success: false,
+            error: 'Early return (no AI processing reached)',
+          },
+        });
+      } catch {}
+    }
   }
 }

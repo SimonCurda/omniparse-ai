@@ -1,5 +1,6 @@
 // ============================================================================
 // Robust PDF Extraction — Vercel Serverless Compatible
+// Path 0: unpdf (serverless-compatible pdfjs wrapper)
 // Path 1: pdfjs-dist text extraction
 // Path 2: Regex fallback (FlateDecode, ASCIIHex, ASCII85)
 // Path 3: Raw JPEG extraction from PDF streams (BEST for scanned PDFs)
@@ -44,6 +45,22 @@ export interface PdfExtractResult {
  */
 export async function extractPdfText(buffer: Buffer): Promise<PdfExtractResult> {
   const errors: string[] = [];
+
+  // ── Path 0: unpdf (serverless-compatible pdfjs wrapper) ──
+  try {
+    const { extractText, getDocumentProxy } = await import('unpdf');
+    const pdf = await getDocumentProxy(new Uint8Array(buffer));
+    const result = await extractText(pdf, { mergePages: true });
+    const text = result.text || '';
+    const len = text ? text.trim().length : 0;
+    if (len >= 100) {
+      return { text: text.trim(), source: 'text' };
+    }
+    errors.push(`Path 0 (unpdf): extracted only ${len} chars (likely metadata)`);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    errors.push(`Path 0 (unpdf): ${msg}`);
+  }
 
   // ── Path 1: pdfjs-dist text extraction ──
   try {

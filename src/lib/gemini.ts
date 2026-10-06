@@ -29,13 +29,18 @@ const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 // Vision models (tried in order — first one that works is used)
 const GROQ_VISION_MODELS = [
-  'llama-3.2-90b-vision-preview',   // higher quality vision
-  'llama-3.2-11b-vision-preview',   // smaller, faster vision
+  'meta-llama/llama-4-scout-17b-16e-instruct',
+  'llama-3.2-90b-vision-preview',
+  'llama-3.2-11b-vision-preview',
 ];
 
 // Chat models (tried in order)
-const CHAT_MODEL = 'llama-3.1-8b-instant';
-const CHAT_MODEL_FALLBACK_1 = 'llama-3.3-70b-versatile';
+const CHAT_MODEL = 'openai/gpt-oss-20b';
+const CHAT_MODEL_FALLBACK_1 = 'openai/gpt-oss-120b';
+const CHAT_MODEL_FALLBACK_2 = 'meta-llama/llama-4-scout-17b-16e-instruct';
+const CHAT_MODEL_FALLBACK_3 = 'gemma2-9b-it';
+const CHAT_MODEL_FALLBACK_4 = 'llama-3.1-8b-instant';
+const CHAT_MODEL_FALLBACK_5 = 'llama-3.3-70b-versatile';
 
 // Groq free tier output token limits per minute:
 //   llama-3.1-8b-instant:     ~30,000 OTPM  (highest, most reliable)
@@ -184,6 +189,32 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// ─── AI error response detection ────────────────────────────────────────
+// Some AI models return a "successful" HTTP 200 response but with content
+// that is actually an error message (e.g. "An error occurred during processing").
+// We detect these and treat them as failures, falling through to the next model
+// instead of returning the error text as if it were a valid extraction result.
+const AI_ERROR_PATTERNS: RegExp[] = [
+  /^an error occurred during processing/i,
+  /^internal server error/i,
+  /^the model is overloaded/i,
+  /^i cannot process this request/i,
+  /^i'm unable to process/i,
+  /^sorry, i (?:cannot|can't|could not|couldn't) (?:process|complete|handle)/i,
+  /^an unexpected error occurred/i,
+  /^service (?:temporarily )?unavailable/i,
+  /^the service is (?:temporarily )?unavailable/i,
+  /^please try again (?:later|in a moment)/i,
+];
+
+function isAIErrorResponse(content: string): boolean {
+  const trimmed = content.trim();
+  if (trimmed.length < 10) return false;
+  if (trimmed.length > 200) return false;
+  if (trimmed.startsWith('{') || trimmed.startsWith('[')) return false;
+  return AI_ERROR_PATTERNS.some((p) => p.test(trimmed));
+}
+
 export interface GeminiVisionMessage {
   role?: 'user' | 'model';
   content: Array<
@@ -218,6 +249,8 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
     openaiMessages.push({ role: msg.role === 'model' ? 'assistant' : 'user', content: parts });
   }
 
+  const triedVisionModels: string[] = [];
+
   // ─── Try Mistral FIRST (EU-based, GDPR-friendly) ────────────────────
   // STRATEGIC: Mistral AI is based in Paris, France (EU). Transfers to them
   // stay within the EU — NO SCC NEEDED, NO Schrems II issue.
@@ -241,11 +274,17 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
 
   if (mistralKeys.length > 0) {
     const mistralModels = [
+      'pixtral-12b-latest',     // smaller, faster, most likely free-tier eligible
+      'pixtral-12b-2409',
       'pixtral-large-latest',   // best quality vision model
-      'pixtral-12b-latest',     // smaller, faster, often free-tier eligible
+      'pixtral-large-2411',
+      'mistral-small-latest',
+      'mistral-medium-latest',
+      'mistral-large-latest',
     ];
 
     for (const mistralModel of mistralModels) {
+      let modelStatus = '429'; // default if all keys rate-limited
       for (let keyIdx = 0; keyIdx < mistralKeys.length; keyIdx++) {
         const mistralKey = mistralKeys[keyIdx];
         try {
@@ -253,26 +292,36 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
 
           // Mistral API is OpenAI-compatible — uses the same message format
           // we already built. No conversion needed.
+          // Pixtral models don't support response_format — only set it for non-pixtral models.
+          const isPixtralModel = mistralModel.startsWith('pixtral');
+          const requestBody: Record<string, unknown> = {
+            model: mistralModel,
+            messages: openaiMessages,
+            max_tokens: 4096,
+            temperature: 0.1,
+          };
+          if (!isPixtralModel) {
+            requestBody.response_format = { type: 'json_object' };
+          }
+
           const res = await fetch('https://api.mistral.ai/v1/chat/completions', {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${mistralKey}`,
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-              model: mistralModel,
-              messages: openaiMessages,
-              max_tokens: 4096,
-              temperature: 0.1,
-              // Mistral supports response_format for JSON mode on some models
-              response_format: { type: 'json_object' },
-            }),
+            body: JSON.stringify(requestBody),
           });
 
           if (res.ok) {
             const data = await res.json();
             const content = data.choices?.[0]?.message?.content || '';
             if (content) {
+              if (isAIErrorResponse(content)) {
+                console.warn(`[gemini] Mistral vision ${mistralModel} (key ${keyIdx + 1}) returned AI error response: ${content.slice(0, 100)}. Trying next model...`);
+                modelStatus = 'ai-error';
+                break;
+              }
               const usedModel = data.model || mistralModel;
               console.warn(`[gemini] Mistral vision succeeded (model: ${usedModel}, key ${keyIdx + 1})!`);
               return content;
@@ -300,11 +349,17 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
               const fbData = await fbRes.json();
               const fbContent = fbData.choices?.[0]?.message?.content || '';
               if (fbContent) {
+                if (isAIErrorResponse(fbContent)) {
+                  console.warn(`[gemini] Mistral vision ${mistralModel} (free-text, key ${keyIdx + 1}) returned AI error response: ${fbContent.slice(0, 100)}. Trying next model...`);
+                  modelStatus = 'ai-error';
+                  break;
+                }
                 console.warn(`[gemini] Mistral vision succeeded (free-text, model: ${mistralModel}, key ${keyIdx + 1})!`);
                 return fbContent;
               }
             }
             // This model doesn't work — try next model
+            modelStatus = `${res.status}`;
             break;
           }
 
@@ -316,12 +371,15 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
 
           // Other error — try next model
           console.warn(`[gemini] Mistral ${mistralModel} failed (key ${keyIdx + 1}, status ${res.status})`);
+          modelStatus = `${res.status}`;
           break;
         } catch (err) {
           console.warn(`[gemini] Mistral ${mistralModel} error (key ${keyIdx + 1}):`, err instanceof Error ? err.message : String(err));
+          modelStatus = 'error';
           continue;
         }
       }
+      triedVisionModels.push(`${mistralModel}(${modelStatus})`);
     }
   }
 
@@ -363,6 +421,7 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
   // Try OpenRouter — DISABLED by default (ENABLE_OPENROUTER env var must be 'true')
   if (await isOpenRouterEnabledAsync() && orApiKeys.length > 0) {
     for (const model of openRouterVisionModels) {
+      let modelStatus = '429'; // default if all keys rate-limited
       for (let keyIdx = 0; keyIdx < orApiKeys.length; keyIdx++) {
         const orApiKey = orApiKeys[keyIdx];
         try {
@@ -390,6 +449,11 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
             const data = await res.json();
             const content = data.choices?.[0]?.message?.content || '';
             if (content) {
+              if (isAIErrorResponse(content)) {
+                console.warn(`[gemini] OpenRouter vision ${model} (key ${keyIdx + 1}) returned AI error response: ${content.slice(0, 100)}. Trying next model...`);
+                modelStatus = 'ai-error';
+                break;
+              }
               const usedModel = data.model || model;
               console.warn(`[gemini] OpenRouter vision succeeded (model: ${usedModel}, key ${keyIdx + 1})!`);
               return content;
@@ -419,12 +483,18 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
               const fbData = await fbRes.json();
               const fbContent = fbData.choices?.[0]?.message?.content || '';
               if (fbContent) {
+                if (isAIErrorResponse(fbContent)) {
+                  console.warn(`[gemini] OpenRouter vision ${model} (free-text, key ${keyIdx + 1}) returned AI error response: ${fbContent.slice(0, 100)}. Trying next model...`);
+                  modelStatus = 'ai-error';
+                  break;
+                }
                 const usedModel = fbData.model || model;
                 console.warn(`[gemini] OpenRouter vision succeeded (free-text, model: ${usedModel}, key ${keyIdx + 1})!`);
                 return fbContent;
               }
             }
             // This model doesn't work — try next model
+            modelStatus = `${res.status}`;
             break;
           }
 
@@ -436,12 +506,15 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
 
           // Other error — try next model
           console.warn(`[gemini] ${model} failed (key ${keyIdx + 1}, status ${res.status})`);
+          modelStatus = `${res.status}`;
           break;
         } catch (err) {
           console.warn(`[gemini] ${model} error (key ${keyIdx + 1}):`, err instanceof Error ? err.message : String(err));
+          modelStatus = 'error';
           continue;
         }
       }
+      triedVisionModels.push(`${model}(${modelStatus})`);
     }
   }
 
@@ -473,14 +546,22 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
         const data = await res.json();
         const content = data.choices?.[0]?.message?.content || '';
         if (content) {
+          if (isAIErrorResponse(content)) {
+            console.warn(`[gemini] Groq vision model ${groqVisionModel} returned AI error response: ${content.slice(0, 100)}. Trying next model...`);
+            triedVisionModels.push(`${groqVisionModel}(ai-error)`);
+            continue;
+          }
           console.warn(`[gemini] Groq vision model ${groqVisionModel} succeeded!`);
           return content;
         }
+        triedVisionModels.push(`${groqVisionModel}(empty)`);
+        continue;
       }
 
       // 429 — rate limited, try next Groq vision model
       if (res.status === 429) {
         console.warn(`[gemini] Groq vision model ${groqVisionModel} rate limited. Trying next model...`);
+        triedVisionModels.push(`${groqVisionModel}(429)`);
         continue;
       }
 
@@ -488,13 +569,16 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
       if (res.status === 400 || res.status === 404) {
         const errText = await res.text().catch(() => '');
         console.warn(`[gemini] Groq vision model ${groqVisionModel} not available (${res.status}). ${errText.slice(0, 200)}`);
+        triedVisionModels.push(`${groqVisionModel}(${res.status})`);
         continue;
       }
 
       // Other error — try next model
       console.warn(`[gemini] Groq vision model ${groqVisionModel} failed (${res.status}). Trying next...`);
+      triedVisionModels.push(`${groqVisionModel}(${res.status})`);
     } catch (err) {
       console.warn(`[gemini] Groq vision ${groqVisionModel} error:`, err instanceof Error ? err.message : String(err));
+      triedVisionModels.push(`${groqVisionModel}(error)`);
       continue;
     }
   }
@@ -522,6 +606,7 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
     ];
 
     for (const gm of geminiModels) {
+      let modelStatus = '429'; // default if all keys rate-limited
       for (let keyIdx = 0; keyIdx < geminiKeys.length; keyIdx++) {
         const geminiKey = geminiKeys[keyIdx];
         try {
@@ -571,6 +656,11 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
               ?.map((p: { text?: string }) => p.text || '')
               .join('') || '';
             if (content) {
+              if (isAIErrorResponse(content)) {
+                console.warn(`[gemini] Google Gemini vision ${gm} (key ${keyIdx + 1}) returned AI error response: ${content.slice(0, 100)}. Trying next model...`);
+                modelStatus = 'ai-error';
+                break;
+              }
               console.warn(`[gemini] Google Gemini vision succeeded (model: ${gm}, key ${keyIdx + 1})!`);
               return content;
             }
@@ -585,20 +675,27 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
           // 400/404 — model not available, try next model
           if (res.status === 400 || res.status === 404) {
             console.warn(`[gemini] Google Gemini ${gm} not available (status ${res.status}). Trying next model...`);
+            modelStatus = `${res.status}`;
             break;
           }
 
           console.warn(`[gemini] Google Gemini ${gm} failed (key ${keyIdx + 1}, status ${res.status})`);
+          modelStatus = `${res.status}`;
           break;
         } catch (err) {
           console.warn(`[gemini] Google Gemini ${gm} error (key ${keyIdx + 1}):`, err instanceof Error ? err.message : String(err));
+          modelStatus = 'error';
           continue;
         }
       }
+      triedVisionModels.push(`${gm}(${modelStatus})`);
     }
   }
 
-  throw new Error('All vision models (Mistral + OpenRouter + Groq + Gemini) are temporarily unavailable. Please try again in a moment.');
+  const visionErrorDetail = triedVisionModels.length > 0 ? triedVisionModels.join(', ') : 'all vision models';
+  // NOTE: Per DPA compliance, we do NOT suggest US-based providers (OpenRouter, Google Gemini)
+  // here. EU users should add additional MISTRAL_API_KEY entries for higher throughput.
+  throw new Error(`All vision models are temporarily unavailable. Please try again in a moment. (Tried: ${visionErrorDetail}) — For higher throughput, add MISTRAL_API_KEY_2 / MISTRAL_API_KEY_3 in Vercel env vars.`);
 }
 
 /**
@@ -631,8 +728,14 @@ export async function geminiChatCall(
 
   if (mistralKeys.length > 0) {
     const mistralChatModels = [
-      'mistral-small-latest',    // fast, available on free tier
-      'open-mistral-7b',         // older model, often available on free tier
+      'mistral-small-latest',
+      'mistral-large-latest',
+      'mistral-medium-latest',
+      'open-mistral-7b',
+      'open-mixtral-8x7b',
+      'open-mixtral-8x22b',
+      'ministral-3b-latest',
+      'ministral-8b-latest',
     ];
 
     for (const mistralModel of mistralChatModels) {
@@ -660,6 +763,12 @@ export async function geminiChatCall(
             const data = await res.json();
             const content = data.choices?.[0]?.message?.content || '';
             if (content) {
+              if (isAIErrorResponse(content)) {
+                console.warn(`[gemini-chat] Mistral text ${mistralModel} (key ${keyIdx + 1}) returned AI error response: ${content.slice(0, 100)}. Trying next model...`);
+                triedMistralModels.push(`${mistralModel}(ai-error)`);
+                modelFailed = true;
+                break;
+              }
               console.warn(`[gemini-chat] Mistral text succeeded (model: ${mistralModel}, key ${keyIdx + 1})!`);
               return content;
             }
@@ -707,12 +816,12 @@ export async function geminiChatCall(
     // eliminating the "Thinking Process:" / "Output:" / "Draft:" leak class entirely.
     // Only use non-reasoning models for text extraction — reasoning models (qwen)
     // leak their thinking into JSON values (e.g. vendor="High confidence").
-    { model: CHAT_MODEL, maxTokens: MAX_TOKENS_HIGH, supportsJsonMode: true },            // llama-3.1-8b-instant
-    { model: CHAT_MODEL_FALLBACK_1, maxTokens: MAX_TOKENS_HIGH, supportsJsonMode: true }, // llama-4-scout-17b-16e-instruct
-    // NOTE: qwen3.6-27b (CHAT_MODEL_FALLBACK_2) is intentionally EXCLUDED from the
-    // text cascade. It's a reasoning model that leaks thinking into JSON values,
-    // producing garbage like vendor="High confidence" and invoiceNumber="High".
-    // If both llama models fail, we fall through to the OpenRouter fallback below.
+    { model: CHAT_MODEL, maxTokens: MAX_TOKENS_HIGH, supportsJsonMode: true },            // openai/gpt-oss-20b
+    { model: CHAT_MODEL_FALLBACK_1, maxTokens: MAX_TOKENS_HIGH, supportsJsonMode: true }, // openai/gpt-oss-120b
+    { model: CHAT_MODEL_FALLBACK_2, maxTokens: MAX_TOKENS_HIGH, supportsJsonMode: true }, // meta-llama/llama-4-scout-17b-16e-instruct
+    { model: CHAT_MODEL_FALLBACK_3, maxTokens: MAX_TOKENS_HIGH, supportsJsonMode: true }, // gemma2-9b-it
+    { model: CHAT_MODEL_FALLBACK_4, maxTokens: MAX_TOKENS_HIGH, supportsJsonMode: true }, // llama-3.1-8b-instant
+    { model: CHAT_MODEL_FALLBACK_5, maxTokens: MAX_TOKENS_HIGH, supportsJsonMode: true }, // llama-3.3-70b-versatile
   ];
 
   const triedModels: string[] = [];
@@ -798,7 +907,13 @@ export async function geminiChatCall(
             if (fallbackRes.ok) {
               const fallbackData = await fallbackRes.json();
               const fallbackContent = fallbackData.choices?.[0]?.message?.content || '';
-              if (fallbackContent) return fallbackContent;
+              if (fallbackContent) {
+                if (isAIErrorResponse(fallbackContent)) {
+                  console.warn(`[gemini] Model ${model} (422 fallback) returned AI error response: ${fallbackContent.slice(0, 100)}. Trying next model...`);
+                } else {
+                  return fallbackContent;
+                }
+              }
             }
             // If fallback also failed, fall through to next model
             triedModels.push(model);
@@ -855,7 +970,13 @@ export async function geminiChatCall(
               if (fallbackRes.ok) {
                 const fallbackData = await fallbackRes.json();
                 const fallbackContent = fallbackData.choices?.[0]?.message?.content || '';
-                if (fallbackContent) return fallbackContent;
+                if (fallbackContent) {
+                  if (isAIErrorResponse(fallbackContent)) {
+                    console.warn(`[gemini] Model ${model} (json_validate_failed fallback) returned AI error response: ${fallbackContent.slice(0, 100)}. Trying next model...`);
+                  } else {
+                    return fallbackContent;
+                  }
+                }
               }
               // If fallback also failed, fall through to next model
               triedModels.push(model);
@@ -883,7 +1004,14 @@ export async function geminiChatCall(
 
           const data = await res.json();
           const content = data.choices?.[0]?.message?.content || '';
-          if (content) return content;
+          if (content) {
+            if (isAIErrorResponse(content)) {
+              console.warn(`[gemini] Model ${model} returned AI error response: ${content.slice(0, 100)}. Trying next model...`);
+              triedModels.push(`${model}(ai-error)`);
+              break;
+            }
+            return content;
+          }
 
           // Empty response — try next model
           console.warn(`[gemini] Model ${model} returned empty response, trying next...`);
@@ -939,7 +1067,13 @@ export async function geminiChatCall(
         if (res.ok) {
           const data = await res.json();
           const content = data.choices?.[0]?.message?.content || '';
-          if (content) return content;
+          if (content) {
+            if (isAIErrorResponse(content)) {
+              console.warn(`[gemini-chat] OpenRouter text returned AI error response: ${content.slice(0, 100)}. Trying next key...`);
+              continue;
+            }
+            return content;
+          }
         }
         if (res.status === 429 || res.status === 402) continue;
       } catch { continue; }
@@ -992,6 +1126,10 @@ export async function geminiChatCall(
               ?.map((p: { text?: string }) => p.text || '')
               .join('') || '';
             if (content) {
+              if (isAIErrorResponse(content)) {
+                console.warn(`[gemini-chat] Google Gemini text ${gm} (key ${keyIdx + 1}) returned AI error response: ${content.slice(0, 100)}. Trying next model...`);
+                break;
+              }
               console.warn(`[gemini-chat] Google Gemini text succeeded (model: ${gm}, key ${keyIdx + 1})!`);
               return content;
             }
@@ -1019,16 +1157,18 @@ export async function geminiChatCall(
   const errorDetail = allTriedModels.length > 0 ? allTriedModels.join(', ') : 'all models';
 
   // Build a helpful error message based on what failed
+  // NOTE: Per DPA compliance, we do NOT suggest US-based providers (OpenRouter, Google Gemini)
+  // here. EU users should add additional MISTRAL_API_KEY entries for higher throughput.
   const has403 = allTriedModels.some(m => m.includes('(403)'));
   const has429 = allTriedModels.some(m => m.includes('(429)'));
   const has401 = allTriedModels.some(m => m.includes('(401)'));
   let hint = '';
   if (has401 || has403) {
-    hint = ' — API key may be invalid or the model is not available on your tier. Check MISTRAL_API_KEY and GROQ_API_KEY in Vercel env vars.';
+    hint = ' — API key may be invalid or the model is not available on your tier. Check MISTRAL_API_KEY (and consider adding MISTRAL_API_KEY_2/_3 for key rotation) and GROQ_API_KEY in Vercel env vars.';
   } else if (has429) {
-    hint = ' — Free-tier rate limits exceeded. Wait a few minutes or upgrade to a paid API tier.';
+    hint = ' — Free-tier rate limits exceeded. Wait a few minutes, or add MISTRAL_API_KEY_2 / MISTRAL_API_KEY_3 in Vercel env vars to rotate across multiple keys for higher throughput.';
   } else if (allTriedModels.length === 0) {
-    hint = ' — No AI providers are configured. Set MISTRAL_API_KEY and/or GROQ_API_KEY in Vercel env vars. OpenRouter and Google Gemini are disabled by default (set ENABLE_OPENROUTER=true or ENABLE_GOOGLE_GEMINI=true to enable).';
+    hint = ' — No AI providers are configured. Set MISTRAL_API_KEY and/or GROQ_API_KEY in Vercel env vars. For higher throughput, add MISTRAL_API_KEY_2 / MISTRAL_API_KEY_3.';
   }
 
   throw new Error(`AI is temporarily busy — please wait 30 seconds and try again. (Tried: ${errorDetail})${hint}`);
