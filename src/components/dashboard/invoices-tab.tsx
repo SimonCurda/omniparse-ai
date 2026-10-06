@@ -15,6 +15,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -78,12 +79,20 @@ import {
   FileText,
   ArrowUpDown,
   Mail,
+  EllipsisVertical,
+  Tag,
+  Plus,
 } from 'lucide-react';
 import { ConfidenceMeter } from './confidence-meter';
 import { toast } from 'sonner';
 import { useAppStore } from '@/stores/app-store';
 import type { InvoiceRow } from '@/stores/app-store';
 import { calculateAging } from '@/lib/invoice-engine';
+
+const LABEL_DOT_CLASSES: Record<string, string> = {
+  amber: 'bg-amber-500', blue: 'bg-blue-500', emerald: 'bg-emerald-500',
+  red: 'bg-red-500', purple: 'bg-purple-500', pink: 'bg-pink-500',
+};
 
 type SortKey = 'createdAt' | 'total' | 'vendor' | 'invDate' | 'confidence';
 type SortDir = 'asc' | 'desc';
@@ -121,6 +130,19 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceRow | null>(null);
   const [showNormalized, setShowNormalized] = useState(false);
+  const [showNormalizedVisible, setShowNormalizedVisible] = useState<boolean | null>(null);
+
+  // Labels
+  const [labels, setLabels] = useState<Array<{ id: string; name: string; color: string }>>([]);
+  const [labelFilter, setLabelFilter] = useState<string | null>(null);
+  const [showLabelPicker, setShowLabelPicker] = useState<string | null>(null);
+  const [createLabelOpen, setCreateLabelOpen] = useState(false);
+  const [newLabelName, setNewLabelName] = useState('');
+  const [newLabelColor, setNewLabelColor] = useState('amber');
+  const LABEL_COLOR_NAMES = ['amber', 'blue', 'emerald', 'red', 'purple', 'pink'];
+  const LABEL_COLOR_HEX: Record<string, string> = {
+    amber: '#f59e0b', blue: '#3b82f6', emerald: '#10b981', red: '#ef4444', purple: '#8b5cf6', pink: '#ec4899',
+  };
 
   // Bulk operations
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -183,7 +205,11 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
         );
       })
     : filtered
-  ).filter((inv) => (hideReviewed ? !isReviewed(inv) : true));
+  ).filter((inv) => (hideReviewed ? !isReviewed(inv) : true))
+  .filter((inv) => {
+    if (!labelFilter) return true;
+    return (inv.labels || []).some((l) => l.label.id === labelFilter);
+  });
 
   // Apply sorting
   const displayed = useMemo(() => {
@@ -231,6 +257,107 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
       else next.add(id);
       return next;
     });
+  };
+
+  // Feature flag: show/hide "Show Normalized" toggle
+  useEffect(() => {
+    fetch('/api/feature-flags', { headers: { Authorization: 'Bearer ' + localStorage.getItem('op_token') } })
+      .then((r) => { if (!r.ok) throw new Error('Failed'); return r.json(); })
+      .then((data) => {
+        if (typeof data.show_normalized_toggle === 'boolean') {
+          setShowNormalizedVisible(data.show_normalized_toggle);
+          if (!data.show_normalized_toggle) setShowNormalized(false);
+        } else { setShowNormalizedVisible(true); }
+      })
+      .catch(() => setShowNormalizedVisible(true));
+  }, []);
+
+  // Fetch labels
+  useEffect(() => {
+    const token = localStorage.getItem('op_token');
+    if (!token) return;
+    fetch('/api/labels', { headers: { Authorization: 'Bearer ' + token } })
+      .then((r) => (r.ok ? r.json() : { labels: [] }))
+      .then((data) => setLabels(data.labels || []))
+      .catch(() => {});
+  }, []);
+
+  // ---- Label operations ----
+  const createLabel = async (name: string, color?: string) => {
+    const token = localStorage.getItem('op_token');
+    if (!token) return null;
+    try {
+      const res = await fetch('/api/labels', {
+        method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, color: color || 'amber' }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setLabels((prev) => [...prev, data]);
+        toast.success(`Label "${data.name}" created`);
+        return data;
+      }
+      toast.error(data.error || 'Failed to create label');
+    } catch { toast.error('Network error'); }
+    return null;
+  };
+
+  const toggleLabel = async (invoiceId: string, labelId: string, assigned: boolean) => {
+    const token = localStorage.getItem('op_token');
+    if (!token) return;
+    const url = `/api/invoices/${invoiceId}/labels${assigned ? `?labelId=${labelId}` : ''}`;
+    const method = assigned ? 'DELETE' : 'POST';
+    const body = assigned ? undefined : JSON.stringify({ labelId });
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { Authorization: 'Bearer ' + token, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+        ...(body ? { body } : {}),
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        toast.error(`Failed to ${assigned ? 'remove' : 'assign'} label: ${errData.error || res.status}`);
+        return;
+      }
+      useAppStore.getState().refreshInvoices();
+    } catch { toast.error('Network error'); }
+  };
+
+  const deleteLabel = async (labelId: string) => {
+    const token = localStorage.getItem('op_token');
+    if (!token) return;
+    try {
+      const res = await fetch(`/api/labels?id=${encodeURIComponent(labelId)}`, {
+        method: 'DELETE', headers: { Authorization: 'Bearer ' + token },
+      });
+      if (res.ok) {
+        setLabels((prev) => prev.filter((l) => l.id !== labelId));
+        if (labelFilter === labelId) setLabelFilter(null);
+        useAppStore.getState().refreshInvoices();
+        toast.success('Label deleted');
+      }
+    } catch { toast.error('Network error'); }
+  };
+
+  // Bulk label assignment — applies a single label to every selected invoice
+  const bulkLabel = async (labelId: string) => {
+    const token = localStorage.getItem('op_token');
+    if (!token) return;
+    if (selectedIds.size === 0) return;
+    try {
+      const res = await fetch('/api/bulk-actions', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'add_label', invoiceIds: Array.from(selectedIds), labelId }),
+      });
+      if (res.ok) {
+        toast.success(`Label applied to ${selectedIds.size} invoice${selectedIds.size !== 1 ? 's' : ''}`);
+        useAppStore.getState().refreshInvoices();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error || 'Bulk label failed');
+      }
+    } catch { toast.error('Network error'); }
   };
 
   // Fetch audit logs + file data when detail dialog opens
@@ -574,16 +701,20 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
     }
   };
 
+  // Labels → string helper for exports
+  const labelsToStr = (inv: InvoiceRow): string =>
+    (inv.labels ?? []).map((l) => l.label?.name).filter(Boolean).join('; ');
+
   const exportSelectedCSV = () => {
     const selected = invoices.filter((inv) => selectedIds.has(inv.id));
     if (selected.length === 0) return;
-    const header = 'Vendor,Invoice #,Date,Amount,VAT,Total,Currency,Status,Confidence,Validation Status,Processing Time\n';
+    const header = 'Vendor,Invoice #,Date,Amount,VAT,Total,Currency,Status,Confidence,Validation Status,Processing Time,Labels\n';
     const esc = (v: unknown) => {
       const s = String(v ?? '');
       return s.includes(',') || s.includes('"') || s.includes('\n') ? '"' + s.replace(/"/g, '""') + '"' : s;
     };
     const rows = selected.map((inv) =>
-      [inv.vendor, inv.invNumber, inv.invDate, inv.amount, inv.vatAmount, inv.total, inv.currency, inv.status, inv.confidence, inv.validationStatus ?? '', inv.processingTime != null ? `${inv.processingTime.toFixed(1)}s` : ''].map(esc).join(',')
+      [inv.vendor, inv.invNumber, inv.invDate, inv.amount, inv.vatAmount, inv.total, inv.currency, inv.status, inv.confidence, inv.validationStatus ?? '', inv.processingTime != null ? `${inv.processingTime.toFixed(1)}s` : '', labelsToStr(inv)].map(esc).join(',')
     ).join('\n');
     const blob = new Blob([header + rows], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -595,14 +726,63 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
     toast.success('CSV exported');
   };
 
+  const exportSelectedJSON = () => {
+    const selected = invoices.filter((inv) => selectedIds.has(inv.id));
+    if (selected.length === 0) { toast.error('No checked invoices to export'); return; }
+    const blob = new Blob([JSON.stringify(selected, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'selected-invoices.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${selected.length} invoice${selected.length !== 1 ? 's' : ''} to JSON`);
+  };
+
+  const exportSelectedExcel = async () => {
+    const selected = invoices.filter((inv) => selectedIds.has(inv.id));
+    if (selected.length === 0) { toast.error('No checked invoices to export'); return; }
+    try {
+      const XLSX = await import('xlsx');
+      const wsData = [
+        ['Vendor', 'Invoice #', 'Date', 'Amount', 'VAT', 'Total', 'Currency', 'Status', 'Confidence (%)', 'Validation Status', 'Processing Time', 'Labels'],
+        ...selected.map((inv) => [
+          inv.vendor || '',
+          inv.invNumber || '',
+          inv.invDate || '',
+          inv.amount ?? '',
+          inv.vatAmount ?? '',
+          inv.total ?? '',
+          inv.currency || 'USD',
+          inv.isDuplicate ? 'Duplicate' : inv.status === 'review' ? 'Review' : 'Done',
+          inv.confidence ?? '',
+          inv.validationStatus ?? 'N/A',
+          inv.processingTime != null ? `${inv.processingTime.toFixed(1)}s` : '',
+          labelsToStr(inv),
+        ]),
+      ];
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      ws['!cols'] = wsData[0].map((_, colIdx) => {
+        const maxLen = Math.max(...wsData.map((row) => String(row[colIdx] ?? '').length));
+        return { wch: Math.min(Math.max(maxLen + 2, 8), 50) };
+      });
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Selected Invoices');
+      XLSX.writeFile(wb, 'selected-invoices.xlsx');
+      toast.success(`Exported ${selected.length} invoice${selected.length !== 1 ? 's' : ''} to Excel`);
+    } catch {
+      toast.error('Failed to generate Excel file');
+    }
+  };
+
   const exportCSV = () => {
-    const header = 'Vendor,Invoice #,Date,Amount,VAT,Total,Currency,Status,Confidence,Validation Status,Processing Time\n';
+    const header = 'Vendor,Invoice #,Date,Amount,VAT,Total,Currency,Status,Confidence,Validation Status,Processing Time,Labels\n';
     const esc = (v: unknown) => {
       const s = String(v ?? '');
       return s.includes(',') || s.includes('"') || s.includes('\n') ? '"' + s.replace(/"/g, '""') + '"' : s;
     };
     const rows = displayed.map((inv) =>
-      [inv.vendor, inv.invNumber, inv.invDate, inv.amount, inv.vatAmount, inv.total, inv.currency, inv.status, inv.confidence, inv.validationStatus ?? '', inv.processingTime != null ? `${inv.processingTime.toFixed(1)}s` : ''].map(esc).join(',')
+      [inv.vendor, inv.invNumber, inv.invDate, inv.amount, inv.vatAmount, inv.total, inv.currency, inv.status, inv.confidence, inv.validationStatus ?? '', inv.processingTime != null ? `${inv.processingTime.toFixed(1)}s` : '', labelsToStr(inv)].map(esc).join(',')
     ).join('\n');
     const blob = new Blob([header + rows], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -623,13 +803,13 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
 
   const exportCheckedCSV = () => {
     if (checkedInvoices.length === 0) { toast.error('No checked invoices to export'); return; }
-    const header = 'Vendor,Invoice #,Date,Amount,VAT,Total,Currency,Status,Confidence,Validation Status,Processing Time\n';
+    const header = 'Vendor,Invoice #,Date,Amount,VAT,Total,Currency,Status,Confidence,Validation Status,Processing Time,Labels\n';
     const esc = (v: unknown) => {
       const s = String(v ?? '');
       return s.includes(',') || s.includes('"') || s.includes('\n') ? '"' + s.replace(/"/g, '""') + '"' : s;
     };
     const rows = checkedInvoices.map((inv) =>
-      [inv.vendor, inv.invNumber, inv.invDate, inv.amount, inv.vatAmount, inv.total, inv.currency, inv.status, inv.confidence, inv.validationStatus ?? '', inv.processingTime != null ? `${inv.processingTime.toFixed(1)}s` : ''].map(esc).join(',')
+      [inv.vendor, inv.invNumber, inv.invDate, inv.amount, inv.vatAmount, inv.total, inv.currency, inv.status, inv.confidence, inv.validationStatus ?? '', inv.processingTime != null ? `${inv.processingTime.toFixed(1)}s` : '', labelsToStr(inv)].map(esc).join(',')
     ).join('\n');
     const blob = new Blob([header + rows], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -658,7 +838,7 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
     try {
       const XLSX = await import('xlsx');
       const wsData = [
-        ['Vendor', 'Invoice #', 'Date', 'Amount', 'VAT', 'Total', 'Currency', 'Status', 'Confidence (%)', 'Validation Status', 'Processing Time'],
+        ['Vendor', 'Invoice #', 'Date', 'Amount', 'VAT', 'Total', 'Currency', 'Status', 'Confidence (%)', 'Validation Status', 'Processing Time', 'Labels'],
         ...checkedInvoices.map((inv) => [
           inv.vendor || '',
           inv.invNumber || '',
@@ -671,6 +851,7 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
           inv.confidence ?? '',
           inv.validationStatus ?? 'N/A',
           inv.processingTime != null ? `${inv.processingTime.toFixed(1)}s` : '',
+          labelsToStr(inv),
         ]),
       ];
       const ws = XLSX.utils.aoa_to_sheet(wsData);
@@ -703,7 +884,7 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
     try {
       const XLSX = await import('xlsx');
       const wsData = [
-        ['Vendor', 'Invoice #', 'Date', 'Amount', 'VAT', 'Total', 'Currency', 'Status', 'Confidence (%)', 'Validation Status', 'Processing Time'],
+        ['Vendor', 'Invoice #', 'Date', 'Amount', 'VAT', 'Total', 'Currency', 'Status', 'Confidence (%)', 'Validation Status', 'Processing Time', 'Labels'],
         ...displayed.map((inv) => [
           inv.vendor || '',
           inv.invNumber || '',
@@ -716,6 +897,7 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
           inv.confidence ?? '',
           inv.validationStatus ?? 'N/A',
           inv.processingTime != null ? `${inv.processingTime.toFixed(1)}s` : '',
+          labelsToStr(inv),
         ]),
       ];
       const ws = XLSX.utils.aoa_to_sheet(wsData);
@@ -731,6 +913,49 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
     } catch {
       toast.error('Failed to generate Excel file');
     }
+  };
+
+  // ─── PDF export ────────────────────────────────────────────────
+  const generatePDF = async (rows: InvoiceRow[], filename: string, title: string) => {
+    if (rows.length === 0) { toast.error('No invoices to export'); return; }
+    try {
+      const [{ default: jsPDF }, autoTableMod] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
+      const autoTable = (autoTableMod as unknown as { default: (doc: unknown, opts: unknown) => void }).default
+        || (autoTableMod as unknown as (doc: unknown, opts: unknown) => void);
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+      doc.setFontSize(16); doc.setTextColor(40); doc.text(title, 40, 40);
+      doc.setFontSize(10); doc.setTextColor(120);
+      doc.text(`${rows.length} invoice${rows.length !== 1 ? 's' : ''} · Generated ${new Date().toLocaleString('en-US')}`, 40, 58);
+      const head = [['Vendor', 'Invoice #', 'Date', 'Amount', 'VAT', 'Total', 'Currency', 'Status', 'Confidence', 'Labels']];
+      const body = rows.map((inv) => [
+        (inv.vendor ?? '').slice(0, 40), inv.invNumber ?? '', inv.invDate ?? '',
+        inv.amount != null ? inv.amount.toFixed(2) : '', inv.vatAmount != null ? inv.vatAmount.toFixed(2) : '',
+        inv.total != null ? inv.total.toFixed(2) : '', inv.currency || 'USD',
+        inv.isDuplicate ? 'Duplicate' : inv.status === 'review' ? 'Review' : 'Done',
+        inv.confidence != null ? `${(inv.confidence * 100).toFixed(0)}%` : '', labelsToStr(inv),
+      ]);
+      autoTable(doc, {
+        startY: 75, head, body, theme: 'striped',
+        headStyles: { fillColor: [99, 102, 241], textColor: 255, fontSize: 9 },
+        bodyStyles: { fontSize: 8, cellPadding: 4 },
+        columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' }, 8: { halign: 'right' } },
+        margin: { left: 40, right: 40 },
+        didDrawPage: (data: { pageNumber: number }) => {
+          const pageCount = doc.getNumberOfPages();
+          doc.setFontSize(8); doc.setTextColor(150);
+          doc.text(`Page ${data.pageNumber} of ${pageCount} · OmniParse AI`, doc.internal.pageSize.getWidth() / 2, doc.internal.pageSize.getHeight() - 20, { align: 'center' });
+        },
+      });
+      doc.save(filename);
+      toast.success(`PDF exported (${rows.length} invoice${rows.length !== 1 ? 's' : ''})`);
+    } catch (err) { console.error('[exportPDF] error:', err); toast.error('Failed to generate PDF file'); }
+  };
+  const exportPDF = () => generatePDF(displayed, 'invoices.pdf', 'Invoices');
+  const exportCheckedPDF = () => { if (checkedInvoices.length === 0) { toast.error('No checked invoices to export'); return; } generatePDF(checkedInvoices, 'checked-invoices.pdf', 'Checked Invoices'); };
+  const exportSelectedPDF = () => {
+    const selected = invoices.filter((inv) => selectedIds.has(inv.id));
+    if (selected.length === 0) { toast.error('No checked invoices to export'); return; }
+    generatePDF(selected, 'selected-invoices.pdf', 'Selected Invoices');
   };
 
   const openDetail = useCallback((inv: InvoiceRow) => {
@@ -1647,17 +1872,19 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
           >
             <Mail className="h-4 w-4 mr-1" /> Scan Inboxes
           </Button>
-          {/* Show Normalized toggle */}
-          <div className="flex items-center gap-2">
-            <Switch
-              id="show-normalized"
-              checked={showNormalized}
-              onCheckedChange={setShowNormalized}
-            />
-            <Label htmlFor="show-normalized" className="text-sm text-muted-foreground cursor-pointer">
-              Show Normalized
-            </Label>
-          </div>
+          {/* Show Normalized toggle — gated by feature flag */}
+          {showNormalizedVisible === true && (
+            <div className="flex items-center gap-2">
+              <Switch
+                id="show-normalized"
+                checked={showNormalized}
+                onCheckedChange={setShowNormalized}
+              />
+              <Label htmlFor="show-normalized" className="text-sm text-muted-foreground cursor-pointer">
+                Show Normalized
+              </Label>
+            </div>
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" disabled={displayed.length === 0}>
@@ -1678,6 +1905,9 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
               <DropdownMenuItem onClick={exportCheckedExcel} disabled={checkedInvoices.length === 0}>
                 <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel (.xlsx)
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={exportCheckedPDF} disabled={checkedInvoices.length === 0}>
+                <FileText className="mr-2 h-4 w-4" /> PDF
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               {/* All invoices */}
               <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
@@ -1691,6 +1921,9 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
               </DropdownMenuItem>
               <DropdownMenuItem onClick={exportExcel}>
                 <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel (.xlsx)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={exportPDF}>
+                <FileText className="mr-2 h-4 w-4" /> PDF
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -1722,6 +1955,46 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
             Hide checked
           </Label>
         </div>
+
+        {/* Label filter dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="h-8">
+              <Tag className="h-3.5 w-3.5 mr-1" />
+              {labelFilter ? (labels.find((l) => l.id === labelFilter)?.name || 'Label') : 'All labels'}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-52">
+            <DropdownMenuLabel>Filter by label</DropdownMenuLabel>
+            <DropdownMenuItem onClick={() => setLabelFilter(null)}>
+              <span className="flex items-center gap-2 w-full">
+                <span className="h-2 w-2 rounded-full bg-muted-foreground/40" />
+                <span className="flex-1">All invoices</span>
+                {!labelFilter && <CheckCircle2 className="h-3 w-3 text-emerald-500" />}
+              </span>
+            </DropdownMenuItem>
+            {labels.length === 0 && (
+              <div className="px-2 py-1.5 text-xs text-muted-foreground">No labels yet</div>
+            )}
+            {labels.map((label) => (
+              <DropdownMenuItem key={label.id} onClick={() => setLabelFilter(label.id)}>
+                <span className="flex items-center gap-2 w-full">
+                  <span className={`h-2 w-2 rounded-full ${LABEL_DOT_CLASSES[label.color] || 'bg-gray-400'}`} />
+                  <span className="flex-1 truncate">{label.name}</span>
+                  {labelFilter === label.id && <CheckCircle2 className="h-3 w-3 text-emerald-500" />}
+                </span>
+              </DropdownMenuItem>
+            ))}
+            {labels.length > 0 && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setCreateLabelOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" /> New label
+                </DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         {/* Sort controls */}
         <div className="flex items-center gap-2 ml-auto">
@@ -1796,16 +2069,16 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                 <th className="text-center px-4 py-3 font-medium hidden xl:table-cell">Proc. Time</th>
                 <th className="text-center px-4 py-3 font-medium hidden lg:table-cell">Processed</th>
                 <th className="text-center px-4 py-3 font-medium hidden md:table-cell">Lifecycle</th>
+                <th className="text-left px-3 py-3 font-medium hidden lg:table-cell">Labels</th>
                 <th className="text-center px-3 py-3 font-medium w-[88px]">Checked</th>
-                {/* Action buttons: View + Delete (two columns) — always visible */}
-                <th className="px-2 py-3 w-8 sticky right-0 bg-card z-10"></th>
-                <th className="px-2 py-3 w-8 sticky right-8 bg-card z-10"></th>
+                {/* Action column: single sticky column — inline buttons on md+, 3-dot dropdown on mobile */}
+                <th className="px-2 py-3 sticky right-0 bg-card z-10 w-[112px]"></th>
               </tr>
             </thead>
             <tbody>
               {displayed.length === 0 ? (
                 <tr>
-                  <td colSpan={15} className="text-center py-12 text-muted-foreground">
+                  <td colSpan={16} className="text-center py-12 text-muted-foreground">
                     <Inbox className="h-10 w-10 mx-auto mb-3 opacity-40" />
                     <p>No invoices found</p>
                   </td>
@@ -1969,6 +2242,58 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                         </Tooltip>
                       )}
                     </td>
+                    {/* Labels — hidden on small screens; managed via dropdown on mobile actions cell */}
+                    <td className="px-3 py-3 hidden lg:table-cell" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex flex-wrap items-center gap-1 max-w-[220px]">
+                        {(inv.labels || []).map(({ label }) => (
+                          <Badge
+                            key={label.id}
+                            variant="secondary"
+                            className="text-[10px] px-1.5 py-0 border-0 gap-1 shrink-0"
+                            style={{ backgroundColor: `${LABEL_COLOR_HEX[label.color] || '#9ca3af'}1a`, color: LABEL_COLOR_HEX[label.color] || '#6b7280' }}
+                          >
+                            <span className={`h-1.5 w-1.5 rounded-full ${LABEL_DOT_CLASSES[label.color] || 'bg-gray-400'}`} />
+                            {label.name}
+                          </Badge>
+                        ))}
+                        <DropdownMenu open={showLabelPicker === inv.id} onOpenChange={(open) => setShowLabelPicker(open ? inv.id : null)}>
+                          <DropdownMenuTrigger asChild>
+                            <button
+                              type="button"
+                              className="inline-flex items-center justify-center h-5 w-5 rounded-md border border-dashed border-muted-foreground/40 text-muted-foreground hover:border-foreground hover:text-foreground transition-colors"
+                              title="Manage labels"
+                            >
+                              <Tag className="h-3 w-3" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-56">
+                            <DropdownMenuLabel>Labels</DropdownMenuLabel>
+                            {labels.length === 0 && (
+                              <div className="px-2 py-1.5 text-xs text-muted-foreground">No labels yet</div>
+                            )}
+                            {labels.map((label) => {
+                              const assigned = (inv.labels || []).some((l) => l.label.id === label.id);
+                              return (
+                                <DropdownMenuItem
+                                  key={label.id}
+                                  onClick={() => toggleLabel(inv.id, label.id, assigned)}
+                                >
+                                  <div className="flex items-center gap-2 w-full">
+                                    <span className={`h-2 w-2 rounded-full ${LABEL_DOT_CLASSES[label.color] || 'bg-gray-400'}`} />
+                                    <span className="flex-1 truncate">{label.name}</span>
+                                    {assigned && <CheckCircle2 className="h-3 w-3 text-emerald-500" />}
+                                  </div>
+                                </DropdownMenuItem>
+                              );
+                            })}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => { setShowLabelPicker(null); setCreateLabelOpen(true); }}>
+                              <Plus className="h-4 w-4 mr-2" /> New label
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </td>
                     {/* Manual "Checked" toggle */}
                     <td
                       className="px-3 py-3 text-center"
@@ -2005,38 +2330,82 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                         </TooltipContent>
                       </Tooltip>
                     </td>
-                    {/* View button — sticky, always visible */}
-                    <td className="px-2 py-3 sticky right-0 bg-card z-10 group-hover:bg-muted/30" onClick={(e) => e.stopPropagation()}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                            onClick={() => openDetail(inv)}
-                          >
-                            <Eye className="h-4 w-4" />
-                            <span className="sr-only">View details</span>
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>View invoice details</TooltipContent>
-                      </Tooltip>
-                    </td>
-                    {/* Delete — sticky, always visible */}
-                    <td className="px-2 py-3 sticky right-8 bg-card z-10 group-hover:bg-muted/30" onClick={(e) => e.stopPropagation()}>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={(e) => deleteInvoice(inv.id, e)}
-                        disabled={deleting === inv.id}
-                      >
-                        {deleting === inv.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
-                        )}
-                      </Button>
+                    {/* Actions: single sticky column — inline buttons on md+, 3-dot dropdown on mobile */}
+                    <td className="px-2 py-3 sticky right-0 bg-card z-10" onClick={(e) => e.stopPropagation()}>
+                      {/* Inline buttons on md+ */}
+                      <div className="hidden md:flex items-center gap-1 justify-end">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                              onClick={() => openDetail(inv)}
+                            >
+                              <Eye className="h-4 w-4" />
+                              <span className="sr-only">View details</span>
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>View invoice details</TooltipContent>
+                        </Tooltip>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={(e) => deleteInvoice(inv.id, e)}
+                          disabled={deleting === inv.id}
+                        >
+                          {deleting === inv.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+                          )}
+                        </Button>
+                      </div>
+                      {/* 3-dot dropdown on mobile */}
+                      <div className="md:hidden flex justify-end">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <EllipsisVertical className="h-4 w-4" />
+                              <span className="sr-only">More actions</span>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuItem onClick={() => openDetail(inv)}>
+                              <Eye className="h-4 w-4 mr-2" /> View details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={(e) => deleteInvoice(inv.id, e)}
+                              disabled={deleting === inv.id}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" /> Delete
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuLabel>Labels</DropdownMenuLabel>
+                            {labels.length === 0 && (
+                              <div className="px-2 py-1.5 text-xs text-muted-foreground">No labels yet</div>
+                            )}
+                            {labels.map((label) => {
+                              const assigned = (inv.labels || []).some((l) => l.label.id === label.id);
+                              return (
+                                <DropdownMenuItem key={label.id} onClick={() => toggleLabel(inv.id, label.id, assigned)}>
+                                  <span className="flex items-center gap-2 w-full">
+                                    <span className={`h-2 w-2 rounded-full ${LABEL_DOT_CLASSES[label.color] || 'bg-gray-400'}`} />
+                                    <span className="flex-1 truncate">{label.name}</span>
+                                    {assigned && <CheckCircle2 className="h-3 w-3 text-emerald-500" />}
+                                  </span>
+                                </DropdownMenuItem>
+                              );
+                            })}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => setCreateLabelOpen(true)}>
+                              <Plus className="h-4 w-4 mr-2" /> New label
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -2081,14 +2450,56 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                 {bulkDeleting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Trash2 className="h-4 w-4 mr-1" />}
                 Delete Selected
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={exportSelectedCSV}
-              >
-                <FileDown className="h-4 w-4 mr-1" />
-                Export Selected CSV
-              </Button>
+              {/* Export Selected — CSV / Excel / PDF / JSON dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" disabled={selectedIds.size === 0}>
+                    <FileDown className="h-4 w-4 mr-1" />
+                    Export Selected
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem onClick={exportSelectedCSV}>
+                    <FileJson className="mr-2 h-4 w-4" /> CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={exportSelectedExcel}>
+                    <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel (.xlsx)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={exportSelectedPDF}>
+                    <FileText className="mr-2 h-4 w-4" /> PDF
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={exportSelectedJSON}>
+                    <FileJson className="mr-2 h-4 w-4" /> JSON
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              {/* Label All — bulk assign a label to all selected invoices */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" disabled={selectedIds.size === 0}>
+                    <Tag className="h-4 w-4 mr-1" />
+                    Label All
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>Apply label to {selectedIds.size} invoice{selectedIds.size !== 1 ? 's' : ''}</DropdownMenuLabel>
+                  {labels.length === 0 && (
+                    <div className="px-2 py-1.5 text-xs text-muted-foreground">No labels yet</div>
+                  )}
+                  {labels.map((label) => (
+                    <DropdownMenuItem key={label.id} onClick={() => bulkLabel(label.id)}>
+                      <span className="flex items-center gap-2 w-full">
+                        <span className={`h-2 w-2 rounded-full ${LABEL_DOT_CLASSES[label.color] || 'bg-gray-400'}`} />
+                        <span className="flex-1 truncate">{label.name}</span>
+                      </span>
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setCreateLabelOpen(true)}>
+                    <Plus className="h-4 w-4 mr-2" /> New label
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Button
                 variant="ghost"
                 size="sm"
@@ -2147,6 +2558,77 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Create Label Dialog */}
+      <Dialog open={createLabelOpen} onOpenChange={setCreateLabelOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create new label</DialogTitle>
+            <DialogDescription>
+              Labels help you organize and filter invoices. Choose a name and a color.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="new-label-name" className="text-sm font-medium">Name</Label>
+              <Input
+                id="new-label-name"
+                value={newLabelName}
+                onChange={(e) => setNewLabelName(e.target.value)}
+                placeholder="e.g. Urgent, FY2024, Reimbursable"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && newLabelName.trim()) {
+                    createLabel(newLabelName.trim(), newLabelColor).then((created) => {
+                      if (created) {
+                        setNewLabelName('');
+                        setNewLabelColor('amber');
+                        setCreateLabelOpen(false);
+                      }
+                    });
+                  }
+                }}
+                autoFocus
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Color</Label>
+              <div className="flex items-center gap-2 flex-wrap">
+                {LABEL_COLOR_NAMES.map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    onClick={() => setNewLabelColor(color)}
+                    className={`h-7 w-7 rounded-full flex items-center justify-center transition-all ${newLabelColor === color ? 'ring-2 ring-offset-2 ring-offset-background ring-foreground' : ''}`}
+                    style={{ backgroundColor: LABEL_COLOR_HEX[color] }}
+                    title={color}
+                  >
+                    {newLabelColor === color && <CheckCircle2 className="h-4 w-4 text-white" />}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 mt-2">
+            <Button variant="outline" size="sm" onClick={() => { setCreateLabelOpen(false); setNewLabelName(''); setNewLabelColor('amber'); }}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              disabled={!newLabelName.trim()}
+              onClick={async () => {
+                const created = await createLabel(newLabelName.trim(), newLabelColor);
+                if (created) {
+                  setNewLabelName('');
+                  setNewLabelColor('amber');
+                  setCreateLabelOpen(false);
+                }
+              }}
+            >
+              <Plus className="h-4 w-4 mr-1" /> Create label
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
