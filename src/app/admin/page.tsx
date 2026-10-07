@@ -6,6 +6,7 @@ import {
   Search, AlertTriangle, Users, FileText, MessageSquare, Mail, Loader2,
   ArrowUpDown, ArrowUp, ArrowDown, History, EyeOff, Eye, Star,
   Cpu, CheckCircle2, XCircle, Bug, Activity,
+  FlaskConical, BookOpen, DatabaseBackup, Scale, Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -498,6 +499,45 @@ export default function AdminPage() {
     finally { setActionLoading(null); }
   };
 
+  // --- Reset password for an account ---
+  // POST /api/admin/accounts/[id]/reset-password?key=CRON_SECRET with
+  // body { password }. Prompts for a new password and pushes it to the
+  // backend. If the endpoint doesn't exist (yet), the fetch surfaces the
+  // error in a toast — no silent failure.
+  const handleResetPassword = async (id: string, email: string) => {
+    const password = prompt(`Reset password for "${email}".\n\nEnter new password (min 8 characters):`);
+    if (password === null) return; // user cancelled
+    if (!password) { toast.error('Password cannot be empty'); return; }
+    if (password.length < 8) { toast.error('Password must be at least 8 characters'); return; }
+    setActionLoading(id);
+    try {
+      const res = await fetch(`/api/admin/accounts/${id}/reset-password?key=${encodeURIComponent(secret)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        toast.success(data.message || 'Password reset successfully');
+      } else {
+        toast.error(data.error || `Failed to reset password (HTTP ${res.status})`);
+      }
+    } catch {
+      toast.error('Network error');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // --- Backup trigger ---
+  // The database backup is handled by a server-side cron job (see vercel.json
+  // / scheduled tasks). There's no manual endpoint to hit from the browser —
+  // surfacing a toast lets admins know the mechanism without implying a
+  // one-click download.
+  const handleBackup = () => {
+    toast.info('Backup script runs via cron — no manual trigger needed.');
+  };
+
   // Login screen
   if (!authed) {
     return (
@@ -562,32 +602,58 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* Tabs */}
-        <div className="flex gap-2 border-b border-border">
-          <button onClick={() => setTab('accounts')}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${tab === 'accounts' ? 'border-amber-500 text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
-            <Users className="h-4 w-4 inline mr-1.5" /> Active ({sortedAccounts.length})
-          </button>
-          <button onClick={() => setTab('hidden')}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${tab === 'hidden' ? 'border-amber-500 text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
-            <EyeOff className="h-4 w-4 inline mr-1.5" /> Hidden ({hiddenAccounts.length})
-          </button>
-          <button onClick={() => setTab('deleted')}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${tab === 'deleted' ? 'border-amber-500 text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
-            <History className="h-4 w-4 inline mr-1.5" /> Deleted ({deletionLogs.length})
-          </button>
-          <button onClick={() => setTab('providers')}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${tab === 'providers' ? 'border-amber-500 text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
-            <Cpu className="h-4 w-4 inline mr-1.5" /> AI Providers
-          </button>
-          <button onClick={() => setTab('flags')}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${tab === 'flags' ? 'border-amber-500 text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
-            <ShieldCheck className="h-4 w-4 inline mr-1.5" /> Feature Flags
-          </button>
-          <button onClick={() => setTab('modelhealth')}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${tab === 'modelhealth' ? 'border-amber-500 text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
-            <Activity className="h-4 w-4 inline mr-1.5" /> Model Health
-          </button>
+        {/* Tabs + external tool links */}
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 border-b border-border">
+          <div className="flex gap-2 overflow-x-auto pb-px">
+            <button onClick={() => setTab('accounts')}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${tab === 'accounts' ? 'border-amber-500 text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
+              <Users className="h-4 w-4 inline mr-1.5" /> Active ({sortedAccounts.length})
+            </button>
+            <button onClick={() => setTab('hidden')}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${tab === 'hidden' ? 'border-amber-500 text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
+              <EyeOff className="h-4 w-4 inline mr-1.5" /> Hidden ({hiddenAccounts.length})
+            </button>
+            <button onClick={() => setTab('deleted')}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${tab === 'deleted' ? 'border-amber-500 text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
+              <History className="h-4 w-4 inline mr-1.5" /> Deleted ({deletionLogs.length})
+            </button>
+            <button onClick={() => setTab('providers')}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${tab === 'providers' ? 'border-amber-500 text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
+              <Cpu className="h-4 w-4 inline mr-1.5" /> AI Providers
+            </button>
+            <button onClick={() => setTab('flags')}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${tab === 'flags' ? 'border-amber-500 text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
+              <ShieldCheck className="h-4 w-4 inline mr-1.5" /> Feature Flags
+            </button>
+            <button onClick={() => setTab('modelhealth')}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${tab === 'modelhealth' ? 'border-amber-500 text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
+              <Activity className="h-4 w-4 inline mr-1.5" /> Model Health
+            </button>
+          </div>
+
+          {/* External tools + legal docs — top-right toolbar */}
+          <div className="flex flex-wrap gap-1.5 pb-1">
+            <a href="/api-test"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs hover:bg-muted/50 transition-colors"
+              title="Open the API tester playground">
+              <FlaskConical className="h-3 w-3" /> API Tester
+            </a>
+            <a href="/api-docs"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs hover:bg-muted/50 transition-colors"
+              title="Open the API documentation">
+              <BookOpen className="h-3 w-3" /> API Docs
+            </a>
+            <button onClick={handleBackup}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs hover:bg-muted/50 transition-colors"
+              title="Database backups run on a cron schedule">
+              <DatabaseBackup className="h-3 w-3" /> Backup
+            </button>
+            <a href="/legal"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs hover:bg-muted/50 transition-colors"
+              title="View legal documents (privacy policy, terms, DPA)">
+              <Scale className="h-3 w-3" /> Legal Docs
+            </a>
+          </div>
         </div>
 
         {/* === ACCOUNTS TAB === */}
@@ -692,6 +758,7 @@ export default function AdminPage() {
                                 )}
                                 <button onClick={() => handleHide(acc.id, acc.email)} title="Hide from active view" className="p-1.5 rounded hover:bg-muted text-muted-foreground"><EyeOff className="h-4 w-4" /></button>
                                 <button onClick={() => handleToggleDebug(acc)} title={acc.debugEnabled ? 'Disable debug mode (hides Debug Logs button on upload tab)' : 'Enable debug mode (shows Debug Logs button on upload tab)'} className={`p-1.5 rounded hover:bg-amber-500/20 ${acc.debugEnabled ? 'text-amber-500' : 'text-muted-foreground'}`}><Bug className="h-4 w-4" /></button>
+                                <button onClick={() => handleResetPassword(acc.id, acc.email)} title="Reset password" className="p-1.5 rounded hover:bg-amber-500/20 text-amber-600"><Shield className="h-4 w-4" /></button>
                                 <button onClick={() => handleDelete(acc.id, acc.email)} title="Delete" className="p-1.5 rounded hover:bg-red-500/20 text-red-500"><Trash2 className="h-4 w-4" /></button>
                               </>
                             )}
@@ -987,8 +1054,9 @@ export default function AdminPage() {
               </div>
               <p className="text-sm text-muted-foreground mb-4">
                 Probes each AI model endpoint with a 1-token request and records the status. Decommissioned
-                models are surfaced here so they can be removed from the cascade. A daily cron at 06:00 UTC
-                also runs this check and emails alerts on status transitions.
+                models are surfaced here so they can be removed from the cascade, and new models detected in
+                each provider's catalog are flagged for review. A daily cron at 06:00 UTC also runs this check
+                and emails alerts on status transitions.
               </p>
 
               {/* Summary cards */}
@@ -999,6 +1067,7 @@ export default function AdminPage() {
                   decommissioned: rows.filter((r) => r.status === 'decommissioned').length,
                   rate_limited: rows.filter((r) => r.status === 'rate_limited').length,
                   error: rows.filter((r) => r.status === 'error').length,
+                  new_model: rows.filter((r) => r.status === 'new_model').length,
                   unknown: rows.filter((r) => r.status === 'unknown' || !r.status).length,
                 };
                 const summaryItems = [
@@ -1006,10 +1075,11 @@ export default function AdminPage() {
                   { label: 'Decommissioned', value: counts.decommissioned, color: 'text-red-500', bg: 'bg-red-500/10' },
                   { label: 'Rate Limited', value: counts.rate_limited, color: 'text-amber-500', bg: 'bg-amber-500/10' },
                   { label: 'Errors', value: counts.error, color: 'text-orange-500', bg: 'bg-orange-500/10' },
+                  { label: 'New Models', value: counts.new_model, color: 'text-violet-500', bg: 'bg-violet-500/10' },
                   { label: 'Deprecations', value: (modelHealth?.deprecations ?? []).length, color: 'text-red-500', bg: 'bg-red-500/5' },
                 ];
                 return (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
                     {summaryItems.map((s) => (
                       <div key={s.label} className={`rounded-lg border border-border p-3 ${s.bg}`}>
                         <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{s.label}</p>
@@ -1050,12 +1120,14 @@ export default function AdminPage() {
                           : row.status === 'decommissioned' ? 'text-red-500'
                           : row.status === 'rate_limited' ? 'text-amber-500'
                           : row.status === 'error' ? 'text-orange-500'
+                          : row.status === 'new_model' ? 'text-violet-500'
                           : 'text-muted-foreground';
                         const bg =
                           row.status === 'ok' ? 'bg-emerald-500/10'
                           : row.status === 'decommissioned' ? 'bg-red-500/10'
                           : row.status === 'rate_limited' ? 'bg-amber-500/10'
                           : row.status === 'error' ? 'bg-orange-500/10'
+                          : row.status === 'new_model' ? 'bg-violet-500/10'
                           : 'bg-muted';
                         return (
                           <tr key={i} className="border-b border-border last:border-0 hover:bg-muted/30">
@@ -1110,6 +1182,42 @@ export default function AdminPage() {
                         )}
                       </div>
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {/* New models — candidates for the cascade */}
+              {modelHealth && (modelHealth.latest ?? []).some((r) => r.status === 'new_model') && (
+                <div className="mt-4">
+                  <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-violet-500" />
+                    New Models Available ({
+                      (modelHealth.latest ?? []).filter((r) => r.status === 'new_model').length
+                    })
+                  </h4>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    These chat-capable models exist in the provider's catalog but aren't in our
+                    cascade yet. Probe them manually before adding to MISTRAL_MODELS / GROQ_MODELS.
+                  </p>
+                  <div className="space-y-2">
+                    {(modelHealth.latest ?? [])
+                      .filter((r) => r.status === 'new_model')
+                      .map((d, i) => (
+                        <div key={i} className="flex items-center gap-3 p-3 bg-violet-500/5 border border-violet-500/20 rounded-lg text-sm">
+                          <Sparkles className="h-4 w-4 text-violet-500 shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <span className="font-medium capitalize">{d.provider}</span>
+                            <span className="text-muted-foreground mx-1">·</span>
+                            <span className="font-mono text-xs">{d.modelName}</span>
+                            {d.notes && <p className="text-xs text-muted-foreground mt-0.5">{d.notes}</p>}
+                          </div>
+                          {d.checkedAt && (
+                            <span className="text-[10px] text-muted-foreground shrink-0">
+                              seen {new Date(d.checkedAt).toLocaleDateString()}
+                            </span>
+                          )}
+                        </div>
+                      ))}
                   </div>
                 </div>
               )}

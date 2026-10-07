@@ -18,12 +18,21 @@ import { sendAlertEmail } from '@/lib/email-alert';
 //   rate_limited   — HTTP 429 from the provider
 //   decommissioned — HTTP 404 / explicit "decommissioned" / "model not found"
 //   error          — any other failure (5xx, network error, timeout, etc.)
+//   new_model      — model exists in the provider's catalog but isn't in our
+//                    ALL_MODELS list (candidate to add to the cascade)
 //
 // Mistral API key rotation: we try each configured key (MISTRAL_API_KEY,
 // MISTRAL_API_KEY_2, MISTRAL_API_KEY_3) on 429 before declaring the model
 // rate-limited. Groq has a single key.
+//
+// New-model detection: after probing the configured models, the sweep also
+// fetches each provider's full model catalog (GET /v1/models) and surfaces any
+// chat-capable models we're NOT yet using as status='new_model'. These are
+// candidates for the cascade — the admin decides whether to add them. The
+// detection is best-effort: any network/parse failure is logged and skipped so
+// it can never abort the sweep.
 
-type HealthStatus = 'ok' | 'decommissioned' | 'rate_limited' | 'error';
+type HealthStatus = 'ok' | 'decommissioned' | 'rate_limited' | 'error' | 'new_model';
 
 interface ModelSpec {
   provider: 'mistral' | 'groq';
@@ -314,6 +323,65 @@ async function previousStatus(
   return rows[0] ?? null;
 }
 
+/**
+ * Fetch the full model catalog from a provider's /v1/models endpoint.
+ *
+ * Returns a deduplicated list of model IDs that are chat-capable (i.e.
+ * plausible candidates for the cascade). Best-effort: any error returns an
+ * empty array so the sweep never fails because of a catalog fetch.
+ *
+ *  - Mistral: filters on `capabilities.completion_chat === true` (the API
+ *    exposes a capabilities object). Vision models like pixtral also set this,
+ *    so they're included automatically.
+ *  - Groq: the /models endpoint doesn't expose capabilities, so we exclude
+ *    obvious non-chat families by name (whisper, guard, tts, embedding,
+ *    moderation) and drop anything marked inactive.
+ */
+async function fetchAvailableModelIds(provider: 'mistral' | 'groq'): Promise<string[]> {
+  try {
+    if (provider === 'mistral') {
+      const keys = getMistralKeys();
+      if (keys.length === 0) return [];
+      // The /models endpoint is read-only and not rate-limited the way chat
+      // completions are, so the first key is enough.
+      const res = await fetch('https://api.mistral.ai/v1/models', {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${keys[0]}`, Accept: 'application/json' },
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!res.ok) return [];
+      const data = (await res.json().catch(() => ({ data: [] }))) as {
+        data?: Array<{ id?: string; capabilities?: { completion_chat?: boolean } }>;
+      };
+      const rows = Array.isArray(data?.data) ? data.data : [];
+      return rows
+        .filter((r) => r?.capabilities?.completion_chat === true && r.id)
+        .map((r) => String(r.id));
+    }
+
+    // Groq
+    const groqKey = getGroqKey();
+    if (!groqKey) return [];
+    const res = await fetch('https://api.groq.com/openai/v1/models', {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${groqKey}`, Accept: 'application/json' },
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) return [];
+    const data = (await res.json().catch(() => ({ data: [] }))) as {
+      data?: Array<{ id?: string; active?: boolean }>;
+    };
+    const rows = Array.isArray(data?.data) ? data.data : [];
+    const EXCLUDE = /whisper|guard|tts|embed|moderation/i;
+    return rows
+      .filter((r) => r.active !== false && r.id && !EXCLUDE.test(r.id))
+      .map((r) => String(r.id));
+  } catch (err) {
+    console.warn(`[model-health-check] Failed to fetch ${provider} model list:`, err);
+    return [];
+  }
+}
+
 export async function GET(req: NextRequest) {
   const isAuthed = authenticate(req);
   if (!isAuthed) {
@@ -372,6 +440,68 @@ export async function GET(req: NextRequest) {
     });
   }
 
+  // --- New-model detection ---
+  // Fetch each provider's full chat-capable catalog and surface any model we
+  // aren't using yet as status='new_model'. These are candidates for the
+  // cascade — the admin decides whether to add them. We cap the count per
+  // provider to keep the results readable (some catalogs have 30+ entries,
+  // most of which are irrelevant to invoice parsing).
+  const NEW_MODEL_CAP_PER_PROVIDER = 15;
+  const knownByProvider: Record<'mistral' | 'groq', Set<string>> = {
+    mistral: new Set(MISTRAL_MODELS.map((m) => m.modelName)),
+    groq: new Set(GROQ_MODELS.map((m) => m.modelName)),
+  };
+
+  const newModelSpecs: Array<{ provider: 'mistral' | 'groq'; modelName: string }> = [];
+  for (const provider of ['mistral', 'groq'] as const) {
+    const available = await fetchAvailableModelIds(provider);
+    let added = 0;
+    for (const id of available) {
+      if (added >= NEW_MODEL_CAP_PER_PROVIDER) break;
+      if (knownByProvider[provider].has(id)) continue;
+      // Dedupe within this run (the catalog could in theory list a model twice).
+      if (newModelSpecs.some((m) => m.provider === provider && m.modelName === id)) continue;
+      newModelSpecs.push({ provider, modelName: id });
+      added++;
+    }
+  }
+
+  for (const spec of newModelSpecs) {
+    const note =
+      'New model available in provider catalog — candidate for the cascade. ' +
+      'Probe manually before adding to MISTRAL_MODELS / GROQ_MODELS.';
+    // Persist a row so the admin dashboard (which reads latest-by-model) can
+    // surface it under the "new_model" status. A DB write failure here is
+    // non-fatal — the result is still returned in the response payload.
+    try {
+      await db.modelHealthLog.create({
+        data: {
+          provider: spec.provider,
+          modelName: spec.modelName,
+          status: 'new_model',
+          statusCode: null,
+          responseTimeMs: null,
+          notes: note,
+        },
+      });
+    } catch (err) {
+      console.warn(
+        `[model-health-check] Failed to log new_model ${spec.provider}/${spec.modelName}:`,
+        err,
+      );
+    }
+
+    results.push({
+      provider: spec.provider,
+      modelName: spec.modelName,
+      status: 'new_model',
+      statusCode: null,
+      responseTimeMs: null,
+      notes: note,
+      statusChanged: false,
+    });
+  }
+
   // Send a single digest email if anything transitioned. Batching keeps the
   // Resend send count low (free-tier cap is 100/day).
   if (alerts.length > 0) {
@@ -406,6 +536,7 @@ export async function GET(req: NextRequest) {
     rate_limited: results.filter((r) => r.status === 'rate_limited').length,
     decommissioned: results.filter((r) => r.status === 'decommissioned').length,
     error: results.filter((r) => r.status === 'error').length,
+    new_model: results.filter((r) => r.status === 'new_model').length,
   };
 
   return NextResponse.json({

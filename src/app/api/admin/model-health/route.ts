@@ -7,7 +7,11 @@ import { sendAlertEmail } from '@/lib/email-alert';
 //
 // GET /api/admin/model-health?key=CRON_SECRET
 //   Returns: { latest: [...], deprecations: [...], alertHistory: [...] }
-//   - latest:        the most-recent ModelHealthLog row per (provider, model)
+//   - latest:        the most-recent ModelHealthLog row per (provider, model).
+//                    Includes the hardcoded KNOWN_MODELS plus any
+//                    status='new_model' rows written by the auto-detection in
+//                    /api/admin/model-health-check (so newly-released models
+//                    surface in the dashboard for admin review).
 //   - deprecations:  latest rows whose status is 'decommissioned'
 //   - alertHistory:  recent rows whose status differs from the previous row
 //                    (i.e. transitions that triggered an email alert)
@@ -59,8 +63,11 @@ export async function GET(req: NextRequest) {
     // `groupBy` so we get a stable, complete response even for models that
     // have never been probed (in which case `latest` is null for that model).
     const latest: Array<Record<string, unknown>> = [];
+    const seenKeys = new Set<string>();
     for (const m of KNOWN_MODELS) {
       const row = await latestRow(m.provider, m.modelName);
+      const key = `${m.provider}|${m.modelName}`;
+      seenKeys.add(key);
       latest.push({
         provider: m.provider,
         modelName: m.modelName,
@@ -70,6 +77,37 @@ export async function GET(req: NextRequest) {
         notes: row?.notes ?? null,
         checkedAt: row?.checkedAt ?? null,
       });
+    }
+
+    // Surface any "new_model" entries written by the auto-detection in the
+    // cron endpoint. These are models that exist in the provider's catalog but
+    // aren't in KNOWN_MODELS — admins need to see them to decide whether to
+    // add them to the cascade. We pull recent rows and dedupe by provider+model
+    // in memory (Prisma's `distinct` is finicky with ordering, and the row
+    // count here is small enough that a linear scan is fine).
+    try {
+      const newModelRows = await db.modelHealthLog.findMany({
+        where: { status: 'new_model' },
+        orderBy: { checkedAt: 'desc' },
+        take: 500,
+      });
+      for (const row of newModelRows) {
+        const key = `${row.provider}|${row.modelName}`;
+        if (seenKeys.has(key)) continue; // already covered by KNOWN_MODELS
+        seenKeys.add(key);
+        latest.push({
+          provider: row.provider,
+          modelName: row.modelName,
+          status: row.status,
+          statusCode: row.statusCode,
+          responseTimeMs: row.responseTimeMs,
+          notes: row.notes,
+          checkedAt: row.checkedAt,
+        });
+      }
+    } catch (err) {
+      // Non-fatal — the dashboard just won't show new-model rows this load.
+      console.warn('[admin/model-health] Failed to load new_model rows:', err);
     }
 
     // Deprecations: latest rows with status='decommissioned'. These are the

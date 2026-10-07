@@ -2096,8 +2096,6 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                 <th className="text-center px-4 py-3 font-medium hidden xl:table-cell">Proc. Time</th>
                 <th className="text-center px-4 py-3 font-medium hidden lg:table-cell">Processed</th>
                 <th className="text-center px-4 py-3 font-medium hidden md:table-cell">Lifecycle</th>
-                <th className="text-left px-3 py-3 font-medium hidden lg:table-cell">Labels</th>
-                <th className="text-center px-3 py-3 font-medium w-[88px]">Checked</th>
                 {/* Action column: single sticky column — inline buttons on md+, 3-dot dropdown on mobile */}
                 <th className="px-2 py-3 sticky right-0 bg-card z-10 w-[112px]"></th>
               </tr>
@@ -2105,7 +2103,7 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
             <tbody>
               {displayed.length === 0 ? (
                 <tr>
-                  <td colSpan={16} className="text-center py-12 text-muted-foreground">
+                  <td colSpan={14} className="text-center py-12 text-muted-foreground">
                     <Inbox className="h-10 w-10 mx-auto mb-3 opacity-40" />
                     <p>No invoices found</p>
                   </td>
@@ -2287,94 +2285,6 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                           <TooltipContent>Status tracking is not available.</TooltipContent>
                         </Tooltip>
                       )}
-                    </td>
-                    {/* Labels — hidden on small screens; managed via dropdown on mobile actions cell */}
-                    <td className="px-3 py-3 hidden lg:table-cell" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex flex-wrap items-center gap-1 max-w-[220px]">
-                        {(inv.labels || []).map(({ label }) => (
-                          <Badge
-                            key={label.id}
-                            variant="secondary"
-                            className="text-[10px] px-1.5 py-0 border-0 gap-1 shrink-0"
-                            style={{ backgroundColor: `${LABEL_COLOR_HEX[label.color] || '#9ca3af'}1a`, color: LABEL_COLOR_HEX[label.color] || '#6b7280' }}
-                          >
-                            <span className={`h-1.5 w-1.5 rounded-full ${LABEL_DOT_CLASSES[label.color] || 'bg-gray-400'}`} />
-                            {label.name}
-                          </Badge>
-                        ))}
-                        <DropdownMenu open={showLabelPicker === inv.id} onOpenChange={(open) => setShowLabelPicker(open ? inv.id : null)}>
-                          <DropdownMenuTrigger asChild>
-                            <button
-                              type="button"
-                              className="inline-flex items-center justify-center h-5 w-5 rounded-md border border-dashed border-muted-foreground/40 text-muted-foreground hover:border-foreground hover:text-foreground transition-colors"
-                              title="Manage labels"
-                            >
-                              <Tag className="h-3 w-3" />
-                            </button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-56">
-                            <DropdownMenuLabel>Labels</DropdownMenuLabel>
-                            {labels.length === 0 && (
-                              <div className="px-2 py-1.5 text-xs text-muted-foreground">No labels yet</div>
-                            )}
-                            {labels.map((label) => {
-                              const assigned = (inv.labels || []).some((l) => l.label.id === label.id);
-                              return (
-                                <DropdownMenuItem
-                                  key={label.id}
-                                  onClick={() => toggleLabel(inv.id, label.id, assigned)}
-                                >
-                                  <div className="flex items-center gap-2 w-full">
-                                    <span className={`h-2 w-2 rounded-full ${LABEL_DOT_CLASSES[label.color] || 'bg-gray-400'}`} />
-                                    <span className="flex-1 truncate">{label.name}</span>
-                                    {assigned && <CheckCircle2 className="h-3 w-3 text-emerald-500" />}
-                                  </div>
-                                </DropdownMenuItem>
-                              );
-                            })}
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => { setShowLabelPicker(null); setCreateLabelOpen(true); }}>
-                              <Plus className="h-4 w-4 mr-2" /> New label
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </td>
-                    {/* Manual "Checked" toggle */}
-                    <td
-                      className="px-3 py-3 text-center"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className={`h-8 w-8 ${isReviewed(inv) ? 'text-emerald-500 hover:text-emerald-600' : 'text-muted-foreground hover:text-foreground'}`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleReviewed(inv.id, isReviewed(inv));
-                            }}
-                            disabled={reviewing === inv.id}
-                          >
-                            {reviewing === inv.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : isReviewed(inv) ? (
-                              <CheckCircle2 className="h-5 w-5" />
-                            ) : (
-                              <Circle className="h-5 w-5" />
-                            )}
-                            <span className="sr-only">
-                              {isReviewed(inv) ? 'Mark as needs review' : 'Mark as checked'}
-                            </span>
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          {isReviewed(inv)
-                            ? 'Checked — click to mark as needs review'
-                            : 'Click to mark this invoice as checked'}
-                        </TooltipContent>
-                      </Tooltip>
                     </td>
                     {/* Actions: single sticky column — 3-dot dropdown on ALL screen sizes */}
                     <td className="px-2 py-3 sticky right-0 bg-card z-10" onClick={(e) => e.stopPropagation()}>
