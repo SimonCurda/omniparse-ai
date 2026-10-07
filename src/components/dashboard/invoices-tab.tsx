@@ -2136,6 +2136,25 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                           </Badge>
                         )}
                       </div>
+                      {/* Label badges under vendor name — visible on ALL screen sizes */}
+                      {(inv.labels || []).length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {(inv.labels || []).map(({ label }) => (
+                            <span
+                              key={label.id}
+                              className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full border"
+                              style={{
+                                backgroundColor: `${LABEL_COLOR_HEX[label.color] || '#9ca3af'}1a`,
+                                color: LABEL_COLOR_HEX[label.color] || '#6b7280',
+                                borderColor: `${LABEL_COLOR_HEX[label.color] || '#9ca3af'}40`,
+                              }}
+                            >
+                              <span className={`h-1.5 w-1.5 rounded-full ${LABEL_DOT_CLASSES[label.color] || 'bg-gray-400'}`} />
+                              {label.name}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                       <div className="text-xs text-muted-foreground md:hidden">{inv.invNumber}</div>
                     </td>
                     <td className="px-4 py-3 font-mono text-xs text-muted-foreground hidden md:table-cell">
