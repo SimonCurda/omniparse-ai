@@ -2147,20 +2147,20 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                   )}
                 </th>
                 <th className="text-left px-4 py-3 font-medium">Vendor</th>
-                <th className="text-left px-4 py-3 font-medium hidden md:table-cell">Invoice #</th>
-                <th className="text-left px-4 py-3 font-medium hidden sm:table-cell">
+                <th className="text-left px-4 py-3 font-medium whitespace-nowrap">Invoice #</th>
+                <th className="text-left px-4 py-3 font-medium whitespace-nowrap">
                   {showNormalized ? 'Norm. Vendor' : 'Date'}
                 </th>
-                <th className="text-right px-4 py-3 font-medium">
+                <th className="text-right px-4 py-3 font-medium whitespace-nowrap">
                   {showNormalized ? 'Norm. Total' : 'Total'}
                 </th>
-                <th className="text-center px-4 py-3 font-medium hidden md:table-cell">Approval</th>
-                <th className="text-center px-4 py-3 font-medium hidden xl:table-cell">Validation</th>
-                <th className="text-center px-4 py-3 font-medium hidden lg:table-cell">Confidence</th>
-                <th className="text-center px-4 py-3 font-medium hidden lg:table-cell">Aging</th>
-                <th className="text-center px-4 py-3 font-medium hidden xl:table-cell">Proc. Time</th>
-                <th className="text-center px-4 py-3 font-medium">Processed</th>
-                <th className="text-center px-4 py-3 font-medium">Lifecycle</th>
+                <th className="text-center px-4 py-3 font-medium whitespace-nowrap">Approval</th>
+                <th className="text-center px-4 py-3 font-medium whitespace-nowrap">Validation</th>
+                <th className="text-center px-4 py-3 font-medium whitespace-nowrap">Confidence</th>
+                <th className="text-center px-4 py-3 font-medium whitespace-nowrap">Aging</th>
+                <th className="text-center px-4 py-3 font-medium whitespace-nowrap">Proc. Time</th>
+                <th className="text-center px-4 py-3 font-medium whitespace-nowrap">Processed</th>
+                <th className="text-center px-4 py-3 font-medium whitespace-nowrap">Lifecycle</th>
                 {/* Action column: single sticky column — inline buttons on md+, 3-dot dropdown on mobile */}
                 <th className="px-2 py-3 sticky right-0 bg-card z-10 w-[112px]"></th>
               </tr>
@@ -2237,10 +2237,10 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                       )}
                       <div className="text-xs text-muted-foreground md:hidden">{inv.invNumber}</div>
                     </td>
-                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground hidden md:table-cell">
+                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground whitespace-nowrap">
                       {inv.invNumber}
                     </td>
-                    <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">
+                    <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
                       {showNormalized && inv.normalizedInvDate ? inv.normalizedInvDate : inv.invDate}
                     </td>
                     <td className="px-4 py-3 text-right font-medium">
@@ -2249,23 +2249,23 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                         : fmtCurrency(inv.total, inv.currency)}
                     </td>
                     {/* Approval Status */}
-                    <td className="px-4 py-3 text-center hidden md:table-cell">
+                    <td className="px-4 py-3 text-center whitespace-nowrap">
                       {renderApprovalBadge(inv.approvalStatus)}
                     </td>
                     {/* Validation Status */}
-                    <td className="px-4 py-3 text-center hidden xl:table-cell">
+                    <td className="px-4 py-3 text-center whitespace-nowrap">
                       {renderValidationBadge(inv)}
                     </td>
                     {/* Confidence */}
-                    <td className="px-4 py-3 text-center hidden lg:table-cell">
+                    <td className="px-4 py-3 text-center whitespace-nowrap">
                       <ConfidenceMeter confidence={inv.confidence} fieldConfidence={inv.fieldConfidence} />
                     </td>
                     {/* Aging */}
-                    <td className="px-4 py-3 text-center hidden lg:table-cell">
+                    <td className="px-4 py-3 text-center whitespace-nowrap">
                       {renderAging(inv)}
                     </td>
                     {/* Processing Time */}
-                    <td className="px-4 py-3 text-center hidden xl:table-cell">
+                    <td className="px-4 py-3 text-center whitespace-nowrap">
                       {renderProcessingTime(inv)}
                     </td>
                     {/* Processed At — smart timestamp: time today, date otherwise */}

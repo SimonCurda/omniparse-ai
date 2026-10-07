@@ -68,7 +68,12 @@ export function DashboardShell() {
   useEffect(() => {
     const token = localStorage.getItem('op_token');
     if (token) {
-      fetch('/api/invoices', { headers: { Authorization: 'Bearer ' + token } })
+      // `cache: 'no-store'` is critical — without it, the browser serves a
+      // stale cached response that doesn't include labels. This was the root
+      // cause of the "labels don't show until I tag an invoice" bug: the
+      // initial load got a stale no-labels response, and only after tagging
+      // (which calls refreshInvoices with cache:'no-store') did labels appear.
+      fetch('/api/invoices', { headers: { Authorization: 'Bearer ' + token }, cache: 'no-store' })
         .then((r) => r.ok ? r.json() : [])
         .then((data) => setInvoices(data.map((inv: Record<string, unknown>) => ({
           id: inv.id, filename: inv.filename, vendor: inv.vendor,
