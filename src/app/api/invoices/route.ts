@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(
     invoices.map((inv) => ({
       ...inv,
-      labels: inv.labels.map((a) => ({ id: a.label.id, name: a.label.name, color: a.label.color })),
+      labels: inv.labels.map((a) => ({ label: { id: a.label.id, name: a.label.name, color: a.label.color } })),
     })),
   );
 }
