@@ -79,7 +79,6 @@ import {
   FileText,
   ArrowUpDown,
   Mail,
-  EllipsisVertical,
   Tag,
   Plus,
 } from 'lucide-react';
@@ -2286,34 +2285,76 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                         </Tooltip>
                       )}
                     </td>
-                    {/* Actions: single sticky column — 3-dot dropdown on ALL screen sizes */}
+                    {/* Actions: single sticky column — inline icon buttons on ALL screen sizes.
+                        Replaces the previous 3-dot dropdown. Putting every toggle inline
+                        keeps the column roughly the same width while making every action
+                        one click away — no need to open a menu first. Each button has a
+                        tooltip so the icon alone is enough to identify the action.
+                        Order: View → Mark Checked → Labels (still a dropdown, since the
+                        list of labels can be long) → Delete. */}
                     <td className="px-2 py-3 sticky right-0 bg-card z-10" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex justify-end">
+                      <div className="flex items-center justify-end gap-0.5">
+                        {/* View details */}
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => openDetail(inv)}
+                              aria-label="View details"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>View details</TooltipContent>
+                        </Tooltip>
+
+                        {/* Mark as checked / needs review — icon reflects current state */}
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              disabled={reviewing === inv.id}
+                              onClick={() => toggleReviewed(inv.id, isReviewed(inv))}
+                              aria-label={isReviewed(inv) ? 'Mark as needs review' : 'Mark as checked'}
+                            >
+                              {reviewing === inv.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : isReviewed(inv) ? (
+                                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                              ) : (
+                                <Circle className="h-4 w-4 text-muted-foreground" />
+                              )}
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {isReviewed(inv) ? 'Mark as needs review' : 'Mark as checked'}
+                          </TooltipContent>
+                        </Tooltip>
+
+                        {/* Labels — still a dropdown because there can be many.
+                            Trigger is a Tag icon, with the count of assigned labels
+                            shown as a small superscript-style badge when > 0. */}
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <EllipsisVertical className="h-4 w-4" />
-                              <span className="sr-only">More actions</span>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 relative"
+                              aria-label="Labels"
+                            >
+                              <Tag className="h-4 w-4" />
+                              {(inv.labels || []).length > 0 && (
+                                <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] px-1 rounded-full bg-amber-500 text-white text-[9px] font-bold flex items-center justify-center leading-none">
+                                  {(inv.labels || []).length}
+                                </span>
+                              )}
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-56">
-                            <DropdownMenuItem onClick={() => openDetail(inv)}>
-                              <Eye className="h-4 w-4 mr-2" /> View details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => toggleReviewed(inv.id, isReviewed(inv))}
-                              disabled={reviewing === inv.id}
-                            >
-                              {reviewing === inv.id ? (
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              ) : isReviewed(inv) ? (
-                                <Circle className="h-4 w-4 mr-2" />
-                              ) : (
-                                <CheckCircle2 className="h-4 w-4 mr-2" />
-                              )}
-                              {isReviewed(inv) ? 'Mark as needs review' : 'Mark as checked'}
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
                             <DropdownMenuLabel>Labels</DropdownMenuLabel>
                             {labels.length === 0 && (
                               <div className="px-2 py-1.5 text-xs text-muted-foreground">No labels yet</div>
@@ -2334,21 +2375,29 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                             <DropdownMenuItem onClick={() => { setNewLabelName(''); setNewLabelColor('amber'); setCreateLabelOpen(true); }}>
                               <Plus className="h-4 w-4 mr-2" /> New label
                             </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              onClick={(e) => deleteInvoice(inv.id, e)}
-                              disabled={deleting === inv.id}
-                              className="text-destructive focus:text-destructive"
-                            >
-                              {deleting === inv.id ? (
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              ) : (
-                                <Trash2 className="h-4 w-4 mr-2" />
-                              )}
-                              Delete
-                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
+
+                        {/* Delete */}
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 hover:text-destructive hover:bg-destructive/10"
+                              disabled={deleting === inv.id}
+                              onClick={(e) => deleteInvoice(inv.id, e)}
+                              aria-label="Delete invoice"
+                            >
+                              {deleting === inv.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Delete</TooltipContent>
+                        </Tooltip>
                       </div>
                     </td>
                   </tr>

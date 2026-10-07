@@ -2,10 +2,30 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
 
+// Force dynamic rendering and explicitly disable every form of caching.
+// The invoices list changes whenever the user uploads or deletes an invoice,
+// so a stale cached copy in the browser (or in a Vercel edge cache) leads
+// to "invoices tab is broken" reports where the list shown doesn't match
+// what's actually in the database. The user observed that the tab works in
+// an incognito window — that's the giveaway: incognito has no cache, the
+// regular browser profile does. Setting `Cache-Control: no-store` on every
+// response forces the browser to always revalidate against the server.
+//
+// `dynamic = 'force-dynamic'` also tells Next.js not to render this route
+// at build time (which would otherwise produce a static, frozen copy).
+export const dynamic = 'force-dynamic';
+
+const NO_CACHE_HEADERS = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+  Pragma: 'no-cache',
+  Expires: '0',
+  'Surrogate-Control': 'no-store',
+} as const;
+
 export async function GET(req: NextRequest) {
   const auth = await getUserFromRequest(req);
   if (!auth) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: NO_CACHE_HEADERS });
   }
 
   const invoices = await db.invoice.findMany({
@@ -33,6 +53,7 @@ export async function GET(req: NextRequest) {
       ...inv,
       labels: inv.labels.map((a) => ({ label: { id: a.label.id, name: a.label.name, color: a.label.color } })),
     })),
+    { headers: NO_CACHE_HEADERS },
   );
 }
 

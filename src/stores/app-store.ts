@@ -130,7 +130,17 @@ export const useAppStore = create<AppState>((set) => ({
     const token = typeof localStorage !== 'undefined' ? localStorage.getItem('op_token') : null;
     if (!token) return;
     try {
-      const res = await fetch('/api/invoices', { headers: { Authorization: 'Bearer ' + token } });
+      // `cache: 'no-store'` opts out of Next.js's fetch cache (which can
+      // serve stale data in regular browser sessions). Combined with the
+      // `Cache-Control: no-store` header the server sets on /api/invoices,
+      // this guarantees the invoices tab always reflects the current DB
+      // state. Without it, a normal browser profile can show a stale list
+      // even after uploads/deletes — which is what produced the "invoices
+      // tab is broken" symptom that worked in incognito but not normally.
+      const res = await fetch('/api/invoices', {
+        headers: { Authorization: 'Bearer ' + token },
+        cache: 'no-store',
+      });
       if (!res.ok) return;
       const data = await res.json();
       if (Array.isArray(data)) {

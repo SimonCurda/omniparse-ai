@@ -476,3 +476,20 @@ model FeatureFlag {
   updatedBy String   @default("admin")
   updatedAt DateTime @updatedAt
 }
+
+// ─── Admin Links ─────────────────────────────────────────────────────────────
+// Shortcuts the admin adds to the "Links" tab in the admin dashboard.
+// Each link has a name, URL, category (free-form string used as the section
+// heading), and an optional icon name (lucide-react icon key, e.g. "Github").
+// sortOrder controls ordering within a category (lower = first).
+model AdminLink {
+  id        String   @id @default(cuid())
+  name      String
+  url       String
+  category  String   @default("General")
+  icon      String?  // lucide icon name, e.g. "Github", "Database", "Mail"
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([category])
+}

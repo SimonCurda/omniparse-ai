@@ -9,7 +9,19 @@ import {
   Cpu, CheckCircle2, XCircle, Bug, Activity,
   FlaskConical, BookOpen, DatabaseBackup, Scale, Sparkles,
   Link as LinkIcon, Database, Cloud, CreditCard, Cookie, Github, ExternalLink,
+  Plus, X, Save, Globe, EllipsisVertical,
 } from 'lucide-react';
+import {
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import * as LucideIcons from 'lucide-react';
 import { toast } from 'sonner';
 
 interface AccountStats {
@@ -115,6 +127,18 @@ interface ModelHealthPayload {
   alertHistory: ModelHealthAlert[];
 }
 
+// AdminLink — a user-added shortcut shown in the Links tab.
+interface AdminLink {
+  id: string;
+  name: string;
+  url: string;
+  category: string;
+  icon: string | null;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 type SortField = 'risk' | 'invoices' | 'chat' | 'inboxes' | 'age' | 'email' | 'plan';
 type SortDir = 'asc' | 'desc';
 
@@ -142,8 +166,23 @@ export default function AdminPage() {
   const [modelHealthLoading, setModelHealthLoading] = useState(false);
   const [modelHealthRunning, setModelHealthRunning] = useState(false);
   const [backupLoading, setBackupLoading] = useState(false);
+  const [githubBackupLoading, setGithubBackupLoading] = useState(false);
   const [sortField, setSortField] = useState<SortField>('risk');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
+
+  // --- Admin Links state ---
+  // Custom links the admin has added (loaded from /api/admin/links).
+  // Shown alongside the hardcoded links in the Links tab.
+  const [adminLinks, setAdminLinks] = useState<AdminLink[]>([]);
+  const [adminLinksLoading, setAdminLinksLoading] = useState(false);
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [linkForm, setLinkForm] = useState({
+    name: '',
+    url: '',
+    category: 'General',
+    icon: 'Link',
+  });
+  const [linkSaving, setLinkSaving] = useState(false);
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -585,6 +624,131 @@ export default function AdminPage() {
     }
   };
 
+  // --- GitHub backup trigger ---
+  // POST /api/admin/backup/github?key=CRON_SECRET builds the same JSON dump
+  // as the download endpoint, then pushes it to the configured GitHub repo
+  // via the Contents API. Files land at:
+  //   backups/omniparse-backup-<timestamp>.json
+  //   backups/latest.json   (overwritten every run)
+  const handleBackupToGithub = async () => {
+    if (githubBackupLoading) return;
+    const ok = window.confirm(
+      'Push database backup to GitHub now? This will create a new file under backups/ and overwrite backups/latest.json.',
+    );
+    if (!ok) return;
+    setGithubBackupLoading(true);
+    try {
+      const res = await fetch(`/api/admin/backup/github?key=${encodeURIComponent(secret)}`, {
+        method: 'POST',
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || `GitHub backup failed (HTTP ${res.status})`);
+        return;
+      }
+      const sizeKb = Math.max(1, Math.round((data.bytes || 0) / 1024));
+      toast.success(`Backup pushed to GitHub (${sizeKb} KB)`, {
+        description: 'Saved to backups/ folder in the configured repo.',
+        action: data.url
+          ? { label: 'View', onClick: () => window.open(data.url, '_blank', 'noreferrer') }
+          : undefined,
+      });
+    } catch {
+      toast.error('Network error while pushing backup to GitHub');
+    } finally {
+      setGithubBackupLoading(false);
+    }
+  };
+
+  // --- Admin Links: fetch ---
+  // GET /api/admin/links?key=CRON_SECRET returns the list of user-added
+  // shortcuts. Called whenever the admin opens the Links tab.
+  const fetchAdminLinks = useCallback(async () => {
+    if (!secret) return;
+    setAdminLinksLoading(true);
+    try {
+      const res = await fetch(`/api/admin/links?key=${encodeURIComponent(secret)}`);
+      const data = await res.json();
+      if (res.ok) {
+        setAdminLinks(Array.isArray(data.links) ? data.links : []);
+      } else {
+        toast.error(data.error || 'Failed to load links');
+      }
+    } catch {
+      toast.error('Network error');
+    } finally {
+      setAdminLinksLoading(false);
+    }
+  }, [secret]);
+
+  useEffect(() => {
+    if (tab === 'links') fetchAdminLinks();
+  }, [tab, fetchAdminLinks]);
+
+  // --- Admin Links: create ---
+  // POST /api/admin/links?key=CRON_SECRET with the form fields. On success
+  // the new row is appended to the local list and the dialog closes.
+  const handleCreateLink = async () => {
+    if (linkSaving) return;
+    const name = linkForm.name.trim();
+    const url = linkForm.url.trim();
+    if (!name) {
+      toast.error('Name is required');
+      return;
+    }
+    if (!url) {
+      toast.error('URL is required');
+      return;
+    }
+    setLinkSaving(true);
+    try {
+      const res = await fetch(`/api/admin/links?key=${encodeURIComponent(secret)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          url,
+          category: linkForm.category.trim() || 'General',
+          icon: linkForm.icon || null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || 'Failed to create link');
+        return;
+      }
+      setAdminLinks((cur) => [...cur, data.link]);
+      toast.success(`Link "${name}" added`);
+      setLinkDialogOpen(false);
+      setLinkForm({ name: '', url: '', category: 'General', icon: 'Link' });
+    } catch {
+      toast.error('Network error');
+    } finally {
+      setLinkSaving(false);
+    }
+  };
+
+  // --- Admin Links: delete ---
+  // DELETE /api/admin/links/[id]?key=CRON_SECRET. Optimistically removes the
+  // row from the local list; reverts on error.
+  const handleDeleteLink = async (id: string) => {
+    const prev = adminLinks;
+    setAdminLinks((cur) => cur.filter((l) => l.id !== id));
+    try {
+      const res = await fetch(`/api/admin/links/${id}?key=${encodeURIComponent(secret)}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setAdminLinks(prev);
+        toast.error(data.error || 'Failed to delete link');
+      }
+    } catch {
+      setAdminLinks(prev);
+      toast.error('Network error');
+    }
+  };
+
   // Login screen
   if (!authed) {
     return (
@@ -698,6 +862,11 @@ export default function AdminPage() {
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs hover:bg-muted/50 transition-colors disabled:opacity-50"
               title="Download a JSON snapshot of the database now">
               {backupLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <DatabaseBackup className="h-3 w-3" />} Backup
+            </button>
+            <button onClick={handleBackupToGithub} disabled={githubBackupLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs hover:bg-muted/50 transition-colors disabled:opacity-50"
+              title="Push a JSON snapshot of the database to the configured GitHub repo">
+              {githubBackupLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Github className="h-3 w-3" />} Push to GitHub
             </button>
             <a href="/legal"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs hover:bg-muted/50 transition-colors"
@@ -1324,12 +1493,24 @@ export default function AdminPage() {
         {/* === LINKS TAB === */}
         {tab === 'links' && (
           <div className="space-y-6">
-            <div className="rounded-xl border border-border bg-card p-6">
-              <h3 className="text-lg font-semibold mb-1">Quick Links</h3>
-              <p className="text-sm text-muted-foreground">
-                Categorized shortcuts to the dashboards, docs, and references the admin uses most.
-                External links open in a new tab; internal links navigate within the app.
-              </p>
+            <div className="rounded-xl border border-border bg-card p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-semibold mb-1">Quick Links</h3>
+                <p className="text-sm text-muted-foreground">
+                  Categorized shortcuts to the dashboards, docs, and references the admin uses most.
+                  External links open in a new tab; internal links navigate within the app.
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setLinkForm({ name: '', url: '', category: 'General', icon: 'Link' });
+                  setLinkDialogOpen(true);
+                }}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-500 text-white text-xs font-medium hover:bg-amber-600 transition-colors shrink-0"
+                title="Add a new custom link"
+              >
+                <Plus className="h-3.5 w-3.5" /> Add Link
+              </button>
             </div>
 
             {/* Monitoring & Tools */}
@@ -1395,8 +1576,155 @@ export default function AdminPage() {
                 </div>
               </div>
             </div>
+
+            {/* Custom links — admin-added, grouped by category */}
+            {/* Rendered from the AdminLink table. Each category becomes its own
+                section with a heading and a responsive grid of LinkCard tiles.
+                Each tile has a delete affordance (3-dot menu) so the admin can
+                remove a link they no longer want. */}
+            {adminLinksLoading && (
+              <div className="rounded-xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin inline mr-2" />
+                Loading custom links…
+              </div>
+            )}
+            {!adminLinksLoading && adminLinks.length === 0 && (
+              <div className="rounded-xl border border-dashed border-border bg-card/50 p-6 text-center">
+                <LinkIcon className="h-8 w-8 text-muted-foreground/50 mx-auto mb-2" />
+                <p className="text-sm font-medium">No custom links yet</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Click <span className="font-medium">Add Link</span> above to create your first shortcut.
+                </p>
+              </div>
+            )}
+            {!adminLinksLoading && adminLinks.length > 0 && (
+              (() => {
+                // Group adminLinks by category, preserving the order in which
+                // categories first appear in the (already-sorted) list.
+                const categories: { name: string; links: AdminLink[] }[] = [];
+                for (const link of adminLinks) {
+                  let bucket = categories.find((c) => c.name === link.category);
+                  if (!bucket) {
+                    bucket = { name: link.category, links: [] };
+                    categories.push(bucket);
+                  }
+                  bucket.links.push(link);
+                }
+                return categories.map((cat) => (
+                  <div key={cat.name}>
+                    <h4 className="text-sm font-semibold mb-3 flex items-center gap-2 text-muted-foreground uppercase tracking-wide">
+                      <LinkIcon className="h-4 w-4" /> {cat.name}
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                      {cat.links.map((link) => (
+                        <CustomLinkCard
+                          key={link.id}
+                          link={link}
+                          onDelete={() => handleDeleteLink(link.id)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ));
+              })()
+            )}
           </div>
         )}
+
+        {/* === Add Link Dialog === */}
+        <Dialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Add custom link</DialogTitle>
+              <DialogDescription>
+                Add a shortcut to the Links tab. Pick a category to control which section it appears under.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Name <span className="text-destructive">*</span></label>
+                <input
+                  type="text"
+                  value={linkForm.name}
+                  onChange={(e) => setLinkForm((f) => ({ ...f, name: e.target.value }))}
+                  placeholder="e.g. Stripe Dashboard"
+                  className="mt-1 w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">URL <span className="text-destructive">*</span></label>
+                <input
+                  type="text"
+                  value={linkForm.url}
+                  onChange={(e) => setLinkForm((f) => ({ ...f, url: e.target.value }))}
+                  placeholder="https://… or /internal-path"
+                  className="mt-1 w-full px-3 py-2 rounded-lg border border-border bg-background text-sm font-mono"
+                />
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  External links (http/https) open in a new tab; paths starting with <code>/</code> navigate internally.
+                </p>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Category</label>
+                <input
+                  type="text"
+                  value={linkForm.category}
+                  onChange={(e) => setLinkForm((f) => ({ ...f, category: e.target.value }))}
+                  placeholder="General"
+                  className="mt-1 w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
+                  list="link-category-suggestions"
+                />
+                <datalist id="link-category-suggestions">
+                  {/* Suggestions are filled from existing categories at render time */}
+                  {Array.from(new Set(adminLinks.map((l) => l.category))).map((c) => (
+                    <option key={c} value={c} />
+                  ))}
+                </datalist>
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Free-form label. Links with the same category appear under one section heading.
+                </p>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Icon</label>
+                <Select
+                  value={linkForm.icon}
+                  onValueChange={(v) => setLinkForm((f) => ({ ...f, icon: v }))}
+                >
+                  <SelectTrigger className="mt-1 w-full">
+                    <SelectValue placeholder="Pick an icon" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {LINK_ICON_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        <span className="flex items-center gap-2">
+                          {renderLucideIcon(opt.value, 'h-3.5 w-3.5')}
+                          {opt.label}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={() => setLinkDialogOpen(false)}
+                className="px-3 py-2 rounded-lg text-sm border border-border hover:bg-muted/50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateLink}
+                disabled={linkSaving}
+                className="px-3 py-2 rounded-lg text-sm bg-amber-500 text-white hover:bg-amber-600 transition-colors disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {linkSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                Add link
+              </button>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         <p className="text-xs text-muted-foreground text-center">
           OmniParse Admin Dashboard · {tab === 'accounts' ? `Sorted by ${sortField} (${sortDir})` : 'Deleted accounts audit trail'}
@@ -1546,6 +1874,123 @@ function LinkCard({
   }
   return (
     <Link href={href} className={cardClasses} title={`Open ${subtitle}`}>
+      {inner}
+    </Link>
+  );
+}
+
+// --- Icon picker options for the Add Link dialog ---
+// A curated subset of lucide-react icons that cover the most common admin
+// shortcut use cases. Stored as `value` (PascalCase icon name as exported
+// by lucide-react) so we can look it up dynamically via `LucideIcons[name]`.
+const LINK_ICON_OPTIONS: { value: string; label: string }[] = [
+  { value: 'Link', label: 'Link' },
+  { value: 'Globe', label: 'Globe' },
+  { value: 'Github', label: 'GitHub' },
+  { value: 'Database', label: 'Database' },
+  { value: 'Cloud', label: 'Cloud' },
+  { value: 'Mail', label: 'Mail' },
+  { value: 'CreditCard', label: 'Credit Card' },
+  { value: 'Cpu', label: 'CPU' },
+  { value: 'Sparkles', label: 'Sparkles' },
+  { value: 'BookOpen', label: 'Book' },
+  { value: 'FileText', label: 'File' },
+  { value: 'Activity', label: 'Activity' },
+  { value: 'Scale', label: 'Scale' },
+  { value: 'Shield', label: 'Shield' },
+  { value: 'Cookie', label: 'Cookie' },
+  { value: 'FlaskConical', label: 'Flask' },
+  { value: 'Server', label: 'Server' },
+  { value: 'Settings', label: 'Settings' },
+  { value: 'Terminal', label: 'Terminal' },
+  { value: 'Code', label: 'Code' },
+];
+
+// Dynamically renders a lucide-react icon by its PascalCase name.
+// Falls back to the Link icon if the name isn't found or isn't a component.
+function renderLucideIcon(name: string | null | undefined, className = 'h-4 w-4') {
+  if (!name) return <LinkIcon className={className} />;
+  const Icon = (LucideIcons as Record<string, unknown>)[name];
+  if (Icon && typeof Icon === 'function') {
+    const C = Icon as React.ComponentType<{ className?: string }>;
+    return <C className={className} />;
+  }
+  return <LinkIcon className={className} />;
+}
+
+// --- Custom Link card for admin-added links ---
+// Same look as the hardcoded LinkCard, but with a 3-dot menu in the top-right
+// corner that lets the admin delete the link. The icon is rendered dynamically
+// from the stored icon name (see renderLucideIcon above).
+function CustomLinkCard({
+  link,
+  onDelete,
+}: {
+  link: AdminLink;
+  onDelete: () => void;
+}) {
+  const isExternal = /^https?:\/\//i.test(link.url);
+  const subtitle = isExternal ? link.url.replace(/^https?:\/\//, '').replace(/\/$/, '') : `Internal · ${link.url}`;
+  const Icon = renderLucideIcon(link.icon, 'h-4 w-4 text-muted-foreground group-hover:text-amber-500 transition-colors');
+  const cardClasses =
+    'group relative rounded-xl border border-border bg-card p-4 flex items-start gap-3 hover:border-amber-500/40 hover:bg-amber-500/5 transition-colors';
+
+  const inner = (
+    <>
+      <div className="w-9 h-9 rounded-lg bg-muted group-hover:bg-amber-500/10 flex items-center justify-center shrink-0 transition-colors">
+        {Icon}
+      </div>
+      <div className="min-w-0 flex-1 pr-6">
+        <div className="flex items-center gap-1.5">
+          <p className="font-medium text-sm truncate">{link.name}</p>
+          {isExternal && (
+            <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0" />
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground truncate">{subtitle}</p>
+      </div>
+      {/* 3-dot menu — top-right corner so it doesn't interfere with the click target */}
+      <div className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.preventDefault()}>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              className="p-1 rounded hover:bg-muted transition-colors"
+              title="More actions"
+            >
+              <EllipsisVertical className="h-3.5 w-3.5 text-muted-foreground" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-40">
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.preventDefault();
+                if (window.confirm(`Delete link "${link.name}"?`)) onDelete();
+              }}
+              className="text-destructive focus:text-destructive"
+            >
+              <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </>
+  );
+
+  if (isExternal) {
+    return (
+      <a
+        href={link.url}
+        target="_blank"
+        rel="noreferrer"
+        className={cardClasses}
+        title={`Open ${subtitle} in a new tab`}
+      >
+        {inner}
+      </a>
+    );
+  }
+  return (
+    <Link href={link.url} className={cardClasses} title={`Open ${subtitle}`}>
       {inner}
     </Link>
   );
