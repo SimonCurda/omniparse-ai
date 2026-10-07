@@ -616,6 +616,11 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
           });
         }
         toast.success(data.reviewed ? 'Marked as checked' : 'Marked as needs review');
+        // Refresh from server to ensure the lifecycle column reflects any
+        // auto-bump (e.g. pending → approved) that the review endpoint did.
+        // The optimistic update above already merged the returned data, but
+        // this guarantees the UI is fully in sync with the DB.
+        useAppStore.getState().refreshInvoices();
       } else {
         const data = await res.json().catch(() => ({}));
         toast.error(data.error || 'Failed to update review state');
@@ -2149,14 +2154,13 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                 <th className="text-right px-4 py-3 font-medium">
                   {showNormalized ? 'Norm. Total' : 'Total'}
                 </th>
-                <th className="text-center px-4 py-3 font-medium">Status</th>
                 <th className="text-center px-4 py-3 font-medium hidden md:table-cell">Approval</th>
                 <th className="text-center px-4 py-3 font-medium hidden xl:table-cell">Validation</th>
                 <th className="text-center px-4 py-3 font-medium hidden lg:table-cell">Confidence</th>
                 <th className="text-center px-4 py-3 font-medium hidden lg:table-cell">Aging</th>
                 <th className="text-center px-4 py-3 font-medium hidden xl:table-cell">Proc. Time</th>
-                <th className="text-center px-4 py-3 font-medium hidden lg:table-cell">Processed</th>
-                <th className="text-center px-4 py-3 font-medium hidden md:table-cell">Lifecycle</th>
+                <th className="text-center px-4 py-3 font-medium">Processed</th>
+                <th className="text-center px-4 py-3 font-medium">Lifecycle</th>
                 {/* Action column: single sticky column — inline buttons on md+, 3-dot dropdown on mobile */}
                 <th className="px-2 py-3 sticky right-0 bg-card z-10 w-[112px]"></th>
               </tr>
@@ -2164,7 +2168,7 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
             <tbody>
               {displayed.length === 0 ? (
                 <tr>
-                  <td colSpan={14} className="text-center py-12 text-muted-foreground">
+                  <td colSpan={13} className="text-center py-12 text-muted-foreground">
                     <Inbox className="h-10 w-10 mx-auto mb-3 opacity-40" />
                     <p>No invoices found</p>
                   </td>
@@ -2244,21 +2248,6 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                         ? fmtCurrency(inv.normalizedTotal, inv.normalizedCurrency || inv.currency)
                         : fmtCurrency(inv.total, inv.currency)}
                     </td>
-                    <td className="px-4 py-3 text-center">
-                      {inv.isDuplicate ? (
-                        <Badge variant="secondary" className="bg-amber-500/10 text-amber-500 border-0">
-                          Duplicate
-                        </Badge>
-                      ) : inv.status === 'review' ? (
-                        <Badge variant="secondary" className="bg-orange-500/10 text-orange-500 border-0">
-                          Review
-                        </Badge>
-                      ) : (
-                        <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-500 border-0">
-                          Done
-                        </Badge>
-                      )}
-                    </td>
                     {/* Approval Status */}
                     <td className="px-4 py-3 text-center hidden md:table-cell">
                       {renderApprovalBadge(inv.approvalStatus)}
@@ -2280,13 +2269,13 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                       {renderProcessingTime(inv)}
                     </td>
                     {/* Processed At — smart timestamp: time today, date otherwise */}
-                    <td className="px-4 py-3 text-center hidden lg:table-cell">
+                    <td className="px-4 py-3 text-center">
                       <span className="text-xs text-muted-foreground" title={new Date(inv.createdAt).toLocaleString()}>
                         {fmtRelativeTime(inv.createdAt)}
                       </span>
                     </td>
                     {/* Lifecycle Status */}
-                    <td className="px-4 py-3 text-center hidden md:table-cell" onClick={(e) => e.stopPropagation()}>
+                    <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                       {canChangeLifecycle ? (
                         statusChanging === inv.id ? (
                           <Loader2 className="h-4 w-4 animate-spin mx-auto" />
