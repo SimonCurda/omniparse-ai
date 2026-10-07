@@ -58,12 +58,17 @@ export const changePasswordSchema = z
         (pwd) => /[0-9]/.test(pwd),
         'Password must contain at least one number'
       ),
-    confirmPassword: z.string().min(1, 'Please confirm your new password'),
+    // confirmPassword is optional on the server — the client validates the
+    // match before sending. We only check it if the client happens to send it.
+    confirmPassword: z.string().optional(),
   })
-  .refine((data) => data.newPassword === data.confirmPassword, {
-    message: 'New passwords do not match',
-    path: ['confirmPassword'],
-  });
+  .refine(
+    (data) => data.confirmPassword === undefined || data.newPassword === data.confirmPassword,
+    {
+      message: 'New passwords do not match',
+      path: ['confirmPassword'],
+    },
+  );
 
 // ─── Upload Validation ────────────────────────────────────────────────────────
 

@@ -331,7 +331,7 @@ export function SettingsTab() {
       const res = await fetch('/api/auth/change-password', {
         method: 'POST',
         headers,
-        body: JSON.stringify({ currentPassword, newPassword }),
+        body: JSON.stringify({ currentPassword, newPassword, confirmPassword }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
