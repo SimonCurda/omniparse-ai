@@ -69,6 +69,10 @@ model User {
   hidden           Boolean  @default(false)
   // Admin can star/mark accounts for easy spotting between many users
   starred           Boolean  @default(false)
+  // REST API key for programmatic access. Null until the user generates one
+  // from Settings → API Access. Used as an alternative to the session JWT:
+  // clients pass it via the `X-API-Key` header. See /api-docs for usage.
+  apiKey            String?  @unique
   // Admin can enable debug mode for specific accounts — shows a "Debug" button
   // on the upload tab that displays parse diagnostic logs
   debugEnabled      Boolean  @default(false)

@@ -49,6 +49,7 @@ const PLANS: Plan[] = [
       { text: 'CSV export' },
       { text: 'Basic analytics dashboard' },
       { text: 'Invoice status tracking (pending → approved → exported)' },
+      { text: 'REST API access (X-API-Key header)' },
       { text: 'Invoice editing', included: false },
       { text: 'JSON & Excel export', included: false },
       { text: 'Duplicate detection', included: false },

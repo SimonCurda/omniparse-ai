@@ -22,7 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { CreditCard, Loader2, Download, Trash2, Shield, Eye, EyeOff, Plus, X, Sparkles, Lock, Clock, GripVertical, ArrowUp, ArrowDown, Keyboard, LogOut } from 'lucide-react';
+import { CreditCard, Loader2, Download, Trash2, Shield, Eye, EyeOff, Plus, X, Sparkles, Lock, Clock, GripVertical, ArrowUp, ArrowDown, Keyboard, LogOut, Code, Copy, RefreshCw, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAppStore } from '@/stores/app-store';
 import { DEFAULT_SHORTCUTS, saveShortcuts } from '@/lib/shortcuts';
@@ -73,6 +73,12 @@ export function SettingsTab() {
   const [newFieldInstruction, setNewFieldInstruction] = useState('');
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 
+  // API key state (REST API access)
+  const [apiKey, setApiKey] = useState<string | null>(null);
+  const [apiKeyLoading, setApiKeyLoading] = useState(false);
+  const [apiKeyVisible, setApiKeyVisible] = useState(false);
+  const [apiKeyFetched, setApiKeyFetched] = useState(false);
+
   useEffect(() => {
     const token = localStorage.getItem('op_token');
     if (!token) return;
@@ -97,6 +103,56 @@ export function SettingsTab() {
       })
       .catch(() => {});
   }, []);
+
+  // --- API key (REST API access) ---
+  // Fetch the user's API key on mount. The server auto-generates one on
+  // first GET if none exists, so the key is always present after this call.
+  useEffect(() => {
+    const token = localStorage.getItem('op_token');
+    if (!token) return;
+    fetch('/api/auth/api-key', { headers: { Authorization: 'Bearer ' + token }, cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.apiKey) setApiKey(data.apiKey);
+        setApiKeyFetched(true);
+      })
+      .catch(() => setApiKeyFetched(true));
+  }, []);
+
+  const regenerateApiKey = async () => {
+    const token = localStorage.getItem('op_token');
+    if (!token) { toast.error('Please log in again.'); return; }
+    if (!window.confirm('Regenerate API key? Your existing key will stop working immediately. Any scripts using it will need to be updated.')) return;
+    setApiKeyLoading(true);
+    try {
+      const res = await fetch('/api/auth/api-key', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token },
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setApiKey(data.apiKey);
+        setApiKeyVisible(true);
+        toast.success('API key regenerated. Update any scripts that use the old key.');
+      } else {
+        toast.error(data.error || 'Failed to regenerate API key');
+      }
+    } catch {
+      toast.error('Network error');
+    } finally {
+      setApiKeyLoading(false);
+    }
+  };
+
+  const copyApiKey = async () => {
+    if (!apiKey) return;
+    try {
+      await navigator.clipboard.writeText(apiKey);
+      toast.success('API key copied to clipboard');
+    } catch {
+      toast.error('Failed to copy — select and copy manually');
+    }
+  };
 
   const saveCustomFields = async (fields: Array<{ name: string; instruction: string; enabled: boolean }>) => {
     const token = localStorage.getItem('op_token');
@@ -967,6 +1023,91 @@ export function SettingsTab() {
                 Invoices older than the retention period will be automatically purged. Export your data before changing this setting.
               </p>
             </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* API Access Card — REST API key for programmatic access */}
+      <Card data-glow data-glow-border-only className="glass-card border-border/50">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Code className="h-5 w-5 text-amber-500" />
+            API Access
+          </CardTitle>
+          <CardDescription>
+            Use the REST API to programmatically access your invoices, labels, and data. Available on all plans.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {apiKeyFetched && apiKey && (
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Your API Key</Label>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 px-3 py-2 rounded-lg border border-border bg-muted/30 font-mono text-xs truncate">
+                  {apiKeyVisible ? apiKey : '•'.repeat(40)}
+                </div>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setApiKeyVisible((v) => !v)}
+                  title={apiKeyVisible ? 'Hide' : 'Show'}
+                  className="shrink-0"
+                >
+                  {apiKeyVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={copyApiKey}
+                  title="Copy to clipboard"
+                  className="shrink-0"
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="flex flex-wrap gap-2 pt-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={regenerateApiKey}
+                  disabled={apiKeyLoading}
+                >
+                  {apiKeyLoading ? (
+                    <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <RefreshCw className="mr-2 h-3.5 w-3.5" />
+                  )}
+                  Regenerate
+                </Button>
+                <a href="/api-docs" target="_blank" rel="noopener">
+                  <Button variant="outline" size="sm">
+                    <ExternalLink className="mr-2 h-3.5 w-3.5" />
+                    API Docs
+                  </Button>
+                </a>
+              </div>
+              <div className="mt-3 rounded-lg border border-border bg-muted/20 p-3 text-xs text-muted-foreground">
+                <p className="font-medium text-foreground mb-1">Quick start:</p>
+                <code className="block text-[11px] mt-1">
+                  curl -H "X-API-Key: {apiKeyVisible ? apiKey : 'YOUR_API_KEY'}" \<br />
+                  &nbsp;&nbsp;{typeof window !== 'undefined' ? window.location.origin : 'https://your-app.vercel.app'}/api/invoices
+                </code>
+              </div>
+            </div>
+          )}
+          {apiKeyFetched && !apiKey && (
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">No API key generated yet.</p>
+              <Button onClick={regenerateApiKey} disabled={apiKeyLoading}>
+                {apiKeyLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Code className="mr-2 h-4 w-4" />}
+                Generate API Key
+              </Button>
+            </div>
+          )}
+          {!apiKeyFetched && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading API key…
+            </div>
           )}
         </CardContent>
       </Card>

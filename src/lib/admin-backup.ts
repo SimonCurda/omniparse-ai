@@ -308,9 +308,16 @@ export async function pushBackupToGitHub(
 
   if (!timestampedRes.ok) {
     const errText = await timestampedRes.text();
+    let errorDetail = errText.slice(0, 500);
+    try {
+      const errJson = JSON.parse(errText);
+      errorDetail = errJson.message || errJson.error || errorDetail;
+    } catch {
+      // response wasn't JSON — use the raw text
+    }
     return {
       ok: false,
-      error: `GitHub API rejected timestamped file (HTTP ${timestampedRes.status}): ${errText.slice(0, 500)}`,
+      error: `GitHub API rejected backup (HTTP ${timestampedRes.status}): ${errorDetail}`,
     };
   }
 
@@ -357,13 +364,14 @@ export async function pushBackupToGitHub(
 
   if (!latestRes.ok) {
     // The timestamped file already succeeded — latest.json failure is non-fatal.
+    // Log the error for debugging but don't fail the whole operation.
     const errText = await latestRes.text();
+    console.warn('[admin-backup] latest.json overwrite failed (non-fatal):', latestRes.status, errText.slice(0, 300));
     return {
       ok: true,
       url,
       latestUrl: `https://github.com/${owner}/${repo}/blob/main/backups/latest.json`,
     };
-    void errText; // suppress unused warning if the line above is tweaked
   }
 
   const latestJson = (await latestRes.json()) as { content?: { html_url?: string } };

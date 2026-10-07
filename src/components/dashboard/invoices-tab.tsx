@@ -275,7 +275,7 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
   useEffect(() => {
     const token = localStorage.getItem('op_token');
     if (!token) return;
-    fetch('/api/labels', { headers: { Authorization: 'Bearer ' + token } })
+    fetch('/api/labels', { headers: { Authorization: 'Bearer ' + token }, cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : { labels: [] }))
       .then((data) => setLabels(Array.isArray(data) ? data : (data.labels || [])))
       .catch(() => {});
@@ -289,6 +289,7 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
       const res = await fetch('/api/labels', {
         method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, color: color || 'amber' }),
+        cache: 'no-store',
       });
       const data = await res.json();
       if (res.ok) {

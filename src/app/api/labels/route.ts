@@ -39,6 +39,15 @@ function normalizeName(raw: unknown): string | null {
 }
 
 // GET /api/labels — list the current user's labels (oldest first).
+export const dynamic = 'force-dynamic';
+
+const NO_CACHE_HEADERS = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+  Pragma: 'no-cache',
+  Expires: '0',
+  'Surrogate-Control': 'no-store',
+} as const;
+
 export async function GET(req: NextRequest) {
   try {
     const auth = await getUserFromRequest(req);
@@ -66,6 +75,7 @@ export async function GET(req: NextRequest) {
         updatedAt: l.updatedAt,
         usageCount: l._count.invoices,
       })),
+      { headers: NO_CACHE_HEADERS },
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';

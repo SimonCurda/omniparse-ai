@@ -45,12 +45,34 @@ export function verifyToken(token: string): JWTPayload | null {
 }
 
 export async function getUserFromRequest(req: Request): Promise<{ userId: string; email: string } | null> {
+  // 1. Bearer JWT (browser sessions) — the primary auth method.
   const authHeader = req.headers.get('authorization');
-  if (!authHeader?.startsWith('Bearer ')) return null;
-  const token = authHeader.slice(7);
-  const payload = verifyToken(token);
-  if (!payload) return null;
-  return { userId: payload.userId, email: payload.email };
+  if (authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.slice(7);
+    const payload = verifyToken(token);
+    if (payload) return { userId: payload.userId, email: payload.email };
+  }
+
+  // 2. X-API-Key header (programmatic REST API access).
+  //    The user generates a key from Settings → API Access. When present,
+  //    we look up the user by apiKey and return their identity. This allows
+  //    external scripts and integrations to call /api/* endpoints without
+  //    a browser session JWT.
+  const apiKey = req.headers.get('x-api-key');
+  if (apiKey) {
+    try {
+      const user = await db.user.findUnique({
+        where: { apiKey },
+        select: { id: true, email: true },
+      });
+      if (user) return { userId: user.id, email: user.email };
+    } catch {
+      // If the apiKey column doesn't exist yet (pre-migration), the query
+      // throws — fall through to return null.
+    }
+  }
+
+  return null;
 }
 
 /**

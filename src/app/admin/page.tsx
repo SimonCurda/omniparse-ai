@@ -814,8 +814,9 @@ export default function AdminPage() {
         )}
 
         {/* Tabs + external tool links */}
-        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 border-b border-border">
-          <div className="flex gap-2 overflow-x-auto pb-px">
+        <div className="space-y-3">
+          {/* Tab row — scrolls horizontally on small screens so the Links tab is always reachable */}
+          <div className="flex gap-2 overflow-x-auto pb-px border-b border-border">
             <button onClick={() => setTab('accounts')}
               className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${tab === 'accounts' ? 'border-amber-500 text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
               <Users className="h-4 w-4 inline mr-1.5" /> Active ({sortedAccounts.length})
@@ -846,8 +847,10 @@ export default function AdminPage() {
             </button>
           </div>
 
-          {/* External tools + legal docs — top-right toolbar */}
-          <div className="flex flex-wrap gap-1.5 pb-1">
+          {/* External tools + legal docs — separate row below the tabs so they
+              never overlap or push the Links tab off-screen. Wraps gracefully
+              on small screens. */}
+          <div className="flex flex-wrap gap-1.5">
             <a href="/api-test"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs hover:bg-muted/50 transition-colors"
               title="Open the API tester playground">
