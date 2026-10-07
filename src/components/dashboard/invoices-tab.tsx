@@ -278,7 +278,7 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
     if (!token) return;
     fetch('/api/labels', { headers: { Authorization: 'Bearer ' + token } })
       .then((r) => (r.ok ? r.json() : { labels: [] }))
-      .then((data) => setLabels(data.labels || []))
+      .then((data) => setLabels(Array.isArray(data) ? data : (data.labels || [])))
       .catch(() => {});
   }, []);
 
