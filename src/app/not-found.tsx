@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { ArrowLeft, Home, Shield } from 'lucide-react';
 
 export default function NotFound() {
   const router = useRouter();
@@ -23,12 +24,22 @@ export default function NotFound() {
           </p>
         </div>
 
-        <button
-          onClick={() => router.push('/')}
-          className="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-        >
-          Go to Homepage
-        </button>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <button
+            onClick={() => router.push('/admin')}
+            className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-amber-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            <Shield className="h-4 w-4" />
+            Back to Admin
+          </button>
+          <button
+            onClick={() => router.push('/')}
+            className="inline-flex items-center gap-2 rounded-lg border border-border px-5 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            <Home className="h-4 w-4" />
+            Go to Homepage
+          </button>
+        </div>
       </div>
     </div>
   );
