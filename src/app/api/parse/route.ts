@@ -1316,6 +1316,14 @@ export async function POST(req: NextRequest) {
     const sanitizedInvDate = (parsed.invoiceDate as string) || null;
     const sanitizedDueDate = (parsed.dueDate as string) || null;
     const sanitizedCurrency = (parsed.currency as string) || 'USD';
+    const sanitizedFileName = sanitizedName.replace(/\u0000/g, '');
+    const sanitizedFieldConfidence = fieldConfidence ? stripNullBytes(fieldConfidence) : fieldConfidence;
+    const sanitizedRawExtraction = stripNullBytes(parsed);
+    const sanitizedLineItems = parsed.lineItems ? stripNullBytes(parsed.lineItems) : parsed.lineItems;
+    const sanitizedValidationResults = stripNullBytes(fullValidationResults);
+    const sanitizedCustomFieldValues = Object.keys(customFieldValues).length > 0 ? stripNullBytes(customFieldValues) as Record<string, unknown> : customFieldValues;
+    const sanitizedNormalized = stripNullBytes(normalized) as { vendor?: string; invDate?: string; dueDate?: string; amount?: number | null; total?: number | null; currency?: string };
+    const sanitizedFileMetadata = fileMetadata ? stripNullBytes(fileMetadata) : fileMetadata;
 
     addDebugLog('ai_response_parsed', {
       vendor: sanitizedVendor,
@@ -1329,7 +1337,7 @@ export async function POST(req: NextRequest) {
     const invoice = await db.invoice.create({
       data: {
         userId: auth.userId,
-        filename: sanitizedName,
+        filename: sanitizedFileName,
         vendor: sanitizedVendor,
         invNumber: sanitizedInvNumber,
         invDate: sanitizedInvDate,
@@ -1340,21 +1348,21 @@ export async function POST(req: NextRequest) {
         currency: sanitizedCurrency,
         status: validationStatus === 'fail' ? 'review' : validationStatus === 'warning' ? 'review' : overallConfidence >= 0.85 ? 'done' : 'review',
         confidence: overallConfidence,
-        fieldConfidence: fieldConfidence ? JSON.parse(JSON.stringify(fieldConfidence)) : Prisma.JsonNull,
-        rawExtraction: JSON.parse(JSON.stringify(parsed)),
-        lineItems: Array.isArray(parsed.lineItems) ? JSON.parse(JSON.stringify(parsed.lineItems)) : Prisma.JsonNull,
+        fieldConfidence: sanitizedFieldConfidence ? JSON.parse(JSON.stringify(sanitizedFieldConfidence)) : Prisma.JsonNull,
+        rawExtraction: JSON.parse(JSON.stringify(sanitizedRawExtraction)),
+        lineItems: Array.isArray(sanitizedLineItems) ? JSON.parse(JSON.stringify(sanitizedLineItems)) : Prisma.JsonNull,
         // New fields
-        validationResults: JSON.parse(JSON.stringify(fullValidationResults)),
+        validationResults: JSON.parse(JSON.stringify(sanitizedValidationResults)),
         validationStatus,
-        normalizedVendor: normalized.vendor || null,
-        normalizedInvDate: normalized.invDate || null,
-        normalizedDueDate: normalized.dueDate || null,
-        normalizedAmount: normalized.amount,
-        normalizedTotal: normalized.total,
-        normalizedCurrency: normalized.currency,
-        pdfMetadata: fileMetadata ? JSON.parse(JSON.stringify(fileMetadata)) : Prisma.JsonNull,
+        normalizedVendor: sanitizedNormalized.vendor || null,
+        normalizedInvDate: sanitizedNormalized.invDate || null,
+        normalizedDueDate: sanitizedNormalized.dueDate || null,
+        normalizedAmount: sanitizedNormalized.amount,
+        normalizedTotal: sanitizedNormalized.total,
+        normalizedCurrency: sanitizedNormalized.currency,
+        pdfMetadata: sanitizedFileMetadata ? JSON.parse(JSON.stringify(sanitizedFileMetadata)) : Prisma.JsonNull,
         processingTime: Math.round(processingTime * 100) / 100,
-        customFields: Object.keys(customFieldValues).length > 0 ? JSON.parse(JSON.stringify(customFieldValues)) : Prisma.JsonNull,
+        customFields: Object.keys(sanitizedCustomFieldValues).length > 0 ? JSON.parse(JSON.stringify(sanitizedCustomFieldValues)) : Prisma.JsonNull,
         fileData: base64,
         fileType: file.type,
         // Auto-purge file data after 30 days to save DB storage
