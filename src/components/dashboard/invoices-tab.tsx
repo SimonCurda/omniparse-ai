@@ -344,20 +344,30 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
     const token = localStorage.getItem('op_token');
     if (!token) return;
     if (selectedIds.size === 0) return;
-    try {
-      const res = await fetch('/api/bulk-actions', {
-        method: 'POST',
-        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'add_label', invoiceIds: Array.from(selectedIds), labelId }),
-      });
-      if (res.ok) {
-        toast.success(`Label applied to ${selectedIds.size} invoice${selectedIds.size !== 1 ? 's' : ''}`);
-        useAppStore.getState().refreshInvoices();
-      } else {
-        const data = await res.json().catch(() => ({}));
-        toast.error(data.error || 'Bulk label failed');
+    setBulkDeleting(true);
+    let successCount = 0;
+    let failCount = 0;
+    for (const invId of selectedIds) {
+      try {
+        const res = await fetch(`/api/invoices/${invId}/labels`, {
+          method: 'POST',
+          headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ labelId }),
+        });
+        if (res.ok) successCount++;
+        else failCount++;
+      } catch {
+        failCount++;
       }
-    } catch { toast.error('Network error'); }
+    }
+    setBulkDeleting(false);
+    if (failCount === 0) {
+      toast.success(`Label applied to ${successCount} invoice${successCount !== 1 ? 's' : ''}`);
+    } else {
+      toast.error(`${successCount} succeeded, ${failCount} failed`);
+    }
+    useAppStore.getState().refreshInvoices();
+    setSelectedIds(new Set());
   };
 
   // Fetch audit logs + file data when detail dialog opens
