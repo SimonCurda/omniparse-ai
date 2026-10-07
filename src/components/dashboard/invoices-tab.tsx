@@ -2376,40 +2376,9 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                         </TooltipContent>
                       </Tooltip>
                     </td>
-                    {/* Actions: single sticky column — inline buttons on md+, 3-dot dropdown on mobile */}
+                    {/* Actions: single sticky column — 3-dot dropdown on ALL screen sizes */}
                     <td className="px-2 py-3 sticky right-0 bg-card z-10" onClick={(e) => e.stopPropagation()}>
-                      {/* Inline buttons on md+ */}
-                      <div className="hidden md:flex items-center gap-1 justify-end">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                              onClick={() => openDetail(inv)}
-                            >
-                              <Eye className="h-4 w-4" />
-                              <span className="sr-only">View details</span>
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>View invoice details</TooltipContent>
-                        </Tooltip>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={(e) => deleteInvoice(inv.id, e)}
-                          disabled={deleting === inv.id}
-                        >
-                          {deleting === inv.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
-                          )}
-                        </Button>
-                      </div>
-                      {/* 3-dot dropdown on mobile */}
-                      <div className="md:hidden flex justify-end">
+                      <div className="flex justify-end">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -2417,16 +2386,22 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                               <span className="sr-only">More actions</span>
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-48">
+                          <DropdownMenuContent align="end" className="w-56">
                             <DropdownMenuItem onClick={() => openDetail(inv)}>
                               <Eye className="h-4 w-4 mr-2" /> View details
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              onClick={(e) => deleteInvoice(inv.id, e)}
-                              disabled={deleting === inv.id}
-                              className="text-destructive focus:text-destructive"
+                              onClick={() => toggleReviewed(inv.id, isReviewed(inv))}
+                              disabled={reviewing === inv.id}
                             >
-                              <Trash2 className="h-4 w-4 mr-2" /> Delete
+                              {reviewing === inv.id ? (
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              ) : isReviewed(inv) ? (
+                                <Circle className="h-4 w-4 mr-2" />
+                              ) : (
+                                <CheckCircle2 className="h-4 w-4 mr-2" />
+                              )}
+                              {isReviewed(inv) ? 'Mark as needs review' : 'Mark as checked'}
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuLabel>Labels</DropdownMenuLabel>
@@ -2446,8 +2421,21 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                               );
                             })}
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => setCreateLabelOpen(true)}>
+                            <DropdownMenuItem onClick={() => { setNewLabelName(''); setNewLabelColor('amber'); setCreateLabelOpen(true); }}>
                               <Plus className="h-4 w-4 mr-2" /> New label
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={(e) => deleteInvoice(inv.id, e)}
+                              disabled={deleting === inv.id}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              {deleting === inv.id ? (
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-4 w-4 mr-2" />
+                              )}
+                              Delete
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>

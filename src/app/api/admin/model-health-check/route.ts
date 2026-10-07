@@ -34,17 +34,17 @@ interface ModelSpec {
 
 const MISTRAL_MODELS: ModelSpec[] = [
   { provider: 'mistral', modelName: 'pixtral-12b-latest', vision: true },
-  { provider: 'mistral', modelName: 'pixtral-large-latest', vision: true },
   { provider: 'mistral', modelName: 'mistral-small-latest' },
-  { provider: 'mistral', modelName: 'mistral-medium-latest' },
-  { provider: 'mistral', modelName: 'mistral-large-latest' },
+  // pixtral-large-latest: 400 'Invalid model' on free tier
+  // mistral-medium-latest: 429 rate limited
+  // mistral-large-latest: 403 paid tier only
 ];
 
 const GROQ_MODELS: ModelSpec[] = [
   { provider: 'groq', modelName: 'openai/gpt-oss-20b' },
   { provider: 'groq', modelName: 'openai/gpt-oss-120b' },
-  { provider: 'groq', modelName: 'meta-llama/llama-4-scout-17b-16e-instruct' },
-  { provider: 'groq', modelName: 'gemma2-9b-it' },
+  // meta-llama/llama-4-scout-17b-16e-instruct: 404 decommissioned
+  // gemma2-9b-it: 400 decommissioned
 ];
 
 const ALL_MODELS: ModelSpec[] = [...MISTRAL_MODELS, ...GROQ_MODELS];

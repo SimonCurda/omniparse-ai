@@ -29,7 +29,6 @@ const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 // Vision models (tried in order — first one that works is used)
 const GROQ_VISION_MODELS = [
-  'meta-llama/llama-4-scout-17b-16e-instruct',
   'llama-3.2-90b-vision-preview',
   'llama-3.2-11b-vision-preview',
 ];
@@ -37,8 +36,8 @@ const GROQ_VISION_MODELS = [
 // Chat models (tried in order)
 const CHAT_MODEL = 'openai/gpt-oss-20b';
 const CHAT_MODEL_FALLBACK_1 = 'openai/gpt-oss-120b';
-const CHAT_MODEL_FALLBACK_2 = 'meta-llama/llama-4-scout-17b-16e-instruct';
-const CHAT_MODEL_FALLBACK_3 = 'gemma2-9b-it';
+// llama-4-scout and gemma2-9b-it are DECOMMISSIONED on Groq (Oct 2026)
+// Only gpt-oss models remain available
 const CHAT_MODEL_FALLBACK_4 = 'llama-3.1-8b-instant';
 const CHAT_MODEL_FALLBACK_5 = 'llama-3.3-70b-versatile';
 
@@ -276,11 +275,10 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
     const mistralModels = [
       'pixtral-12b-latest',     // smaller, faster, most likely free-tier eligible
       'pixtral-12b-2409',
-      'pixtral-large-latest',   // best quality vision model
+      // pixtral-large-latest removed — returns 400 'Invalid model' on free tier
       'pixtral-large-2411',
       'mistral-small-latest',
-      'mistral-medium-latest',
-      'mistral-large-latest',
+      // mistral-medium-latest and mistral-large-latest removed — 429/403 on free tier
     ];
 
     for (const mistralModel of mistralModels) {
@@ -729,8 +727,7 @@ export async function geminiChatCall(
   if (mistralKeys.length > 0) {
     const mistralChatModels = [
       'mistral-small-latest',
-      'mistral-large-latest',
-      'mistral-medium-latest',
+      // mistral-large-latest and mistral-medium-latest removed — 429/403 on free tier
       'open-mistral-7b',
       'open-mixtral-8x7b',
       'open-mixtral-8x22b',
@@ -818,8 +815,7 @@ export async function geminiChatCall(
     // leak their thinking into JSON values (e.g. vendor="High confidence").
     { model: CHAT_MODEL, maxTokens: MAX_TOKENS_HIGH, supportsJsonMode: true },            // openai/gpt-oss-20b
     { model: CHAT_MODEL_FALLBACK_1, maxTokens: MAX_TOKENS_HIGH, supportsJsonMode: true }, // openai/gpt-oss-120b
-    { model: CHAT_MODEL_FALLBACK_2, maxTokens: MAX_TOKENS_HIGH, supportsJsonMode: true }, // meta-llama/llama-4-scout-17b-16e-instruct
-    { model: CHAT_MODEL_FALLBACK_3, maxTokens: MAX_TOKENS_HIGH, supportsJsonMode: true }, // gemma2-9b-it
+    // llama-4-scout and gemma2-9b-it removed — both decommissioned (404/400)
     { model: CHAT_MODEL_FALLBACK_4, maxTokens: MAX_TOKENS_HIGH, supportsJsonMode: true }, // llama-3.1-8b-instant
     { model: CHAT_MODEL_FALLBACK_5, maxTokens: MAX_TOKENS_HIGH, supportsJsonMode: true }, // llama-3.3-70b-versatile
   ];
