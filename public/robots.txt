@@ -1,14 +1,24 @@
-User-agent: Googlebot
-Allow: /
+# OmniParse AI — robots.txt
+# Allow search engines to crawl the landing page and legal pages
+# Block all API routes and dashboard (require auth)
 
-User-agent: Bingbot
-Allow: /
-
-User-agent: Twitterbot
-Allow: /
-
-User-agent: facebookexternalhit
-Allow: /
-
+# Allow all crawlers
 User-agent: *
+
+# Allow landing page
 Allow: /
+
+# Allow legal pages
+Allow: /privacy-policy
+Allow: /terms-of-service
+Allow: /cookie-policy
+Allow: /ai-act-notice
+
+# Block API routes
+Disallow: /api/
+
+# Block dashboard and admin
+Disallow: /admin
+
+# Sitemap (if we add one later)
+# Sitemap: https://omniparse-ai.vercel.app/sitemap.xml

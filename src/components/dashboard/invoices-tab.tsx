@@ -319,6 +319,23 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
         toast.error(`Failed to ${assigned ? 'remove' : 'assign'} label: ${errData.error || res.status}`);
         return;
       }
+      // Optimistic update — immediately update the invoice in local state
+      // so labels appear without waiting for refreshInvoices()
+      const labelDef = labels.find((l) => l.id === labelId);
+      if (labelDef) {
+        const { invoices: currentInvoices, setInvoices } = useAppStore.getState();
+        setInvoices(currentInvoices.map((inv) => {
+          if (inv.id !== invoiceId) return inv;
+          if (assigned) {
+            // Remove label
+            return { ...inv, labels: (inv.labels || []).filter((l) => l.label.id !== labelId) };
+          } else {
+            // Add label
+            return { ...inv, labels: [...(inv.labels || []), { label: { id: labelDef.id, name: labelDef.name, color: labelDef.color } }] };
+          }
+        }));
+      }
+      // Also refresh from server to make sure state is accurate
       useAppStore.getState().refreshInvoices();
     } catch { toast.error('Network error'); }
   };
@@ -2045,7 +2062,7 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
         </div>
       </div>
 
-      <div className="rounded-lg border overflow-hidden">
+      <div className="rounded-lg border overflow-hidden w-full">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
