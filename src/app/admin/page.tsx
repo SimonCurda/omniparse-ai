@@ -1,12 +1,14 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import Link from 'next/link';
 import {
   Shield, ShieldAlert, ShieldCheck, Snowflake, Trash2, RefreshCw,
   Search, AlertTriangle, Users, FileText, MessageSquare, Mail, Loader2,
   ArrowUpDown, ArrowUp, ArrowDown, History, EyeOff, Eye, Star,
   Cpu, CheckCircle2, XCircle, Bug, Activity,
   FlaskConical, BookOpen, DatabaseBackup, Scale, Sparkles,
+  Link as LinkIcon, Database, Cloud, CreditCard, Cookie, Github, ExternalLink,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -130,7 +132,7 @@ export default function AdminPage() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'high' | 'medium' | 'low' | 'frozen'>('all');
-  const [tab, setTab] = useState<'accounts' | 'hidden' | 'deleted' | 'providers' | 'flags' | 'modelhealth'>('accounts');
+  const [tab, setTab] = useState<'accounts' | 'hidden' | 'deleted' | 'providers' | 'flags' | 'modelhealth' | 'links'>('accounts');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [providersLoading, setProvidersLoading] = useState(false);
@@ -139,6 +141,7 @@ export default function AdminPage() {
   const [modelHealth, setModelHealth] = useState<ModelHealthPayload | null>(null);
   const [modelHealthLoading, setModelHealthLoading] = useState(false);
   const [modelHealthRunning, setModelHealthRunning] = useState(false);
+  const [backupLoading, setBackupLoading] = useState(false);
   const [sortField, setSortField] = useState<SortField>('risk');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 
@@ -530,12 +533,56 @@ export default function AdminPage() {
   };
 
   // --- Backup trigger ---
-  // The database backup is handled by a server-side cron job (see vercel.json
-  // / scheduled tasks). There's no manual endpoint to hit from the browser —
-  // surfacing a toast lets admins know the mechanism without implying a
-  // one-click download.
-  const handleBackup = () => {
-    toast.info('Backup script runs via cron — no manual trigger needed.');
+  // Prompts for confirmation, then fetches /api/admin/backup?key=CRON_SECRET
+  // which streams a JSON dump of every table back as a downloadable file.
+  // We trigger the download by building a Blob URL from the response body so
+  // the file lands in the admin's Downloads folder without a full page reload.
+  const handleBackup = async () => {
+    if (backupLoading) return;
+    const ok = window.confirm(
+      'Create database backup now? This will export all data as JSON.',
+    );
+    if (!ok) return;
+    setBackupLoading(true);
+    try {
+      const res = await fetch(`/api/admin/backup?key=${encodeURIComponent(secret)}`);
+      if (!res.ok) {
+        let msg = `Backup failed (HTTP ${res.status})`;
+        try {
+          const data = await res.json();
+          if (data?.error) msg = data.error;
+        } catch {
+          // response wasn't JSON — keep the default message
+        }
+        toast.error(msg);
+        return;
+      }
+      // Pull the filename out of the Content-Disposition header so the
+      // downloaded file keeps the server-generated timestamp.
+      const disposition = res.headers.get('Content-Disposition') || '';
+      let filename = `omniparse-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+      const match = disposition.match(/filename="?([^"]+)"?/i);
+      if (match && match[1]) filename = match[1];
+
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      // Revoke on the next tick so the download has a chance to start.
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+
+      // Best-effort size estimate for the toast.
+      const sizeKb = Math.max(1, Math.round(blob.size / 1024));
+      toast.success(`Backup downloaded (${sizeKb} KB) — ${filename}`);
+    } catch {
+      toast.error('Network error while creating backup');
+    } finally {
+      setBackupLoading(false);
+    }
   };
 
   // Login screen
@@ -629,6 +676,10 @@ export default function AdminPage() {
               className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${tab === 'modelhealth' ? 'border-amber-500 text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
               <Activity className="h-4 w-4 inline mr-1.5" /> Model Health
             </button>
+            <button onClick={() => setTab('links')}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${tab === 'links' ? 'border-amber-500 text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
+              <LinkIcon className="h-4 w-4 inline mr-1.5" /> Links
+            </button>
           </div>
 
           {/* External tools + legal docs — top-right toolbar */}
@@ -643,10 +694,10 @@ export default function AdminPage() {
               title="Open the API documentation">
               <BookOpen className="h-3 w-3" /> API Docs
             </a>
-            <button onClick={handleBackup}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs hover:bg-muted/50 transition-colors"
-              title="Database backups run on a cron schedule">
-              <DatabaseBackup className="h-3 w-3" /> Backup
+            <button onClick={handleBackup} disabled={backupLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs hover:bg-muted/50 transition-colors disabled:opacity-50"
+              title="Download a JSON snapshot of the database now">
+              {backupLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <DatabaseBackup className="h-3 w-3" />} Backup
             </button>
             <a href="/legal"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs hover:bg-muted/50 transition-colors"
@@ -1270,6 +1321,83 @@ export default function AdminPage() {
           </div>
         )}
 
+        {/* === LINKS TAB === */}
+        {tab === 'links' && (
+          <div className="space-y-6">
+            <div className="rounded-xl border border-border bg-card p-6">
+              <h3 className="text-lg font-semibold mb-1">Quick Links</h3>
+              <p className="text-sm text-muted-foreground">
+                Categorized shortcuts to the dashboards, docs, and references the admin uses most.
+                External links open in a new tab; internal links navigate within the app.
+              </p>
+            </div>
+
+            {/* Monitoring & Tools */}
+            <div>
+              <h4 className="text-sm font-semibold mb-3 flex items-center gap-2 text-muted-foreground uppercase tracking-wide">
+                <Activity className="h-4 w-4" /> Monitoring &amp; Tools
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                <LinkCard href="/api-test" icon={FlaskConical} title="API Tester" subtitle="Internal · /api-test" />
+                <LinkCard href="/api-docs" icon={BookOpen} title="API Docs" subtitle="Internal · /api-docs" />
+                <LinkCard href="https://supabase.com/dashboard" icon={Database} title="Supabase Dashboard" subtitle="supabase.com/dashboard" external />
+                <LinkCard href="https://vercel.com/dashboard" icon={Cloud} title="Vercel Dashboard" subtitle="vercel.com/dashboard" external />
+                <LinkCard href="https://resend.com" icon={Mail} title="Resend (Email)" subtitle="resend.com" external />
+                <LinkCard href="https://console.groq.com" icon={Cpu} title="Groq Console" subtitle="console.groq.com" external />
+                <LinkCard href="https://console.mistral.ai" icon={Sparkles} title="Mistral Console" subtitle="console.mistral.ai" external />
+                <LinkCard href="https://dashboard.stripe.com" icon={CreditCard} title="Stripe Dashboard" subtitle="dashboard.stripe.com" external />
+              </div>
+            </div>
+
+            {/* Legal & Docs */}
+            <div>
+              <h4 className="text-sm font-semibold mb-3 flex items-center gap-2 text-muted-foreground uppercase tracking-wide">
+                <Scale className="h-4 w-4" /> Legal &amp; Docs
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                <LinkCard href="/privacy-policy" icon={Scale} title="Privacy Policy" subtitle="Internal · /privacy-policy" />
+                <LinkCard href="/terms-of-service" icon={FileText} title="Terms of Service" subtitle="Internal · /terms-of-service" />
+                <LinkCard href="/cookie-policy" icon={Cookie} title="Cookie Policy" subtitle="Internal · /cookie-policy" />
+                <LinkCard href="/ai-act-notice" icon={ShieldAlert} title="AI Act Notice" subtitle="Internal · /ai-act-notice" />
+                <LinkCard href="/OmniParse-Legal-Documents.pdf" icon={FileText} title="Legal PDF" subtitle="Internal · /OmniParse-Legal-Documents.pdf" />
+              </div>
+            </div>
+
+            {/* Development */}
+            <div>
+              <h4 className="text-sm font-semibold mb-3 flex items-center gap-2 text-muted-foreground uppercase tracking-wide">
+                <Cpu className="h-4 w-4" /> Development
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                <LinkCard href="https://github.com/SimonCurda/omniparse-ai" icon={Github} title="GitHub Repo" subtitle="github.com/SimonCurda/omniparse-ai" external />
+                {/* Prisma migration runbook — shown inline, not a link */}
+                <div className="rounded-xl border border-border bg-card p-4 flex flex-col gap-2">
+                  <div className="flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                      <DatabaseBackup className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm">Prisma Migration Runbook</p>
+                      <p className="text-xs text-muted-foreground truncate">Reference — see inline</p>
+                    </div>
+                  </div>
+                  <details className="text-xs text-muted-foreground">
+                    <summary className="cursor-pointer hover:text-foreground transition-colors">Show runbook</summary>
+                    <ol className="list-decimal pl-4 mt-2 space-y-1">
+                      <li>Edit <code className="px-1 py-0.5 rounded bg-muted">prisma/schema.prisma</code>.</li>
+                      <li>Generate migration: <code className="px-1 py-0.5 rounded bg-muted">bunx prisma migrate dev --name &lt;change&gt;</code></li>
+                      <li>Apply to prod: <code className="px-1 py-0.5 rounded bg-muted">bunx prisma migrate deploy</code></li>
+                      <li>If schema-only (no data move): <code className="px-1 py-0.5 rounded bg-muted">bun run db:push</code></li>
+                      <li>Regenerate client: <code className="px-1 py-0.5 rounded bg-muted">bunx prisma generate</code></li>
+                      <li>Redeploy so the new client takes effect.</li>
+                    </ol>
+                  </details>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <p className="text-xs text-muted-foreground text-center">
           OmniParse Admin Dashboard · {tab === 'accounts' ? `Sorted by ${sortField} (${sortDir})` : 'Deleted accounts audit trail'}
         </p>
@@ -1363,5 +1491,62 @@ function ProviderToggleCard({ label, role, location, dbEnabled, apiKeySet, effec
         <p className="text-xs text-muted-foreground mt-1">{notes}</p>
       </div>
     </div>
+  );
+}
+
+// --- Link card for the Links tab ---
+// Renders a single shortcut. External links (http/https) open in a new tab
+// with rel="noreferrer" and show an ExternalLink badge; internal links use
+// next/link for client-side navigation.
+function LinkCard({
+  href,
+  icon: Icon,
+  title,
+  subtitle,
+  external,
+}: {
+  href: string;
+  icon: any;
+  title: string;
+  subtitle: string;
+  external?: boolean;
+}) {
+  const cardClasses =
+    'group rounded-xl border border-border bg-card p-4 flex items-start gap-3 hover:border-amber-500/40 hover:bg-amber-500/5 transition-colors';
+
+  const inner = (
+    <>
+      <div className="w-9 h-9 rounded-lg bg-muted group-hover:bg-amber-500/10 flex items-center justify-center shrink-0 transition-colors">
+        <Icon className="h-4 w-4 text-muted-foreground group-hover:text-amber-500 transition-colors" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5">
+          <p className="font-medium text-sm truncate">{title}</p>
+          {external && (
+            <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0" />
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground truncate">{subtitle}</p>
+      </div>
+    </>
+  );
+
+  if (external) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noreferrer"
+        className={cardClasses}
+        title={`Open ${subtitle} in a new tab`}
+      >
+        {inner}
+      </a>
+    );
+  }
+  return (
+    <Link href={href} className={cardClasses} title={`Open ${subtitle}`}>
+      {inner}
+    </Link>
   );
 }

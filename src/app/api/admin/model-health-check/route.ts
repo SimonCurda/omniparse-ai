@@ -372,7 +372,7 @@ async function fetchAvailableModelIds(provider: 'mistral' | 'groq'): Promise<str
       data?: Array<{ id?: string; active?: boolean }>;
     };
     const rows = Array.isArray(data?.data) ? data.data : [];
-    const EXCLUDE = /whisper|guard|tts|embed|moderation/i;
+    const EXCLUDE = /whisper|guard|tts|embed|moderation|orpheus|allam|canopylabs|qwen3\.8|leanstral|mistral-code|codestral|fim/i;
     return rows
       .filter((r) => r.active !== false && r.id && !EXCLUDE.test(r.id))
       .map((r) => String(r.id));
