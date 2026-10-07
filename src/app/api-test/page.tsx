@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useRef, useCallback, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowLeft, Upload, Loader2, Play, Eye, EyeOff, Copy, Check,
   FileJson, Trash2, FlaskConical, ChevronDown,
@@ -82,8 +82,46 @@ interface ResponseState {
 }
 
 export default function ApiTestPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    }>
+      <ApiTestPageInner />
+    </Suspense>
+  );
+}
+
+function ApiTestPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // The admin toolbar passes ?tab=<current> when opening this page in a new
+  // tab. We pass it back when returning so the admin panel opens on the
+  // same tab the user was on, not the default 'accounts' tab.
+  const fromTab = searchParams.get('tab') || '';
+
+  // Try to close the tab first (works when the tab was opened via a link
+  // with target="_blank"). If the browser refuses (e.g. the tab wasn't
+  // opened by script), fall back to navigating to the admin panel with
+  // the original tab restored via the ?tab= query param.
+  const backToAdmin = useCallback(() => {
+    // window.close() only works for tabs opened by window.open() or
+    // target="_blank" from a link — but some browsers still block it.
+    // We attempt it and check if the page is still alive via a timeout.
+    try {
+      window.close();
+    } catch {
+      // ignore — fall through to navigation
+    }
+    // If the tab didn't close (still here after 100ms), navigate instead.
+    setTimeout(() => {
+      const url = fromTab ? `/admin?tab=${encodeURIComponent(fromTab)}` : '/admin';
+      router.push(url);
+    }, 100);
+  }, [fromTab, router]);
 
   const [selectedEndpoint, setSelectedEndpoint] = useState<EndpointDef>(ENDPOINTS[0]);
   const [apiKey, setApiKey] = useState('');
@@ -212,7 +250,7 @@ export default function ApiTestPage() {
             </div>
           </div>
           <button
-            onClick={() => router.push('/admin')}
+            onClick={backToAdmin}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs hover:bg-muted/50 transition-colors"
             title="Back to Admin Dashboard"
           >
@@ -397,7 +435,7 @@ export default function ApiTestPage() {
                     </p>
                   </div>
                   <button
-                    onClick={() => router.push('/admin')}
+                    onClick={backToAdmin}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs hover:bg-muted/50 transition-colors shrink-0"
                   >
                     <ArrowLeft className="h-3 w-3" /> Back to Admin

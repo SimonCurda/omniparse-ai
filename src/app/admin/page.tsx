@@ -196,6 +196,13 @@ export default function AdminPage() {
         if (saved) setSecret(saved);
       } catch {}
     }
+    // Restore the tab the user was on when they navigated away (e.g. to
+    // /api-test). The API Tester link passes ?tab=<current> so "Back to
+    // Admin" can return to the same tab instead of the default 'accounts'.
+    const tabParam = urlParams.get('tab');
+    if (tabParam && ['accounts', 'hidden', 'deleted', 'providers', 'flags', 'modelhealth', 'links'].includes(tabParam)) {
+      setTab(tabParam as typeof tab);
+    }
   }, []);
 
   const fetchProviders = useCallback(async () => {
@@ -851,14 +858,14 @@ export default function AdminPage() {
               never overlap or push the Links tab off-screen. Wraps gracefully
               on small screens. */}
           <div className="flex flex-wrap gap-1.5">
-            <a href="/api-test"
+            <a href={`/api-test?tab=${tab}`} target="_blank" rel="noopener"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs hover:bg-muted/50 transition-colors"
-              title="Open the API tester playground">
+              title="Open the API tester playground (new tab)">
               <FlaskConical className="h-3 w-3" /> API Tester
             </a>
-            <a href="/api-docs"
+            <a href="/api-docs" target="_blank" rel="noopener"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs hover:bg-muted/50 transition-colors"
-              title="Open the API documentation">
+              title="Open the API documentation (new tab)">
               <BookOpen className="h-3 w-3" /> API Docs
             </a>
             <button onClick={handleBackup} disabled={backupLoading}
