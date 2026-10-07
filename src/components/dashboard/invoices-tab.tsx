@@ -594,12 +594,15 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
       });
       if (res.ok) {
         const data = await res.json();
-        // Merge reviewed flag into customFields for both list and selected invoice
+        // Merge reviewed flag + auto-bumped lifecycleStatus into both list and selected invoice.
+        // The server may return lifecycleAutoBumped=true when it bumped the
+        // status from "pending" to "approved" as part of the review action.
         const updatedInvoices = invoices.map((inv) =>
           inv.id === invoiceId
             ? {
                 ...inv,
                 customFields: { ...(inv.customFields as Record<string, unknown> | null ?? {}), reviewed: data.reviewed, reviewedAt: data.reviewedAt },
+                ...(data.lifecycleStatus ? { lifecycleStatus: data.lifecycleStatus } : {}),
               }
             : inv
         );
@@ -608,6 +611,7 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
           setSelectedInvoice({
             ...selectedInvoice,
             customFields: { ...(selectedInvoice.customFields as Record<string, unknown> | null ?? {}), reviewed: data.reviewed, reviewedAt: data.reviewedAt },
+            ...(data.lifecycleStatus ? { lifecycleStatus: data.lifecycleStatus } : {}),
           });
         }
         toast.success(data.reviewed ? 'Marked as checked' : 'Marked as needs review');
@@ -801,6 +805,56 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
     }
   };
 
+  // ─── Smart lifecycle: mark invoices as "exported" after export ──────────
+  // Called by every export function (CSV/JSON/Excel/PDF, both "all" and
+  // "checked only" variants) after the file download is triggered. Sends a
+  // bulk PATCH to /api/bulk-actions with change_lifecycle_status so the
+  // lifecycle column reflects that these invoices have been exported.
+  //
+  // Only bumps invoices whose current lifecycle is "pending" or "approved"
+  // (the pre-export states in the pending → approved → exported workflow).
+  // Invoices already at "exported" or a custom terminal status are left
+  // untouched so we don't clobber a status the user set deliberately.
+  //
+  // Errors are non-fatal — the export already succeeded (the file was
+  // downloaded), so we just log a warning instead of showing an error toast.
+  const markInvoicesExported = async (rows: InvoiceRow[]) => {
+    const token = getToken();
+    if (!token || rows.length === 0) return;
+    // Filter to invoices that are in a pre-export lifecycle state.
+    const idsToBump = rows
+      .filter((inv) => !inv.lifecycleStatus || inv.lifecycleStatus === '' || inv.lifecycleStatus === 'pending' || inv.lifecycleStatus === 'approved')
+      .map((inv) => inv.id);
+    if (idsToBump.length === 0) return;
+    try {
+      const res = await fetch('/api/bulk-actions', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'change_lifecycle_status',
+          invoiceIds: idsToBump,
+          data: { status: 'exported' },
+        }),
+      });
+      if (res.ok) {
+        // Update local state so the UI reflects the new status immediately.
+        // We read from the `invoices` closure rather than a state-updater
+        // callback because setInvoices is a plain setter from the store,
+        // not a React setState functional updater.
+        const idSet = new Set(idsToBump);
+        const updatedInvoices = invoices.map((inv) =>
+          idSet.has(inv.id) ? { ...inv, lifecycleStatus: 'exported' } : inv
+        );
+        setInvoices(updatedInvoices);
+        if (selectedInvoice && idSet.has(selectedInvoice.id)) {
+          setSelectedInvoice({ ...selectedInvoice, lifecycleStatus: 'exported' });
+        }
+      }
+    } catch {
+      // Non-fatal — export already succeeded.
+    }
+  };
+
   const exportCSV = () => {
     const header = 'Vendor,Invoice #,Date,Amount,VAT,Total,Currency,Status,Confidence,Validation Status,Processing Time,Labels\n';
     const esc = (v: unknown) => {
@@ -818,6 +872,7 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
     a.click();
     URL.revokeObjectURL(url);
     toast.success('CSV exported');
+    markInvoicesExported(displayed);
   };
 
   // ─── Export Checked Only ─────────────────────────────────────────
@@ -845,6 +900,7 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
     a.click();
     URL.revokeObjectURL(url);
     toast.success(`Exported ${checkedInvoices.length} checked invoices to CSV`);
+    markInvoicesExported(checkedInvoices);
   };
 
   const exportCheckedJSON = () => {
@@ -857,6 +913,7 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
     a.click();
     URL.revokeObjectURL(url);
     toast.success(`Exported ${checkedInvoices.length} checked invoices to JSON`);
+    markInvoicesExported(checkedInvoices);
   };
 
   const exportCheckedExcel = async () => {
@@ -890,6 +947,7 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
       XLSX.utils.book_append_sheet(wb, ws, 'Checked Invoices');
       XLSX.writeFile(wb, 'checked-invoices.xlsx');
       toast.success(`Exported ${checkedInvoices.length} checked invoices to Excel`);
+      markInvoicesExported(checkedInvoices);
     } catch {
       toast.error('Failed to generate Excel file');
     }
@@ -904,6 +962,7 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
     a.click();
     URL.revokeObjectURL(url);
     toast.success('JSON exported');
+    markInvoicesExported(displayed);
   };
 
   const exportExcel = async () => {
@@ -936,6 +995,7 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
       XLSX.utils.book_append_sheet(wb, ws, 'Invoices');
       XLSX.writeFile(wb, 'invoices.xlsx');
       toast.success('Excel exported');
+      markInvoicesExported(displayed);
     } catch {
       toast.error('Failed to generate Excel file');
     }
@@ -974,6 +1034,7 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
       });
       doc.save(filename);
       toast.success(`PDF exported (${rows.length} invoice${rows.length !== 1 ? 's' : ''})`);
+      markInvoicesExported(rows);
     } catch (err) { console.error('[exportPDF] error:', err); toast.error('Failed to generate PDF file'); }
   };
   const exportPDF = () => generatePDF(displayed, 'invoices.pdf', 'Invoices');
@@ -2568,7 +2629,7 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                 id="new-label-name"
                 value={newLabelName}
                 onChange={(e) => setNewLabelName(e.target.value)}
-                placeholder="e.g. Urgent, FY2024, Reimbursable"
+                placeholder="e.g. Urgent, House Renovation, FY2024"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && newLabelName.trim()) {
                     createLabel(newLabelName.trim(), newLabelColor).then((created) => {

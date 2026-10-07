@@ -21,16 +21,17 @@ export function AuthView({ mode, onSwitch, onBack }: { mode: 'login' | 'signup';
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [ageConfirmed, setAgeConfirmed] = useState(false);
   const [withdrawalAcknowledged, setWithdrawalAcknowledged] = useState(false);
+  const [emailOwnershipConfirmed, setEmailOwnershipConfirmed] = useState(false);
 
   const setUser = useAppStore((s) => s.setUser);
   const setView = useAppStore((s) => s.setView);
   const setInvoices = useAppStore((s) => s.setInvoices);
 
-  // In signup mode, submit is disabled until all three consent checkboxes are checked
-  // (Terms + Age + EU Withdrawal acknowledgment per Art. 16(m) Dir 2011/83/EU).
+  // In signup mode, submit is disabled until all four consent checkboxes are checked
+  // (Terms + Age + EU Withdrawal acknowledgment + Email-ownership confirmation).
   const submitDisabled =
     loading ||
-    (mode === 'signup' && (!termsAccepted || !ageConfirmed || !withdrawalAcknowledged));
+    (mode === 'signup' && (!termsAccepted || !ageConfirmed || !withdrawalAcknowledged || !emailOwnershipConfirmed));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,6 +63,12 @@ export function AuthView({ mode, onSwitch, onBack }: { mode: 'login' | 'signup';
       );
       return;
     }
+    if (mode === 'signup' && !emailOwnershipConfirmed) {
+      setApiError(
+        'You must confirm that the email address you registered with is your own, working email. Password reset links are sent to this address.'
+      );
+      return;
+    }
 
     setLoading(true);
 
@@ -73,6 +80,7 @@ export function AuthView({ mode, onSwitch, onBack }: { mode: 'login' | 'signup';
         body.termsAccepted = true;
         body.ageConfirmed = true;
         body.withdrawalAcknowledged = true;
+        body.emailOwnershipConfirmed = true;
       }
 
       const res = await fetch(endpoint, {
@@ -359,6 +367,31 @@ export function AuthView({ mode, onSwitch, onBack }: { mode: 'login' | 'signup';
                     Civil Code and Art. 16(m) of Directive 2011/83/EU.{' '}
                     <a
                       href="/terms-of-service#right-of-withdrawal"
+                      target="_blank"
+                      rel="noopener"
+                      className="text-amber-600 hover:underline"
+                    >
+                      Learn more →
+                    </a>
+                  </Label>
+                </div>
+                <div className="flex items-start gap-2">
+                  <Checkbox
+                    id="email-ownership"
+                    checked={emailOwnershipConfirmed}
+                    onCheckedChange={(checked) => setEmailOwnershipConfirmed(checked === true)}
+                    disabled={loading}
+                    className="mt-0.5"
+                  />
+                  <Label
+                    htmlFor="email-ownership"
+                    className="text-xs text-muted-foreground font-normal leading-relaxed cursor-pointer"
+                  >
+                    I confirm that the email address I have entered is my own, working email address that I
+                    have access to. I understand that password reset links are sent exclusively to this
+                    address, and that if I lose access to it I may be unable to recover my account.{' '}
+                    <a
+                      href="/terms-of-service#account-security"
                       target="_blank"
                       rel="noopener"
                       className="text-amber-600 hover:underline"

@@ -85,6 +85,55 @@ export default function TermsOfServicePage() {
         </ul>
       </section>
 
+      <section id="account-security">
+        <h2>4a. Account Security and Password Reset</h2>
+        <p>
+          <strong>Email address as account identifier.</strong> Your account is identified by the email
+          address you provide at registration. You represent and warrant that the email address you
+          register with is your own, working, accessible email address. At signup, you are required to
+          explicitly confirm this (the &quot;email-ownership confirmation&quot; checkbox). The timestamp
+          of this confirmation is recorded in your account record.
+        </p>
+        <p>
+          <strong>Password reset mechanism.</strong> The Service does not currently offer an automated
+          self-service password-reset flow. If you forget your password, you must contact the operator
+          (see §23 Contact) and request a manual password reset. Any reset is sent to, or applied to,
+          the email address registered on the account.
+        </p>
+        <p>
+          <strong>Account-ownership verification.</strong> Because the registered email is the primary
+          means of verifying that you are the account holder, the operator can only process password-reset
+          requests that are sent from the registered email address itself (or that can otherwise be
+          verified against the registered email). If you registered with an email address you do not own
+          or can no longer access — for example, a disposable email, a typo, a former employer&apos;s
+          email, or someone else&apos;s address — the operator has no reliable way to confirm that you
+          are the legitimate account holder and not a third party attempting to gain unauthorized access
+          to someone else&apos;s account.
+        </p>
+        <p>
+          <strong>Consequence of registering with an email you do not own.</strong> If you register with
+          an email address you do not control, and you subsequently lose your password, the operator
+          may be unable to reset your password or grant you access to the account, because doing so
+          would risk disclosing or handing over account data to a person who cannot be verified as the
+          legitimate account holder. In such a case, the operator is not liable for any loss of access
+          to data stored in the account. You assume all risk arising from the use of an email address
+          you do not own or cannot access.
+        </p>
+        <p>
+          <strong>No liability for refused resets.</strong> The operator reserves the right to refuse a
+          password-reset request where the operator cannot reasonably verify that the requester is the
+          legitimate account holder. This policy exists to protect account holders from unauthorized
+          takeover attempts and to comply with the operator&apos;s obligations under GDPR Art. 32
+          (security of processing) and applicable Czech law.
+        </p>
+        <p>
+          <strong>Recommendation.</strong> To avoid losing access to your account, (i) use an email
+          address you control and expect to retain long-term, (ii) keep your password in a secure
+          password manager, and (iii) if you change email providers, contact support to update your
+          registered email before you lose access to the old one.
+        </p>
+      </section>
+
       <section>
         <h2>5. Intellectual Property and License</h2>
         <p>

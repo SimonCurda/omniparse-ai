@@ -44,6 +44,12 @@ model User {
   // — when user exercised their right of withdrawal via the one-click button in Settings.
   // Null until withdrawal is exercised. Distinct from account deletion.
   withdrawnAt       DateTime?
+  // Email-ownership confirmation — when user confirmed at signup that the
+  // email address they registered with is their own, working, accessible
+  // email. Required for password-reset eligibility: if the user later
+  // requests a password reset from a different email, we cannot verify
+  // account ownership and therefore cannot reset. See ToS §4a.
+  emailOwnershipConfirmedAt DateTime?
   // Material ToS change notification tracking (GDPR Art. 12 + Czech CC §1752)
   // — when user was last emailed about a material ToS change. Used to ensure
   // each user gets the notification once per change cycle.

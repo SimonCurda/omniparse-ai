@@ -273,6 +273,7 @@ export default function PrivacyPolicyPage() {
           <li><strong>Encryption in transit:</strong> HTTPS/TLS 1.2+ for all connections (Vercel-managed certificates, auto-renewed).</li>
           <li><strong>Encryption at rest:</strong> Supabase (PostgreSQL) provides transparent disk encryption (TDE) on managed infrastructure. IMAP credentials stored by users are encrypted with AES-256-GCM.</li>
           <li><strong>Password storage:</strong> Passwords are hashed with bcrypt (12 rounds) and never stored in plaintext or reversible form.</li>
+          <li><strong>Account recovery:</strong> The Service does not currently offer automated self-service password reset. Manual reset requests are processed only when sent from the registered email address, so that account ownership can be verified. If a user registered with an email they do not own or can no longer access, the operator may be unable to process a reset request (see Terms of Service §4a for details).</li>
           <li><strong>Authentication:</strong> JWT-based authentication with 7-day token expiry. Tokens are signed with a server-side secret and rotated periodically.</li>
           <li><strong>Rate limiting:</strong> 5 login attempts per minute per IP on authentication endpoints; broader rate limits on AI endpoints to prevent abuse.</li>
           <li><strong>Security headers:</strong> Content-Security-Policy, Strict-Transport-Security (HSTS, 2-year max-age, preload), X-Frame-Options: DENY, X-Content-Type-Options: nosniff, Referrer-Policy: strict-origin-when-cross-origin.</li>

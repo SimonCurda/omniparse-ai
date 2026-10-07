@@ -49,6 +49,10 @@ export async function POST(req: NextRequest) {
         // User expressly acknowledged losing the 14-day right of withdrawal
         // by requesting immediate performance of the digital-content service.
         withdrawalAcknowledgedAt: new Date(),
+        // Email-ownership confirmation — user confirmed the email they
+        // registered with is their own, working, accessible email. Required
+        // for password-reset eligibility (see ToS §4a).
+        emailOwnershipConfirmedAt: new Date(),
         // emailVerified is intentionally left null — we don't enforce email
         // verification before AI features can be used. The field exists in
         // the schema for future use (if we add verification back later).

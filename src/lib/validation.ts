@@ -34,6 +34,10 @@ export const signupSchema = z.object({
       error:
         'You must acknowledge that you lose the 14-day right of withdrawal once the service begins (Czech Civil Code §1837(j), Directive 2011/83/EU Art. 16(m))',
     }),
+    emailOwnershipConfirmed: z.literal(true, {
+      error:
+        'You must confirm that the email address you registered with is your own, working email. Password reset links are sent to this address — if you do not have access to it, you cannot recover your account.',
+    }),
   });
 
 export const changePasswordSchema = z

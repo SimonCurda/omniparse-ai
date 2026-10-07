@@ -1,0 +1,12 @@
+-- AlterTable: add emailOwnershipConfirmedAt column to User
+--
+-- Records when the user confirmed at signup that the email address they
+-- registered with is their own, working, accessible email. This is a
+-- legal-compliance field: it's required for password-reset eligibility.
+-- If the user later requests a password reset from a different email,
+-- we cannot verify account ownership and therefore cannot reset. See
+-- ToS §4a "Account Security and Password Reset".
+--
+-- Nullable because existing users (who signed up before this field
+-- existed) won't have it set. New signups will always have it populated.
+ALTER TABLE "User" ADD COLUMN "emailOwnershipConfirmedAt" TIMESTAMP(3);

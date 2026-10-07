@@ -8,6 +8,16 @@ import { getUserFromRequest } from '@/lib/auth';
 // so no DB migration is needed. The flag is a manual marker the user clicks
 // in the UI to track which invoices they have already looked at, independent
 // of the auto-detected `validationStatus`.
+//
+// SMART LIFECYCLE AUTOMATION:
+// When the user marks an invoice as checked (reviewed=true), the lifecycle
+// status is automatically bumped to "approved" — but ONLY if the current
+// status is "pending" or empty. This prevents overwriting a more advanced
+// status (e.g. "exported" or a custom terminal status the user set
+// manually). When the user un-checks an invoice (reviewed=false), the
+// lifecycle status is left untouched — the user can revert it manually if
+// needed. This implements the workflow: pending → (review) → approved →
+// (export) → exported.
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   try {
@@ -16,7 +26,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     const invoice = await db.invoice.findFirst({
       where: { id, userId: auth.userId },
-      select: { id: true, customFields: true },
+      select: { id: true, customFields: true, lifecycleStatus: true },
     });
     if (!invoice) return NextResponse.json({ error: 'Invoice not found' }, { status: 404 });
 
@@ -31,9 +41,22 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       reviewedAt,
     };
 
+    // Smart lifecycle: bump to "approved" only when marking as reviewed AND
+    // the current lifecycle is still at its initial state ("pending" or
+    // empty). This avoids overriding "exported" or any custom status the
+    // user may have set.
+    const shouldBumpToApproved =
+      reviewed &&
+      (!invoice.lifecycleStatus ||
+        invoice.lifecycleStatus === '' ||
+        invoice.lifecycleStatus === 'pending');
+
     await db.invoice.update({
       where: { id },
-      data: { customFields: updatedCustomFields as any },
+      data: {
+        customFields: updatedCustomFields as any,
+        ...(shouldBumpToApproved ? { lifecycleStatus: 'approved' } : {}),
+      },
     });
 
     await db.auditLog.create({
@@ -41,7 +64,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         userId: auth.userId,
         invoiceId: id,
         action: reviewed ? 'reviewed' : 'unreviewed',
-        details: { reviewed, reviewedAt },
+        details: {
+          reviewed,
+          reviewedAt,
+          ...(shouldBumpToApproved ? { lifecycleAutoBumped: 'approved' } : {}),
+        },
       },
     });
 
@@ -50,6 +77,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       reviewed,
       reviewedAt,
       customFields: updatedCustomFields,
+      lifecycleStatus: shouldBumpToApproved ? 'approved' : invoice.lifecycleStatus,
+      lifecycleAutoBumped: shouldBumpToApproved,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
