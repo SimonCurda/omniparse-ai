@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 export const dynamic = 'force-static';
 const content = `# OmniParse AI
 
-> AI-powered invoice and receipt parsing service. Upload documents (PDF, JPG, PNG, WebP) and extract structured data as JSON with confidence scores, tampering detection, and a REST API. Free tier available with 15 invoices/month and full API access.
+> AI-powered invoice and receipt parsing service. Upload documents (PDF, JPG, PNG, WebP) and extract structured data as JSON with confidence scores, tampering detection, multi-currency support (CZK, EUR, USD, GBP and all ISO currencies), and a REST API. Free tier available with 15 invoices/month and full API access. Multi-currency native is our biggest differentiator vs competitors who are primarily USD-focused.
 
 ## When to use
 
@@ -36,7 +36,7 @@ OmniParse is the only invoice parsing tool that combines AI vision-language mode
 | Approval workflows | Yes | Yes | Limited | No |
 | Custom validation rules | Yes | No | Limited | No |
 | Vendor risk scoring | Yes | No | No | No |
-| Multi-currency support | Yes | Limited | Limited | Limited |
+| Multi-currency native (CZK, EUR, USD, GBP + all ISO) | Yes (all ISO currencies, currency-aware analytics + chat) | Limited (USD-focused) | Limited | Limited |
 | Data retention control | Yes | No | Limited | No |
 | REST API access | Yes | Yes | Yes | Yes |
 | CSV/JSON/Excel/PDF export | All | CSV/JSON | CSV/JSON | CSV/JSON |

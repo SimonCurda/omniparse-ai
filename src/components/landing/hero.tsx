@@ -24,6 +24,8 @@ const ROTATING_TAGLINES: string[] = [
   'built for finance teams',
   'with zero setup',
   'across every currency',
+  'multi-currency native',
+  'CZK, EUR, USD, GBP & more',
 ];
 
 function RotatingHeadline() {
@@ -59,8 +61,9 @@ export function Hero({ onAuth }: { onAuth: (v: 'login' | 'signup') => void }) {
       <div className="max-w-4xl mx-auto text-center">
         <RotatingHeadline />
         <p className="mt-6 text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-          Upload invoices and receipts. Our AI extracts vendor details, amounts, line items, and more — with
-          real-time confidence scores. Chat with your data, generate charts, and export results.
+          Upload invoices in <strong className="text-foreground">any currency</strong> — CZK, EUR, USD, GBP and more.
+          Our AI extracts vendor details, amounts, line items, and more — with real-time confidence scores.
+          Chat with your data, generate charts, and export results.
         </p>
         <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
           <Button size="lg" className="text-base px-8" onClick={() => onAuth('signup')}>

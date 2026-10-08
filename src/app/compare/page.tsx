@@ -47,7 +47,7 @@ const FEATURES: Feature[] = [
   { feature: 'Approval workflows', omniparse: true, parseur: true, nanonets: 'Limited', docparser: false },
   { feature: 'Custom validation rules', omniparse: true, parseur: false, nanonets: 'Limited', docparser: false },
   { feature: 'Vendor risk scoring', omniparse: true, parseur: false, nanonets: false, docparser: false },
-  { feature: 'Multi-currency support', omniparse: true, parseur: 'Limited', nanonets: 'Limited', docparser: 'Limited' },
+  { feature: 'Multi-currency native (CZK, EUR, USD, GBP + more)', omniparse: 'Full (all ISO currencies)', parseur: 'Limited (USD-focused)', nanonets: 'Limited', docparser: 'Limited', note: 'OmniParse is built multi-currency from the ground up — analytics, chat, exports all currency-aware' },
   { feature: 'Data retention control', omniparse: true, parseur: false, nanonets: 'Limited', docparser: false },
   { feature: 'REST API access', omniparse: true, parseur: true, nanonets: true, docparser: true },
   { feature: 'CSV / JSON / Excel / PDF export', omniparse: 'All', parseur: 'CSV/JSON', nanonets: 'CSV/JSON', docparser: 'CSV/JSON' },
@@ -94,15 +94,40 @@ export default function ComparePage() {
           <h2 className="text-lg font-semibold mb-3">Quick Summary</h2>
           <p className="text-sm text-muted-foreground leading-relaxed mb-3">
             <strong className="text-foreground">OmniParse</strong> is the best choice if you need an AI invoice parsing API
-            with tampering detection, per-field confidence scores, and GDPR compliance with EU-based AI providers.
-            It&apos;s the only tool that combines vision-language model extraction, a chat assistant for querying invoice
-            data, and a free REST API with an OpenAPI specification.
+            with tampering detection, per-field confidence scores, GDPR compliance with EU-based AI providers, and
+            <strong className="text-foreground"> native multi-currency support</strong>. It&apos;s the only tool that combines
+            vision-language model extraction, a chat assistant for querying invoice data, multi-currency analytics
+            (CZK, EUR, USD, GBP and more), and a free REST API with an OpenAPI specification.
           </p>
           <p className="text-sm text-muted-foreground leading-relaxed">
             <strong className="text-foreground">Parseur</strong> is a good choice for simple, template-free extraction with
             email import. <strong className="text-foreground">Nanonets</strong> excels at high-volume processing with
             custom-trained models. <strong className="text-foreground">Docparser</strong> is rule-based (not AI) and best
-            for developers who want webhook integrations with traditional template-based extraction.
+            for developers who want webhook integrations with traditional template-based extraction. All three competitors
+            are primarily USD-focused with limited multi-currency support.
+          </p>
+        </div>
+
+        {/* Multi-currency highlight */}
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-6 mb-10">
+          <h2 className="text-lg font-semibold mb-3">Multi-Currency Native — Our Biggest Differentiator</h2>
+          <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+            OmniParse is built <strong className="text-foreground">multi-currency from the ground up</strong>. While
+            competitors are primarily USD-focused, OmniParse natively supports CZK, EUR, USD, GBP and any other ISO 4217
+            currency — with correct symbol formatting (Kč for CZK, € for EUR, £ for GBP), currency-aware analytics,
+            per-currency grouping in charts, and an AI chat assistant that understands currency context.
+          </p>
+          <ul className="text-sm text-muted-foreground space-y-1 mb-3">
+            <li>• <strong className="text-foreground">All ISO currencies</strong> — CZK, EUR, USD, GBP, JPY, CHF, PLN, SEK, and 150+ more</li>
+            <li>• <strong className="text-foreground">Correct symbol formatting</strong> — narrow symbols via Intl.NumberFormat (Kč, €, £, $, ¥)</li>
+            <li>• <strong className="text-foreground">Per-currency analytics</strong> — monthly charts show one series per currency, totals grouped by currency</li>
+            <li>• <strong className="text-foreground">Currency-aware AI chat</strong> — ask &quot;how much did we spend in EUR last month?&quot; and get the right answer</li>
+            <li>• <strong className="text-foreground">Exports preserve currency codes</strong> — CSV, JSON, Excel, PDF all include the currency column</li>
+            <li>• <strong className="text-foreground">European number format support</strong> — correctly parses &quot;1.234,56&quot; (European) and &quot;1,234.56&quot; (US)</li>
+          </ul>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            If you process invoices from multiple countries or in multiple currencies, OmniParse is the only tool that
+            handles this natively — no workarounds, no manual conversion, no &quot;convert to USD first&quot; steps.
           </p>
         </div>
 

@@ -105,8 +105,8 @@ export const COMPARISON_DATA: CompetitorRow[] = [
     competitor3: true,
   },
   {
-    feature: 'Multi-currency analytics',
-    tooltip: 'Track invoices in CZK, EUR, USD, GBP and more. Analytics group by currency, monthly charts show one series per currency, and the AI chat is currency-aware.',
+    feature: 'Multi-currency native (CZK, EUR, USD, GBP + more)',
+    tooltip: 'OmniParse is built multi-currency from the ground up. Track invoices in CZK, EUR, USD, GBP and any other ISO currency. Analytics group by currency, monthly charts show one series per currency, the AI chat is currency-aware, and exports preserve currency codes. Competitors are primarily USD-focused with limited multi-currency support.',
     omniparse: true,
     competitor1: 'Limited',
     competitor2: 'Limited',
