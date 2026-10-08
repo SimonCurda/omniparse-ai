@@ -1550,7 +1550,7 @@ export default function AdminPage() {
                 <LinkCard href="/terms-of-service" icon={FileText} title="Terms of Service" subtitle="Internal · /terms-of-service" />
                 <LinkCard href="/cookie-policy" icon={Cookie} title="Cookie Policy" subtitle="Internal · /cookie-policy" />
                 <LinkCard href="/ai-act-notice" icon={ShieldAlert} title="AI Act Notice" subtitle="Internal · /ai-act-notice" />
-                <LinkCard href="/OmniParse-Legal-Documents.pdf" icon={FileText} title="Legal PDF" subtitle="Internal · /OmniParse-Legal-Documents.pdf" />
+                <LinkCard href="/OmniParse-Legal-Documents-v3.6.pdf" icon={FileText} title="Legal PDF" subtitle="Internal · /OmniParse-Legal-Documents-v3.6.pdf" />
               </div>
             </div>
 

@@ -46,7 +46,7 @@ export function Footer() {
               <li><Link href="/ai-act-notice" className="hover:text-foreground transition-colors">AI Act Notice</Link></li>
               <li>
                 <a
-                  href="/OmniParse-Legal-Documents.pdf"
+                  href="/OmniParse-Legal-Documents-v3.6.pdf"
                   target="_blank"
                   rel="noopener"
                   className="hover:text-foreground transition-colors inline-flex items-center gap-1"

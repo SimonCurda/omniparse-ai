@@ -19,7 +19,7 @@ export default function LegalLayout({ title, lastUpdated, children }: { title: s
           <div className="ml-auto">
             <Button variant="outline" size="sm" asChild>
               <a
-                href="/OmniParse-Legal-Documents.pdf"
+                href="/OmniParse-Legal-Documents-v3.6.pdf"
                 target="_blank"
                 rel="noopener"
                 title="Open the full Legal Documents PDF (all 4 documents, opens in a new tab — shareable URL)"
@@ -47,7 +47,7 @@ export default function LegalLayout({ title, lastUpdated, children }: { title: s
           <div className="flex flex-wrap gap-3">
             <Button variant="outline" size="sm" asChild>
               <a
-                href="/OmniParse-Legal-Documents.pdf"
+                href="/OmniParse-Legal-Documents-v3.6.pdf"
                 target="_blank"
                 rel="noopener"
               >
@@ -58,8 +58,8 @@ export default function LegalLayout({ title, lastUpdated, children }: { title: s
             </Button>
             <Button variant="ghost" size="sm" asChild>
               <a
-                href="/OmniParse-Legal-Documents.pdf"
-                download="OmniParse-Legal-Documents.pdf"
+                href="/OmniParse-Legal-Documents-v3.6.pdf"
+                download="OmniParse-Legal-Documents-v3.6.pdf"
               >
                 <FileText className="h-4 w-4 mr-1" />
                 Download PDF
@@ -69,7 +69,7 @@ export default function LegalLayout({ title, lastUpdated, children }: { title: s
           <p className="text-xs text-muted-foreground/70">
             Direct shareable URL:{' '}
             <code className="px-1.5 py-0.5 rounded bg-muted text-foreground/80 text-[11px]">
-              omniparse-ai.vercel.app/OmniParse-Legal-Documents.pdf
+              omniparse-ai.vercel.app/OmniParse-Legal-Documents-v3.6.pdf
             </code>
           </p>
         </div>
