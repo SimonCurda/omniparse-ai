@@ -2171,7 +2171,6 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                 <th className="text-right px-3 py-2 font-medium whitespace-nowrap">
                   {showNormalized ? 'Norm. Total' : 'Total'}
                 </th>
-                <th className="text-center px-3 py-2 font-medium whitespace-nowrap">Approval</th>
                 <th className="text-center px-3 py-2 font-medium whitespace-nowrap">Validation</th>
                 <th className="text-center px-3 py-2 font-medium whitespace-nowrap">Confidence</th>
                 <th className="text-center px-3 py-2 font-medium whitespace-nowrap">Aging</th>
@@ -2185,7 +2184,7 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
             <tbody>
               {displayed.length === 0 ? (
                 <tr>
-                  <td colSpan={13} className="text-center py-12 text-muted-foreground">
+                  <td colSpan={12} className="text-center py-12 text-muted-foreground">
                     <Inbox className="h-10 w-10 mx-auto mb-3 opacity-40" />
                     <p>No invoices found</p>
                   </td>
@@ -2232,6 +2231,8 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                             Duplicate
                           </Badge>
                         )}
+                        {/* Approval badge — merged from the Approval column to save space */}
+                        {renderApprovalBadge(inv.approvalStatus)}
                       </div>
                       {/* Label badges under vendor name — visible on ALL screen sizes */}
                       {(inv.labels || []).length > 0 && (
@@ -2264,10 +2265,6 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                       {showNormalized && inv.normalizedTotal != null
                         ? fmtCurrency(inv.normalizedTotal, inv.normalizedCurrency || inv.currency)
                         : fmtCurrency(inv.total, inv.currency)}
-                    </td>
-                    {/* Approval Status */}
-                    <td className="px-3 py-2 text-center whitespace-nowrap">
-                      {renderApprovalBadge(inv.approvalStatus)}
                     </td>
                     {/* Validation Status */}
                     <td className="px-3 py-2 text-center whitespace-nowrap">
