@@ -4,7 +4,7 @@ export const dynamic = 'force-static';
 
 export default function PrivacyPolicyPage() {
   return (
-    <LegalLayout title="Privacy Policy" lastUpdated="September 19, 2026">
+    <LegalLayout title="Privacy Policy" lastUpdated="October 9, 2026">
       <section>
         <h2>1. Data Controller</h2>
         <p>

@@ -4,7 +4,7 @@ export const dynamic = 'force-static';
 
 export default function CookiePolicyPage() {
   return (
-    <LegalLayout title="Cookie Policy" lastUpdated="September 19, 2026">
+    <LegalLayout title="Cookie Policy" lastUpdated="October 9, 2026">
       <section>
         <h2>1. What Are Cookies and Local Storage</h2>
         <p>
