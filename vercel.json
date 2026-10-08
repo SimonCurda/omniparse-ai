@@ -9,12 +9,12 @@
       "schedule": "0 3 * * *"
     },
     {
-      "path": "/api/admin/model-health-check?key=${CRON_SECRET}",
-      "schedule": "0 6 * * *"
+      "path": "/api/cron/retry-pending",
+      "schedule": "*/15 * * * *"
     },
     {
-      "path": "/api/cron/retry-pending?key=${CRON_SECRET}",
-      "schedule": "0 4 * * *"
+      "path": "/api/cron/notify-tos-change",
+      "schedule": "0 9 * * 1"
     }
   ],
   "headers": [

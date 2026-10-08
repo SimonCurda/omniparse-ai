@@ -7,6 +7,8 @@ import { getUserFromRequest } from '@/lib/auth';
 
 const STRIPE_PRICES: Record<string, string> = {
   pro: process.env.STRIPE_PRO_PRICE_ID || '',
+  plus: process.env.STRIPE_PLUS_PRICE_ID || '',
+  business: process.env.STRIPE_BUSINESS_PRICE_ID || '',
   enterprise: process.env.STRIPE_ENTERPRISE_PRICE_ID || '',
 };
 
