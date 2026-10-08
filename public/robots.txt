@@ -1,61 +1,74 @@
+# ─── OmniParse AI — robots.txt ──────────────────────────────────────────────
+# Allow all AI crawlers and search engines to access public content.
+# Auth-gated routes and user-data API endpoints are disallowed.
+
+# ─── AI Crawlers & Search Bots ──────────────────────────────────────────────
+
+# Google — Gemini (general crawl + AI training/grounding)
 User-agent: Googlebot
 Allow: /
-
 User-agent: Google-Extended
 Allow: /
 
+# Microsoft Bing — Copilot uses Bing's search index
 User-agent: Bingbot
 Allow: /
-
 User-agent: Bingbot-News
 Allow: /
 
+# OpenAI — ChatGPT search and GPT training
 User-agent: GPTBot
 Allow: /
 
+# Anthropic — Claude
 User-agent: ClaudeBot
 Allow: /
 User-agent: Claude-Web
 Allow: /
 
+# Perplexity — Perplexity AI search
 User-agent: PerplexityBot
 Allow: /
 
+# Common Crawl — open dataset used by many AI researchers
 User-agent: CCBot
 Allow: /
 
+# Apple — Apple Intelligence / Siri AI
 User-agent: Applebot
 Allow: /
 User-agent: Applebot-Extended
 Allow: /
 
+# ByteDance — TikTok / Doubao AI
 User-agent: Bytespider
 Allow: /
 
+# Meta — Meta AI
 User-agent: Meta-ExternalAgent
 Allow: /
 
+# Amazon — Amazon Q / Alexa AI
 User-agent: Amazonbot
 Allow: /
 
+# ─── Social & Preview Crawlers ──────────────────────────────────────────────
+
 User-agent: Twitterbot
 Allow: /
-
 User-agent: facebookexternalhit
 Allow: /
-
 User-agent: LinkedInBot
 Allow: /
-
 User-agent: Slackbot
 Allow: /
-
 User-agent: Discordbot
 Allow: /
-
 User-agent: TelegramBot
 Allow: /
 
+# ─── Catch-all: All other bots ──────────────────────────────────────────────
+# Allow public content, block auth-gated and user-data routes.
 User-agent: *
 Allow: /
 Disallow: /admin
@@ -83,4 +96,34 @@ Disallow: /api/vendor-risk
 Disallow: /api/vendor-scorecard
 Disallow: /api/stripe/
 
+# ─── Public Pages (explicitly allowed for all crawlers) ─────────────────────
+# These pages are fully indexable by search engines and AI agents:
+#   /                    — Homepage (AI invoice parsing landing page)
+#   /compare             — OmniParse vs Parseur vs Nanonets vs Docparser comparison
+#   /blog                — Blog index (invoice parsing guides)
+#   /blog/ai-invoice-parsing       — How VLMs extract data from invoices
+#   /blog/free-invoice-ocr-api     — Free invoice OCR API guide with code examples
+#   /blog/extract-line-items-from-pdf — How to extract line items from PDF invoices
+#   /api-docs            — Full REST API documentation
+#   /api-test            — Interactive API tester playground
+#   /about               — About OmniParse AI
+#   /contact             — Contact information
+#   /privacy-policy      — Privacy Policy
+#   /terms-of-service    — Terms of Service
+#   /cookie-policy       — Cookie Policy
+#   /ai-act-notice       — AI Act Notice
+
+# ─── Machine-Readable Files for AI Agents ──────────────────────────────────
+# Sitemap — all indexable URLs with lastmod dates
 Sitemap: https://omniparse-ai.vercel.app/sitemap.xml
+
+# llms.txt — agent instruction file with when-to-use guidance,
+#   full comparison table (OmniParse vs Parseur vs Nanonets vs Docparser),
+#   API documentation links, and pricing.
+#   https://omniparse-ai.vercel.app/llms.txt
+
+# OpenAPI specification — machine-readable API surface (OpenAPI 3.0)
+#   https://omniparse-ai.vercel.app/openapi.json
+
+# MCP manifest — Model Context Protocol server manifest with 7 tools
+#   https://omniparse-ai.vercel.app/.well-known/mcp
