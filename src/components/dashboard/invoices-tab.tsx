@@ -2147,7 +2147,7 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
 
       <div className="rounded-lg border overflow-hidden w-full">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="min-w-full text-sm">
             <thead>
               <tr className="border-b bg-muted/50">
                 {/* Checkbox column */}
@@ -2179,7 +2179,7 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                 <th className="text-center px-3 py-2 font-medium whitespace-nowrap">Processed</th>
                 <th className="text-center px-3 py-2 font-medium whitespace-nowrap">Lifecycle</th>
                 {/* Action column: single sticky column — inline buttons on md+, 3-dot dropdown on mobile */}
-                <th className="px-2 py-3 sticky right-0 bg-card z-10 w-[112px]"></th>
+                <th className="px-2 py-3 sticky right-0 bg-card z-10 w-[88px]"></th>
               </tr>
             </thead>
             <tbody>
@@ -2286,13 +2286,13 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                       {renderProcessingTime(inv)}
                     </td>
                     {/* Processed At — smart timestamp: time today, date otherwise */}
-                    <td className="px-3 py-2 text-center">
+                    <td className="px-3 py-2 text-center whitespace-nowrap">
                       <span className="text-xs text-muted-foreground" title={new Date(inv.createdAt).toLocaleString()}>
                         {fmtRelativeTime(inv.createdAt)}
                       </span>
                     </td>
                     {/* Lifecycle Status */}
-                    <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
+                    <td className="px-3 py-2 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                       {canChangeLifecycle ? (
                         statusChanging === inv.id ? (
                           <Loader2 className="h-4 w-4 animate-spin mx-auto" />
