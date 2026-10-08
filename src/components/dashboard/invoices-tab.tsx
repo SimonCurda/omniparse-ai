@@ -83,6 +83,7 @@ import {
   Plus,
 } from 'lucide-react';
 import { ConfidenceMeter } from './confidence-meter';
+import { PdfViewer } from './pdf-viewer';
 import { toast } from 'sonner';
 import { useAppStore } from '@/stores/app-store';
 import type { InvoiceRow } from '@/stores/app-store';
@@ -153,6 +154,7 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
 
   // File viewer for detail dialog
   const [fileDataUrl, setFileDataUrl] = useState<string | null>(null);
+  const [fileBase64, setFileBase64] = useState<string | null>(null);
   const [fileLoading, setFileLoading] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
   const [fileType, setFileType] = useState<string | null>(null);
@@ -392,6 +394,7 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
     if (!selectedInvoice) {
       setAuditLogs([]);
       setFileDataUrl(null);
+      setFileBase64(null);
       setFileType(null);
       return;
     }
@@ -433,6 +436,19 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
         if (blob) {
           const url = URL.createObjectURL(blob);
           setFileDataUrl(url);
+          // For PDFs, convert to base64 for the PdfViewer (canvas-based
+          // renderer that bypasses COEP/COOP iframe restrictions).
+          if (blob.type === 'application/pdf') {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              // reader.result is "data:application/pdf;base64,...."
+              // Strip the data URL prefix to get raw base64.
+              const result = reader.result as string;
+              const base64 = result.includes(',') ? result.split(',')[1] : result;
+              setFileBase64(base64);
+            };
+            reader.readAsDataURL(blob);
+          }
         }
       })
       .catch((err) => {
@@ -1551,15 +1567,16 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                   />
                 ) : fileType === 'application/pdf' ? (
                   <div className="p-4">
-                    <div className="rounded border bg-white overflow-hidden">
-                      <iframe
-                        src={fileDataUrl}
-                        className="w-full h-[50vh] border-0"
-                        title={inv.filename || 'Invoice PDF'}
-                      />
-                    </div>
+                    {fileBase64 ? (
+                      <PdfViewer base64={fileBase64} filename={inv.filename || 'invoice.pdf'} />
+                    ) : (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground mr-2" />
+                        <span className="text-sm text-muted-foreground">Preparing PDF...</span>
+                      </div>
+                    )}
                     <p className="text-xs text-muted-foreground mt-2 text-center">
-                      If the PDF doesn't display, <a href={fileDataUrl} download={inv.filename || 'invoice.pdf'} className="text-primary hover:underline">download it</a> instead.
+                      If the PDF doesn&apos;t display, <a href={fileDataUrl || '#'} download={inv.filename || 'invoice.pdf'} className="text-primary hover:underline">download it</a> instead.
                     </p>
                   </div>
                 ) : (
