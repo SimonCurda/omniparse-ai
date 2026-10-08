@@ -2163,21 +2163,21 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                     </Tooltip>
                   )}
                 </th>
-                <th className="text-left px-4 py-3 font-medium">Vendor</th>
-                <th className="text-left px-4 py-3 font-medium whitespace-nowrap">Invoice #</th>
-                <th className="text-left px-4 py-3 font-medium whitespace-nowrap">
+                <th className="text-left px-3 py-2 font-medium">Vendor</th>
+                <th className="text-left px-3 py-2 font-medium whitespace-nowrap">Invoice #</th>
+                <th className="text-left px-3 py-2 font-medium whitespace-nowrap">
                   {showNormalized ? 'Norm. Vendor' : 'Date'}
                 </th>
-                <th className="text-right px-4 py-3 font-medium whitespace-nowrap">
+                <th className="text-right px-3 py-2 font-medium whitespace-nowrap">
                   {showNormalized ? 'Norm. Total' : 'Total'}
                 </th>
-                <th className="text-center px-4 py-3 font-medium whitespace-nowrap">Approval</th>
-                <th className="text-center px-4 py-3 font-medium whitespace-nowrap">Validation</th>
-                <th className="text-center px-4 py-3 font-medium whitespace-nowrap">Confidence</th>
-                <th className="text-center px-4 py-3 font-medium whitespace-nowrap">Aging</th>
-                <th className="text-center px-4 py-3 font-medium whitespace-nowrap">Proc. Time</th>
-                <th className="text-center px-4 py-3 font-medium whitespace-nowrap">Processed</th>
-                <th className="text-center px-4 py-3 font-medium whitespace-nowrap">Lifecycle</th>
+                <th className="text-center px-3 py-2 font-medium whitespace-nowrap">Approval</th>
+                <th className="text-center px-3 py-2 font-medium whitespace-nowrap">Validation</th>
+                <th className="text-center px-3 py-2 font-medium whitespace-nowrap">Confidence</th>
+                <th className="text-center px-3 py-2 font-medium whitespace-nowrap">Aging</th>
+                <th className="text-center px-3 py-2 font-medium whitespace-nowrap">Proc. Time</th>
+                <th className="text-center px-3 py-2 font-medium whitespace-nowrap">Processed</th>
+                <th className="text-center px-3 py-2 font-medium whitespace-nowrap">Lifecycle</th>
                 {/* Action column: single sticky column — inline buttons on md+, 3-dot dropdown on mobile */}
                 <th className="px-2 py-3 sticky right-0 bg-card z-10 w-[112px]"></th>
               </tr>
@@ -2209,7 +2209,7 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                       ) : null}
                     </td>
                     {/* Vendor */}
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-2">
                       <div className="font-medium flex flex-wrap items-center gap-1">
                         <span className="truncate">{showNormalized && inv.normalizedVendor ? inv.normalizedVendor : inv.vendor}</span>
                         {(inv.customFields as Record<string, unknown> | null)?.source === 'email' && (
@@ -2254,45 +2254,45 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                       )}
                       <div className="text-xs text-muted-foreground md:hidden">{inv.invNumber}</div>
                     </td>
-                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground whitespace-nowrap">
+                    <td className="px-3 py-2 font-mono text-xs text-muted-foreground whitespace-nowrap">
                       {inv.invNumber}
                     </td>
-                    <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                    <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">
                       {showNormalized && inv.normalizedInvDate ? inv.normalizedInvDate : inv.invDate}
                     </td>
-                    <td className="px-4 py-3 text-right font-medium">
+                    <td className="px-3 py-2 text-right font-medium">
                       {showNormalized && inv.normalizedTotal != null
                         ? fmtCurrency(inv.normalizedTotal, inv.normalizedCurrency || inv.currency)
                         : fmtCurrency(inv.total, inv.currency)}
                     </td>
                     {/* Approval Status */}
-                    <td className="px-4 py-3 text-center whitespace-nowrap">
+                    <td className="px-3 py-2 text-center whitespace-nowrap">
                       {renderApprovalBadge(inv.approvalStatus)}
                     </td>
                     {/* Validation Status */}
-                    <td className="px-4 py-3 text-center whitespace-nowrap">
+                    <td className="px-3 py-2 text-center whitespace-nowrap">
                       {renderValidationBadge(inv)}
                     </td>
                     {/* Confidence */}
-                    <td className="px-4 py-3 text-center whitespace-nowrap">
+                    <td className="px-3 py-2 text-center whitespace-nowrap">
                       <ConfidenceMeter confidence={inv.confidence} fieldConfidence={inv.fieldConfidence} />
                     </td>
                     {/* Aging */}
-                    <td className="px-4 py-3 text-center whitespace-nowrap">
+                    <td className="px-3 py-2 text-center whitespace-nowrap">
                       {renderAging(inv)}
                     </td>
                     {/* Processing Time */}
-                    <td className="px-4 py-3 text-center whitespace-nowrap">
+                    <td className="px-3 py-2 text-center whitespace-nowrap">
                       {renderProcessingTime(inv)}
                     </td>
                     {/* Processed At — smart timestamp: time today, date otherwise */}
-                    <td className="px-4 py-3 text-center">
+                    <td className="px-3 py-2 text-center">
                       <span className="text-xs text-muted-foreground" title={new Date(inv.createdAt).toLocaleString()}>
                         {fmtRelativeTime(inv.createdAt)}
                       </span>
                     </td>
                     {/* Lifecycle Status */}
-                    <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                    <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
                       {canChangeLifecycle ? (
                         statusChanging === inv.id ? (
                           <Loader2 className="h-4 w-4 animate-spin mx-auto" />
