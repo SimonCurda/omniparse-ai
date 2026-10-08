@@ -1034,9 +1034,37 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
       const autoTable = (autoTableMod as unknown as { default: (doc: unknown, opts: unknown) => void }).default
         || (autoTableMod as unknown as (doc: unknown, opts: unknown) => void);
       const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
-      doc.setFontSize(16); doc.setTextColor(40); doc.text(title, 40, 40);
-      doc.setFontSize(10); doc.setTextColor(120);
-      doc.text(`${rows.length} invoice${rows.length !== 1 ? 's' : ''} · Generated ${new Date().toLocaleString('en-US')}`, 40, 58);
+
+      // ─── Load Unicode font for Czech/Slovak diacritics ──────────────
+      // jsPDF's built-in Helvetica only supports ASCII + Latin-1 — it can't
+      // render ř, č, ž, š, ě, etc. We fetch a subsetted Liberation Sans TTF
+      // (47KB, Latin + Czech diacritics only) from /public/fonts and add it
+      // as the "NotoSans" font family. If the fetch fails (e.g. offline),
+      // we fall back to Helvetica — diacritics won't render but the PDF
+      // still generates.
+      try {
+        const fontRes = await fetch('/fonts/LiberationSans-Regular.ttf');
+        if (fontRes.ok) {
+          const fontBuf = await fontRes.arrayBuffer();
+          const fontBase64 = btoa(
+            new Uint8Array(fontBuf).reduce((data, byte) => data + String.fromCharCode(byte), '')
+          );
+          doc.addFileToVFS('LiberationSans-Regular.ttf', fontBase64);
+          doc.addFont('LiberationSans-Regular.ttf', 'NotoSans', 'normal');
+          doc.setFont('NotoSans');
+        }
+      } catch (fontErr) {
+        console.warn('[exportPDF] Unicode font load failed, falling back to Helvetica:', fontErr);
+      }
+
+      // ─── Header with OmniParse branding ─────────────────────────────
+      doc.setFontSize(18); doc.setTextColor(245, 158, 11); // amber-500
+      doc.text('OmniParse AI', 40, 38);
+      doc.setFontSize(13); doc.setTextColor(40);
+      doc.text(title, 40, 56);
+      doc.setFontSize(9); doc.setTextColor(120);
+      doc.text(`${rows.length} invoice${rows.length !== 1 ? 's' : ''} · Generated ${new Date().toLocaleString('en-US')}`, 40, 70);
+
       const head = [['Vendor', 'Invoice #', 'Date', 'Amount', 'VAT', 'Total', 'Currency', 'Status', 'Confidence', 'Labels']];
       const body = rows.map((inv) => [
         (inv.vendor ?? '').slice(0, 40), inv.invNumber ?? '', inv.invDate ?? '',
@@ -1046,15 +1074,19 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
         inv.confidence != null ? `${(inv.confidence * 100).toFixed(0)}%` : '', labelsToStr(inv),
       ]);
       autoTable(doc, {
-        startY: 75, head, body, theme: 'striped',
-        headStyles: { fillColor: [99, 102, 241], textColor: 255, fontSize: 9 },
+        startY: 85, head, body, theme: 'striped',
+        headStyles: { fillColor: [245, 158, 11], textColor: 255, fontSize: 9 }, // amber header
         bodyStyles: { fontSize: 8, cellPadding: 4 },
         columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' }, 8: { halign: 'right' } },
         margin: { left: 40, right: 40 },
         didDrawPage: (data: { pageNumber: number }) => {
           const pageCount = doc.getNumberOfPages();
+          const pageWidth = doc.internal.pageSize.getWidth();
+          const pageHeight = doc.internal.pageSize.getHeight();
+          // Footer: page number on left, branding on right
           doc.setFontSize(8); doc.setTextColor(150);
-          doc.text(`Page ${data.pageNumber} of ${pageCount} · OmniParse AI`, doc.internal.pageSize.getWidth() / 2, doc.internal.pageSize.getHeight() - 20, { align: 'center' });
+          doc.text(`Page ${data.pageNumber} of ${pageCount}`, 40, pageHeight - 20);
+          doc.text('Parsed via OmniParse AI · omniparse-ai.vercel.app', pageWidth - 40, pageHeight - 20, { align: 'right' });
         },
       });
       doc.save(filename);
