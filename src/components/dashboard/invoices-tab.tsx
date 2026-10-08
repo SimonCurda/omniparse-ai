@@ -1046,9 +1046,15 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
         const fontRes = await fetch('/fonts/LiberationSans-Regular.ttf');
         if (fontRes.ok) {
           const fontBuf = await fontRes.arrayBuffer();
-          const fontBase64 = btoa(
-            new Uint8Array(fontBuf).reduce((data, byte) => data + String.fromCharCode(byte), '')
-          );
+          // Convert ArrayBuffer to base64 in chunks to avoid stack overflow
+          // with large fonts (410KB → ~550KB base64).
+          const bytes = new Uint8Array(fontBuf);
+          let binary = '';
+          const chunkSize = 8192;
+          for (let i = 0; i < bytes.length; i += chunkSize) {
+            binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunkSize)));
+          }
+          const fontBase64 = btoa(binary);
           doc.addFileToVFS('LiberationSans-Regular.ttf', fontBase64);
           doc.addFont('LiberationSans-Regular.ttf', 'NotoSans', 'normal');
           doc.setFont('NotoSans');
