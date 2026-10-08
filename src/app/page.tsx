@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useAppStore } from '@/stores/app-store';
+import { useAppStore, type InvoiceRow } from '@/stores/app-store';
 import { Navbar } from '@/components/landing/navbar';
 import { Hero } from '@/components/landing/hero';
 import { FeaturesSection } from '@/components/landing/features-section';
@@ -180,7 +180,10 @@ export default function Home() {
     if (view === 'dashboard') {
       const token = localStorage.getItem('op_token');
       if (token) {
-        fetch('/api/invoices', { headers: { Authorization: 'Bearer ' + token } })
+        // cache:'no-store' is critical — without it, the browser serves a
+        // stale cached response without labels. This was the root cause of
+        // the "labels don't show until I tag an invoice" bug.
+        fetch('/api/invoices', { headers: { Authorization: 'Bearer ' + token }, cache: 'no-store' })
           .then((r) => (r.ok ? r.json() : []))
           .then((data) =>
             setInvoices(
@@ -198,6 +201,7 @@ export default function Home() {
                 processingTime: inv.processingTime, customFields: inv.customFields,
                 approvalStatus: inv.approvalStatus, lifecycleStatus: inv.lifecycleStatus,
                 entityId: inv.entityId,
+                labels: Array.isArray(inv.labels) ? (inv.labels as InvoiceRow['labels']) : undefined,
               }))
             )
           )

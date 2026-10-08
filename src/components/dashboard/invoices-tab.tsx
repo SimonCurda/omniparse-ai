@@ -2171,7 +2171,6 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                 <th className="text-right px-3 py-2 font-medium whitespace-nowrap">
                   {showNormalized ? 'Norm. Total' : 'Total'}
                 </th>
-                <th className="text-center px-3 py-2 font-medium whitespace-nowrap">Validation</th>
                 <th className="text-center px-3 py-2 font-medium whitespace-nowrap">Confidence</th>
                 <th className="text-center px-3 py-2 font-medium whitespace-nowrap">Aging</th>
                 <th className="text-center px-3 py-2 font-medium whitespace-nowrap">Proc. Time</th>
@@ -2184,7 +2183,7 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
             <tbody>
               {displayed.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="text-center py-12 text-muted-foreground">
+                  <td colSpan={11} className="text-center py-12 text-muted-foreground">
                     <Inbox className="h-10 w-10 mx-auto mb-3 opacity-40" />
                     <p>No invoices found</p>
                   </td>
@@ -2265,10 +2264,6 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                       {showNormalized && inv.normalizedTotal != null
                         ? fmtCurrency(inv.normalizedTotal, inv.normalizedCurrency || inv.currency)
                         : fmtCurrency(inv.total, inv.currency)}
-                    </td>
-                    {/* Validation Status */}
-                    <td className="px-3 py-2 text-center whitespace-nowrap">
-                      {renderValidationBadge(inv)}
                     </td>
                     {/* Confidence */}
                     <td className="px-3 py-2 text-center whitespace-nowrap">
