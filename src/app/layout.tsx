@@ -140,7 +140,7 @@ export default function RootLayout({
         contactPoint: {
           '@type': 'ContactPoint',
           contactType: 'customer support',
-          email: 'support@omniparse-ai.com',
+          email: 'damr58h@gmail.com',
           url: 'https://omniparse-ai.vercel.app/contact',
           availableLanguage: ['English'],
         },

@@ -6,7 +6,7 @@ const spec = {
     title: 'OmniParse AI REST API',
     description: 'AI-powered invoice parsing API. Upload invoices to extract structured data. Auth: X-API-Key header.',
     version: '1.0.0',
-    contact: { name: 'OmniParse AI', url: 'https://omniparse-ai.vercel.app', email: 'support@omniparse-ai.com' },
+    contact: { name: 'OmniParse AI', url: 'https://omniparse-ai.vercel.app', email: 'damr58h@gmail.com' },
   },
   servers: [{ url: 'https://omniparse-ai.vercel.app', description: 'Production' }],
   components: {

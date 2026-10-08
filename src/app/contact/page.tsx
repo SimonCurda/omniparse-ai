@@ -24,7 +24,7 @@ export default function ContactPage() {
               <div>
                 <h2 className="font-semibold text-sm">Email Support</h2>
                 <p className="text-sm text-muted-foreground mt-1">For technical support, bug reports, feature requests, and account-related inquiries (including password reset requests — see <Link href="/terms-of-service#account-security" className="text-amber-600 hover:underline">ToS §4a</Link> for our password reset policy):</p>
-                <p className="text-sm font-mono mt-2">support@omniparse-ai.com</p>
+                <p className="text-sm font-mono mt-2">damr58h@gmail.com</p>
               </div>
             </div>
             <div className="flex items-start gap-3">
@@ -53,7 +53,7 @@ export default function ContactPage() {
           </div>
           <div className="rounded-xl border border-border bg-card p-6 not-prose">
             <h2 className="font-semibold text-sm mb-2">Legal & Compliance</h2>
-            <p className="text-sm text-muted-foreground">OmniParse AI is operated in compliance with GDPR, the EU AI Act, and Czech law. For legal inquiries, DPA requests, or data subject access requests, please email support@omniparse-ai.com with the subject line &quot;Legal Inquiry.&quot;</p>
+            <p className="text-sm text-muted-foreground">OmniParse AI is operated in compliance with GDPR, the EU AI Act, and Czech law. For legal inquiries, DPA requests, or data subject access requests, please email damr58h@gmail.com with the subject line &quot;Legal Inquiry.&quot;</p>
             <div className="flex flex-wrap gap-3 mt-3">
               <Link href="/privacy-policy" className="text-sm text-amber-600 hover:underline">Privacy Policy</Link>
               <span className="text-muted-foreground">·</span>

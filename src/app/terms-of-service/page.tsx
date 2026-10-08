@@ -132,6 +132,13 @@ export default function TermsOfServicePage() {
           password manager, and (iii) if you change email providers, contact support to update your
           registered email before you lose access to the old one.
         </p>
+        <p>
+          <strong>Password recovery.</strong> If you lose access to your password, you may contact
+          OmniParse support at damr58h@gmail.com. After reasonable verification of account ownership,
+          OmniParse may provide a temporary replacement password through an appropriate communication
+          channel. You must change the temporary password after signing in and must not share it with
+          any third party. OmniParse will not disclose an existing password.
+        </p>
       </section>
 
       <section>

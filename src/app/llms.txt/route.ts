@@ -104,7 +104,7 @@ Rate limits: 60 requests/minute per IP (general), 5/minute for auth endpoints.
 ## Contact
 
 - Website: https://omniparse-ai.vercel.app
-- Support: support@omniparse-ai.com
+- Support: damr58h@gmail.com
 - About: https://omniparse-ai.vercel.app/about
 - Contact: https://omniparse-ai.vercel.app/contact
 `;
