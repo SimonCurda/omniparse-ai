@@ -29,23 +29,10 @@ export function Footer() {
             </ul>
           </div>
           <div>
-            <h4 className="font-semibold text-sm mb-4">Developers</h4>
+            <h4 className="font-semibold text-sm mb-4">Resources</h4>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li><Link href="/api-docs" className="hover:text-foreground transition-colors">API Documentation</Link></li>
               <li><Link href="/api-test" className="hover:text-foreground transition-colors">API Tester</Link></li>
-              <li><Link href="/openapi.json" className="hover:text-foreground transition-colors">OpenAPI Spec</Link></li>
-              <li><Link href="/llms.txt" className="hover:text-foreground transition-colors">llms.txt</Link></li>
-              <li><Link href="/about" className="hover:text-foreground transition-colors">About</Link></li>
-              <li><Link href="/contact" className="hover:text-foreground transition-colors">Contact</Link></li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="font-semibold text-sm mb-4">Developers</h4>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li><Link href="/api-docs" className="hover:text-foreground transition-colors">API Documentation</Link></li>
-              <li><Link href="/api-test" className="hover:text-foreground transition-colors">API Tester</Link></li>
-              <li><Link href="/openapi.json" className="hover:text-foreground transition-colors">OpenAPI Spec</Link></li>
-              <li><Link href="/llms.txt" className="hover:text-foreground transition-colors">llms.txt</Link></li>
               <li><Link href="/about" className="hover:text-foreground transition-colors">About</Link></li>
               <li><Link href="/contact" className="hover:text-foreground transition-colors">Contact</Link></li>
             </ul>
