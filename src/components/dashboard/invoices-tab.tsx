@@ -843,10 +843,11 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
   const markInvoicesExported = async (rows: InvoiceRow[]) => {
     const token = getToken();
     if (!token || rows.length === 0) return;
-    // Filter to invoices that are in a pre-export lifecycle state.
-    const idsToBump = rows
-      .filter((inv) => !inv.lifecycleStatus || inv.lifecycleStatus === '' || inv.lifecycleStatus === 'pending' || inv.lifecycleStatus === 'approved')
-      .map((inv) => inv.id);
+    // Bump ALL exported invoices to 'exported', regardless of their current
+    // lifecycle status. The user's intent is clear: if they exported it,
+    // it should be 'exported'. Don't skip invoices that already have a
+    // different status — the export action overrides it.
+    const idsToBump = rows.map((inv) => inv.id);
     if (idsToBump.length === 0) return;
     try {
       const res = await fetch('/api/bulk-actions', {
@@ -860,9 +861,6 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
       });
       if (res.ok) {
         // Update local state so the UI reflects the new status immediately.
-        // We read from the `invoices` closure rather than a state-updater
-        // callback because setInvoices is a plain setter from the store,
-        // not a React setState functional updater.
         const idSet = new Set(idsToBump);
         const updatedInvoices = invoices.map((inv) =>
           idSet.has(inv.id) ? { ...inv, lifecycleStatus: 'exported' } : inv
@@ -871,9 +869,14 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
         if (selectedInvoice && idSet.has(selectedInvoice.id)) {
           setSelectedInvoice({ ...selectedInvoice, lifecycleStatus: 'exported' });
         }
+        toast.success(`Marked ${idsToBump.length} invoice${idsToBump.length !== 1 ? 's' : ''} as exported`);
+      } else {
+        // Don't silently swallow — tell the user something went wrong.
+        const errData = await res.json().catch(() => ({}));
+        console.warn('[markInvoicesExported] failed:', res.status, errData);
       }
-    } catch {
-      // Non-fatal — export already succeeded.
+    } catch (err) {
+      console.warn('[markInvoicesExported] network error:', err);
     }
   };
 
@@ -2175,7 +2178,7 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                 <th className="text-center px-3 py-2 font-medium whitespace-nowrap">Aging</th>
                 <th className="text-center px-3 py-2 font-medium whitespace-nowrap">Proc. Time</th>
                 <th className="text-center px-3 py-2 font-medium whitespace-nowrap">Processed</th>
-                <th className="text-center px-3 py-2 font-medium whitespace-nowrap">Lifecycle</th>
+                <th className="text-center px-3 py-2 font-medium whitespace-nowrap">Status</th>
                 {/* Action column: single sticky column — inline buttons on md+, 3-dot dropdown on mobile */}
                 <th className="px-2 py-3 sticky right-0 bg-card z-10 w-[88px]"></th>
               </tr>
