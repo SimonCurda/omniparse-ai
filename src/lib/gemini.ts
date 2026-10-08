@@ -278,7 +278,8 @@ export async function geminiVisionCall(messages: GeminiVisionMessage[]): Promise
       // pixtral-large-latest removed — returns 400 'Invalid model' on free tier
       'pixtral-large-2411',
       'mistral-small-latest',
-      // mistral-medium-latest and mistral-large-latest removed — 429/403 on free tier
+      'mistral-medium-latest',  // added back — available on free tier with key rotation
+      // mistral-large-latest removed — 403 paid tier only
     ];
 
     for (const mistralModel of mistralModels) {
@@ -727,7 +728,8 @@ export async function geminiChatCall(
   if (mistralKeys.length > 0) {
     const mistralChatModels = [
       'mistral-small-latest',
-      // mistral-large-latest and mistral-medium-latest removed — 429/403 on free tier
+      'mistral-medium-latest',  // added back — available with key rotation
+      // mistral-large-latest removed — 403 paid tier only
       'open-mistral-7b',
       'open-mixtral-8x7b',
       'open-mixtral-8x22b',

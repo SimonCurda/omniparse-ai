@@ -33,14 +33,14 @@ function authenticate(req: NextRequest): boolean {
 
 const KNOWN_MODELS: Array<{ provider: string; modelName: string }> = [
   { provider: 'mistral', modelName: 'pixtral-12b-latest' },
-  { provider: 'mistral', modelName: 'pixtral-large-latest' },
   { provider: 'mistral', modelName: 'mistral-small-latest' },
   { provider: 'mistral', modelName: 'mistral-medium-latest' },
-  { provider: 'mistral', modelName: 'mistral-large-latest' },
+  // pixtral-large-latest: 400 'Invalid model' on free tier — removed
+  // mistral-large-latest: 403 paid tier only — removed
   { provider: 'groq', modelName: 'openai/gpt-oss-20b' },
   { provider: 'groq', modelName: 'openai/gpt-oss-120b' },
-  { provider: 'groq', modelName: 'meta-llama/llama-4-scout-17b-16e-instruct' },
-  { provider: 'groq', modelName: 'gemma2-9b-it' },
+  // meta-llama/llama-4-scout-17b-16e-instruct: 404 decommissioned — removed
+  // gemma2-9b-it: 400 decommissioned — removed
 ];
 
 async function latestRow(provider: string, modelName: string) {

@@ -44,8 +44,8 @@ interface ModelSpec {
 const MISTRAL_MODELS: ModelSpec[] = [
   { provider: 'mistral', modelName: 'pixtral-12b-latest', vision: true },
   { provider: 'mistral', modelName: 'mistral-small-latest' },
+  { provider: 'mistral', modelName: 'mistral-medium-latest' },
   // pixtral-large-latest: 400 'Invalid model' on free tier
-  // mistral-medium-latest: 429 rate limited
   // mistral-large-latest: 403 paid tier only
 ];
 
