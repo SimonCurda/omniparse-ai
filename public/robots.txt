@@ -1,24 +1,35 @@
-# OmniParse AI — robots.txt
-# Allow search engines to crawl the landing page and legal pages
-# Block all API routes and dashboard (require auth)
-
-# Allow all crawlers
-User-agent: *
-
-# Allow landing page
+User-agent: Googlebot
 Allow: /
 
-# Allow legal pages
-Allow: /privacy-policy
-Allow: /terms-of-service
-Allow: /cookie-policy
-Allow: /ai-act-notice
+User-agent: Bingbot
+Allow: /
 
-# Block API routes
-Disallow: /api/
+User-agent: Twitterbot
+Allow: /
 
-# Block dashboard and admin
+User-agent: facebookexternalhit
+Allow: /
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: *
+Allow: /
+
+# Disallow auth-gated and internal routes
 Disallow: /admin
+Disallow: /api-test
+Disallow: /api/auth/
+Disallow: /api/admin/
 
-# Sitemap (if we add one later)
-# Sitemap: https://omniparse-ai.vercel.app/sitemap.xml
+# Sitemap
+Sitemap: https://omniparse-ai.vercel.app/sitemap.xml
+
+# llms.txt — agent instruction file
+# https://omniparse-ai.vercel.app/llms.txt

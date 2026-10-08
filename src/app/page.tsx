@@ -207,11 +207,20 @@ export default function Home() {
   }, [view]);
 
   if (!mounted) {
+    // Server-side render: return the full landing page content so crawlers
+    // and AI agents see 500+ chars of meaningful HTML. The client-side effects
+    // will run after hydration and switch to the dashboard if there's a token.
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="w-8 h-8 rounded-lg bg-amber-500 flex items-center justify-center animate-pulse">
-          <span className="text-white font-bold text-sm">OP</span>
-        </div>
+      <div className="min-h-screen flex flex-col bg-background">
+        <main id="main-content" className="flex-1">
+          <Hero onAuth={() => {}} />
+          <FeaturesSection />
+          <PricingSection onAuth={() => {}} />
+          <ComparisonSection />
+          <FaqSection />
+          <CtaSection onAuth={() => {}} />
+        </main>
+        <Footer />
       </div>
     );
   }
