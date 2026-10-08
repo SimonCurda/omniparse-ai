@@ -9,7 +9,7 @@ import {
   Cpu, CheckCircle2, XCircle, Bug, Activity,
   FlaskConical, BookOpen, DatabaseBackup, Scale, Sparkles,
   Link as LinkIcon, Database, Cloud, CreditCard, Cookie, Github, ExternalLink,
-  Plus, X, Save, Globe, EllipsisVertical,
+  Plus, X, Save, Globe, EllipsisVertical, Download,
 } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
@@ -869,14 +869,14 @@ export default function AdminPage() {
               <BookOpen className="h-3 w-3" /> API Docs
             </a>
             <button onClick={handleBackup} disabled={backupLoading}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs hover:bg-muted/50 transition-colors disabled:opacity-50"
-              title="Download a JSON snapshot of the database now">
-              {backupLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <DatabaseBackup className="h-3 w-3" />} Backup
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-amber-500/40 bg-amber-500/5 text-xs hover:bg-amber-500/10 transition-colors disabled:opacity-50"
+              title="Download a JSON snapshot of the entire database to your computer">
+              {backupLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />} Download DB Backup
             </button>
             <button onClick={handleBackupToGithub} disabled={githubBackupLoading}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs hover:bg-muted/50 transition-colors disabled:opacity-50"
-              title="Push a JSON snapshot of the database to the configured GitHub repo">
-              {githubBackupLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Github className="h-3 w-3" />} Push to GitHub
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-amber-500/40 bg-amber-500/5 text-xs hover:bg-amber-500/10 transition-colors disabled:opacity-50"
+              title="Push a JSON snapshot of the entire database to your GitHub repo (uses GITHUB_BACKUP_TOKEN/OWNER/REPO env vars)">
+              {githubBackupLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Github className="h-3 w-3" />} Upload to GitHub
             </button>
             <a href="/legal"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs hover:bg-muted/50 transition-colors"
