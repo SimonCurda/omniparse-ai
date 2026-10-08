@@ -28,6 +28,8 @@ export const metadata: Metadata = {
     "document parsing",
     "vision language model",
     "automated accounting",
+    "invoice OCR API",
+    "AI invoice parsing",
   ],
   authors: [{ name: "OmniParse AI" }],
   creator: "OmniParse AI",
@@ -37,6 +39,18 @@ export const metadata: Metadata = {
   // duplicate-content issues if the site is accessed via alternate URLs.
   alternates: {
     canonical: "https://omniparse-ai.vercel.app/",
+  },
+  // Search Console verification meta tags.
+  // Google: file verification already in place (public/google096714356bb03ebc.html).
+  //   The meta tag is an alternative method — if you regenerate your Search
+  //   Console property, replace the content value below with the new code.
+  // Bing: replace the content value below with your Bing Webmaster Tools
+  //   verification code (format: a long hex string). Sign up at bing.com/webmasters.
+  verification: {
+    google: "google096714356bb03ebc",
+    other: {
+      "msvalidate.01": "BING_VERIFICATION_CODE_HERE",
+    },
   },
   icons: {
     // Matches the navbar logo: amber rounded square with "OP" in black bold
@@ -82,9 +96,10 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // JSON-LD structured data for AI agents. Combines SoftwareApplication
-  // (product identity) and Organization (business identity with contactPoint
-  // and address) so agents can parse who we are and what we do.
+  // JSON-LD structured data for AI agents and search engines.
+  // Combines SoftwareApplication (product identity), Organization (business
+  // identity with contactPoint and address), FAQPage (Q&A agents can quote),
+  // and HowTo (step-by-step invoice parsing guide).
   const jsonLd = {
     '@context': 'https://schema.org',
     '@graph': [
@@ -136,6 +151,71 @@ export default function RootLayout({
         },
         sameAs: [
           'https://github.com/SimonCurda/omniparse-ai',
+        ],
+      },
+      {
+        '@type': 'FAQPage',
+        mainEntity: [
+          {
+            '@type': 'Question',
+            name: 'How accurate is the AI extraction?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: 'Our vision-language model typically achieves 95-99% accuracy on standard invoices. Accuracy depends on document quality — clear PDFs and photos work best. Every field includes a confidence score so you know exactly what to verify.',
+            },
+          },
+          {
+            '@type': 'Question',
+            name: 'What file formats are supported?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: 'PDF invoices, receipts, and document photos in JPEG, PNG, and WebP format. Maximum file size is 10MB per document.',
+            },
+          },
+          {
+            '@type': 'Question',
+            name: 'Is my data secure?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: 'Yes. Documents are processed per-request and are not used to train AI models. Built with GDPR, EU AI Act & PIPEDA principles — including data export, account deletion, and audit logging. You can delete your data at any time.',
+            },
+          },
+          {
+            '@type': 'Question',
+            name: 'Can I export the extracted data?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: 'Free plans support CSV export. Pro and above add JSON and Excel (.xlsx) export with styled columns. Plus and higher plans include custom export templates to match your accounting system\'s format.',
+            },
+          },
+          {
+            '@type': 'Question',
+            name: 'What happens if the AI makes a mistake?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: 'Every extracted field has a confidence score. Low-confidence fields are flagged automatically. Pro plan and above let you manually edit extracted data and re-validate. The validation engine runs 8+ built-in rules to catch common errors.',
+            },
+          },
+          {
+            '@type': 'Question',
+            name: 'Do you offer a free plan?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: 'Yes — the Free plan includes 15 invoices per month with AI extraction, confidence scores, tampering detection, and CSV export. No credit card required.',
+            },
+          },
+        ],
+      },
+      {
+        '@type': 'HowTo',
+        name: 'How to parse an invoice with AI',
+        description: 'Step-by-step guide to extracting data from invoices using the OmniParse AI API.',
+        step: [
+          { '@type': 'HowToStep', position: 1, name: 'Sign up for a free account', text: 'Create a free account at omniparse-ai.vercel.app. You get 15 invoices per month with no credit card required.' },
+          { '@type': 'HowToStep', position: 2, name: 'Upload an invoice', text: 'Upload a PDF, JPG, PNG, or WebP file from the dashboard or via the POST /api/parse endpoint.' },
+          { '@type': 'HowToStep', position: 3, name: 'Review extracted data', text: 'The AI returns structured JSON with vendor, dates, amounts, and line items. Each field has a confidence score.' },
+          { '@type': 'HowToStep', position: 4, name: 'Generate an API key', text: 'Go to Settings → API Access to generate your API key for programmatic access.' },
+          { '@type': 'HowToStep', position: 5, name: 'Integrate via REST API', text: 'Use the X-API-Key header to call the API from your code. See /api-docs for full documentation.' },
         ],
       },
     ],

@@ -76,14 +76,8 @@ export function middleware(request: NextRequest) {
   const accept = request.headers.get('accept') || ''
 
   // ─── Markdown content negotiation ──────────────────────────────────
-  // When an AI agent requests the homepage with Accept: text/markdown,
-  // return a Markdown representation of the page content with
-  // Content-Type: text/markdown and Vary: Accept. This satisfies the
-  // Ora "Markdown content negotiation" check and lets agents consume
-  // the page content without parsing HTML.
   if (pathname === '/' && accept.includes('text/markdown')) {
-    const markdown = getHomepageMarkdown()
-    return new NextResponse(markdown, {
+    return new NextResponse(getHomepageMarkdown(), {
       status: 200,
       headers: {
         'Content-Type': 'text/markdown; charset=utf-8',
@@ -94,17 +88,11 @@ export function middleware(request: NextRequest) {
   }
 
   // ─── Agent-friendly 404 with Markdown body ────────────────────────
-  // When an agent requests a nonexistent path with Accept: text/markdown,
-  // return a 404 with a Markdown body explaining the error and linking to
-  // docs/sitemap. This satisfies the Ora "Agent-friendly 404s" check.
-  // We only do this for paths that look like they should be pages (not
-  // static assets, not API routes — those have their own 404 handling).
   const isStaticAsset = /\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map|woff|woff2|ttf|eot|pdf)$/.test(pathname)
   const isApiRoute = pathname.startsWith('/api/')
   const isNextInternal = pathname.startsWith('/_next/')
   if (!isStaticAsset && !isApiRoute && !isNextInternal && accept.includes('text/markdown')) {
-    const markdown = get404Markdown(pathname)
-    return new NextResponse(markdown, {
+    return new NextResponse(get404Markdown(pathname), {
       status: 404,
       headers: {
         'Content-Type': 'text/markdown; charset=utf-8',
@@ -152,59 +140,47 @@ export const config = {
   ],
 }
 
-// ─── Markdown helpers for agent content negotiation ─────────────────────
-// These functions return Markdown representations of the homepage and 404
-// pages for AI agents that send Accept: text/markdown.
-
 function getHomepageMarkdown(): string {
   return `# OmniParse — AI Invoice Parsing
 
-OmniParse is an AI-powered invoice and receipt parsing service. Upload documents (PDF, JPG, PNG, WebP) and the AI extracts vendor, dates, amounts, line items, and custom fields as structured JSON. Includes confidence scores, tampering detection, validation rules, and a chat assistant for querying your invoice data.
+OmniParse is an AI-powered invoice and receipt parsing service. Upload documents (PDF, JPG, PNG, WebP) and the AI extracts vendor, dates, amounts, line items, and custom fields as structured JSON. Includes confidence scores, tampering detection, validation rules, and a REST API.
 
 ## Key Features
 
-- **AI Extraction**: Vision language models extract vendor, invoice number, dates, amounts, VAT, totals, and line items from any invoice format.
-- **Confidence Scores**: Every field has a confidence score so you know what to verify.
-- **Tampering Detection**: 3-layer check (metadata, heuristics, VLM) detects modified PDFs.
-- **Validation Rules**: 8 built-in rules + custom rules to catch errors before export.
-- **Export**: CSV, JSON, Excel, PDF exports with custom templates.
-- **Chat Assistant**: Ask questions about your invoice data in natural language.
-- **REST API**: Programmatic access via X-API-Key header. See /api-docs for full documentation.
-- **Email Import**: Connect IMAP inboxes to auto-import invoices from email attachments.
-- **Approval Workflows**: Auto-approve, flag, or block invoices by amount thresholds.
-- **Multi-Entity**: Business+ plans support multiple subsidiaries/entities.
+- AI Extraction: vendor, dates, amounts, line items from any invoice
+- Confidence Scores on every field
+- 3-layer Tampering Detection (metadata, heuristics, VLM)
+- Validation Rules (8 built-in + custom)
+- Export: CSV, JSON, Excel, PDF
+- REST API with X-API-Key header (see /api-docs)
+- Email Import via IMAP
+- Approval Workflows
+- Chat Assistant for invoice data
 
 ## Pricing
 
-- **Free**: 15 invoices/month, 10 chat messages, CSV export, REST API access.
-- **Pro** ($49/mo): 500 invoices/month, unlimited chat, editing, JSON/Excel export, batch upload.
-- **Plus** ($99/mo): 2,000 invoices/month, approval workflows, custom rules, audit trail, bulk operations.
-- **Business** ($199/mo): 10,000 invoices/month, multi-entity, executive dashboard, vendor scorecard.
-- **Enterprise** ($499/mo): Unlimited everything, advanced audit logs, compliance exports.
-
-## API Access
-
-The REST API is available on all plans. Generate an API key from Settings → API Access in the dashboard. Pass it via the \`X-API-Key\` header. Full documentation at [/api-docs](/api-docs). OpenAPI spec at [/openapi.json](/openapi.json).
+- Free: 15 invoices/month, REST API access
+- Pro ($49/mo): 500 invoices, editing, JSON/Excel export
+- Plus ($99/mo): 2,000 invoices, approval workflows
+- Business ($199/mo): 10,000 invoices, multi-entity
+- Enterprise ($499/mo): Unlimited
 
 ## When to Use
 
-Use OmniParse when you need to:
-- Extract structured data from invoices and receipts automatically
-- Validate invoice data against business rules before processing
+- Extract structured data from invoices and receipts
+- Validate invoice data against business rules
 - Detect tampered or fraudulent documents
 - Build automated accounts-payable workflows
-- Query your invoice data via chat or REST API
-- Import invoices from email attachments automatically
+- Query invoice data via chat or REST API
 
 ## Links
 
 - [API Documentation](/api-docs)
-- [API Tester](/api-test)
 - [OpenAPI Specification](/openapi.json)
 - [llms.txt](/llms.txt)
 - [Sitemap](/sitemap.xml)
-- [Privacy Policy](/privacy-policy)
-- [Terms of Service](/terms-of-service)
+- [Blog](/blog)
+- [Compare](/compare)
 `
 }
 
@@ -220,8 +196,7 @@ The page \`${pathname}\` does not exist on OmniParse.
 - [OpenAPI Specification](/openapi.json)
 - [llms.txt](/llms.txt)
 - [Sitemap](/sitemap.xml)
-- [Privacy Policy](/privacy-policy)
-- [Terms of Service](/terms-of-service)
+- [Blog](/blog)
 - [About](/about)
 - [Contact](/contact)
 

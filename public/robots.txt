@@ -1,63 +1,42 @@
-# ─── AI Crawlers & Search Bots ──────────────────────────────────────────────
-# Allow all major AI crawlers to access public content so that Gemini,
-# Copilot, ChatGPT, Claude, Perplexity, and others can discover and
-# reference the site in their answers.
-
-# Google — Gemini (general crawl + AI training)
 User-agent: Googlebot
 Allow: /
 
-# Google-Extended — specifically for Gemini AI training and Google's
-# generative AI products. Allowing this lets Gemini use site content
-# for grounding and answers.
 User-agent: Google-Extended
 Allow: /
 
-# Microsoft Bing — Copilot uses Bing's search index
 User-agent: Bingbot
 Allow: /
 
-# Bingbot-News — Bing News (Copilot news answers)
 User-agent: Bingbot-News
 Allow: /
 
-# OpenAI — ChatGPT search and GPT-4 training
 User-agent: GPTBot
 Allow: /
 
-# Anthropic — Claude
 User-agent: ClaudeBot
 Allow: /
 User-agent: Claude-Web
 Allow: /
 
-# Perplexity — Perplexity AI search
 User-agent: PerplexityBot
 Allow: /
 
-# Common Crawl — open dataset used by many AI researchers
 User-agent: CCBot
 Allow: /
 
-# Apple — Apple Intelligence / Siri AI
 User-agent: Applebot
 Allow: /
 User-agent: Applebot-Extended
 Allow: /
 
-# ByteDance — TikTok / Doubao AI
 User-agent: Bytespider
 Allow: /
 
-# Meta — Meta AI
 User-agent: Meta-ExternalAgent
 Allow: /
 
-# Amazon — Amazon Q / Alexa AI
 User-agent: Amazonbot
 Allow: /
-
-# ─── Social & Preview Crawlers ──────────────────────────────────────────────
 
 User-agent: Twitterbot
 Allow: /
@@ -76,13 +55,6 @@ Allow: /
 
 User-agent: TelegramBot
 Allow: /
-
-# ─── Catch-all ──────────────────────────────────────────────────────────────
-# All other bots: allow public content, block auth-gated and internal routes.
-# These disallow rules also apply to the named bots above — robots.txt
-# matching is most-specific-first, so a named bot with only "Allow: /"
-# and no Disallow would access everything. We repeat the disallow rules
-# here so NO bot (including AI crawlers) indexes private routes.
 
 User-agent: *
 Allow: /
@@ -111,12 +83,4 @@ Disallow: /api/vendor-risk
 Disallow: /api/vendor-scorecard
 Disallow: /api/stripe/
 
-# ─── Machine-Readable Files ─────────────────────────────────────────────────
-# Sitemap for search engines and AI crawlers
 Sitemap: https://omniparse-ai.vercel.app/sitemap.xml
-
-# llms.txt — agent instruction file with when-to-use guidance
-# https://omniparse-ai.vercel.app/llms.txt
-
-# OpenAPI specification — machine-readable API surface
-# https://omniparse-ai.vercel.app/openapi.json
