@@ -58,7 +58,7 @@ function RotatingHeadline() {
 export function Hero({ onAuth }: { onAuth: (v: 'login' | 'signup') => void }) {
   return (
     <section className="pt-32 pb-24 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto text-center">
+      <div className="max-w-4xl 2xl:max-w-5xl mx-auto text-center">
         <RotatingHeadline />
         <p className="mt-6 text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
           Upload invoices in <strong className="text-foreground">any currency</strong> — CZK, EUR, USD, GBP and more.

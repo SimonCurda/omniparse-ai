@@ -199,7 +199,7 @@ export function PricingSection({ onAuth }: { onAuth: (v: 'login' | 'signup') => 
 
   return (
     <section id="pricing" className="py-24 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-7xl 2xl:max-w-[1760px] mx-auto">
         <div className="text-center mb-10">
           <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">Choose Your Plan</h2>
           <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
@@ -235,7 +235,7 @@ export function PricingSection({ onAuth }: { onAuth: (v: 'login' | 'signup') => 
         {/* Upgrade lever callouts */}
         <div className="mb-8">
           <h3 className="text-center text-base font-semibold mb-4">Most noticeable upgrades</h3>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 max-w-5xl mx-auto">
+          <div className="grid grid-cols-2 lg:grid-cols-4 2xl:grid-cols-5 gap-3 max-w-5xl 2xl:max-w-7xl mx-auto">
             <div data-glow className="glass-card flex items-start gap-2.5 rounded-lg border border-border bg-card p-3">
               <div className="rounded-full bg-emerald-500/10 p-1.5 mt-0.5">
                 <Pencil className="h-3.5 w-3.5 text-emerald-500" />

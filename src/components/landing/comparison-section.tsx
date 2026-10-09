@@ -71,7 +71,7 @@ function MobileFeatureRow({ row }: { row: typeof COMPARISON_DATA[number] }) {
 export function ComparisonSection() {
   return (
     <section id="comparison" className="py-24 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-5xl 2xl:max-w-7xl mx-auto">
         <div className="text-center mb-16">
           <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">See How We Compare</h2>
           <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">

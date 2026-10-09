@@ -215,7 +215,7 @@ export default function Home() {
     // and AI agents see 500+ chars of meaningful HTML. The client-side effects
     // will run after hydration and switch to the dashboard if there's a token.
     return (
-      <div className="min-h-screen flex flex-col bg-background">
+      <div className="min-h-screen flex flex-col bg-background overflow-x-hidden">
         <main id="main-content" className="flex-1">
           <Hero onAuth={() => {}} />
           <FeaturesSection />
@@ -248,7 +248,7 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="min-h-screen flex flex-col bg-background overflow-x-hidden">
       <CursorGlow />
       <Navbar onAuth={handleAuth} />
       <main id="main-content" className="flex-1">
