@@ -224,6 +224,8 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning className="dark">
       <head>
+        {/* Bing Webmaster Tools verification */}
+        <meta name="msvalidate.01" content="BF0BB1849F019066513E0C2E541036E6" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
