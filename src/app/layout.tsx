@@ -49,7 +49,7 @@ export const metadata: Metadata = {
   verification: {
     google: "google096714356bb03ebc",
     other: {
-      "msvalidate.01": "BING_VERIFICATION_CODE_HERE",
+      "msvalidate.01": "BF0BB1849F019066513E0C2E541036E6",
     },
   },
   icons: {
