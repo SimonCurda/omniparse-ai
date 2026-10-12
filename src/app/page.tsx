@@ -28,6 +28,21 @@ export default function Home() {
   const setLegalPage = useAppStore((s) => s.setLegalPage);
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [mounted, setMounted] = useState(false);
+  // Check for existing token on first render — if present, start in a
+  // "loading" state instead of flashing the landing page. The /api/auth/me
+  // call in the useEffect below will either restore the dashboard (valid
+  // token) or fall back to landing (invalid/expired token).
+  const [restoringSession, setRestoringSession] = useState(false);
+
+  // Set initial restoring state BEFORE first paint — if there's a token in
+  // localStorage, we show a loading spinner instead of the landing page,
+  // so the user doesn't see a flash of the landing page on every refresh.
+  if (typeof window !== 'undefined' && !mounted && !restoringSession) {
+    const existingToken = localStorage.getItem('op_token');
+    if (existingToken) {
+      setRestoringSession(true);
+    }
+  }
 
   // OAuth callback redirect pickup.
   // The OAuth callback routes redirect to /?token=<jwt> or /?oauth_error=<provider>.
@@ -168,11 +183,25 @@ export default function Home() {
               emailVerifiedRequired: data.user.emailVerifiedRequired,
               debugEnabled: data.user.debugEnabled,
             });
+            // Token is valid — restore the dashboard view immediately
+            setView('dashboard');
+          } else {
+            // Token is invalid/expired — remove it and show landing
+            localStorage.removeItem('op_token');
+            setView('landing');
           }
         })
-        .catch(() => {});
+        .catch(() => {
+          // Network error — keep the token, show landing (offline mode)
+          setView('landing');
+        })
+        .finally(() => {
+          setRestoringSession(false);
+          setLoading(false);
+        });
     } else {
       setLoading(false);
+      setRestoringSession(false);
     }
   }, []);
 
@@ -225,6 +254,23 @@ export default function Home() {
           <CtaSection onAuth={() => {}} />
         </main>
         <Footer />
+      </div>
+    );
+  }
+
+  // Show a loading spinner while restoring a session from localStorage.
+  // This prevents the flash of the landing page when a logged-in user
+  // refreshes or navigates back. The /api/auth/me call resolves in
+  // ~200ms, so the spinner is barely visible.
+  if (mounted && restoringSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-amber-500 flex items-center justify-center animate-pulse">
+            <span className="text-white font-bold text-base">OP</span>
+          </div>
+          <p className="text-sm text-muted-foreground">Restoring session…</p>
+        </div>
       </div>
     );
   }

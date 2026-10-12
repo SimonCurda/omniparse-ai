@@ -84,7 +84,9 @@ export async function PATCH(
     patch.url = url;
   }
   if (typeof body.category === 'string' && body.category.trim()) {
-    patch.category = body.category.trim();
+    // Normalize: trim + collapse whitespace + title-case first letter
+    const raw = body.category.trim().replace(/\s+/g, ' ');
+    patch.category = raw.charAt(0).toUpperCase() + raw.slice(1);
   }
   if (body.icon !== undefined) {
     patch.icon = body.icon ? String(body.icon).trim() : null;

@@ -53,7 +53,13 @@ export async function POST(req: NextRequest) {
 
   const name = (body.name || '').trim();
   const url = (body.url || '').trim();
-  const category = (body.category || 'General').trim() || 'General';
+  // Normalize category: trim + collapse whitespace + title-case first letter.
+  // This prevents duplicate categories from typos like "Monitoring" vs
+  // "monitoring" vs "Monitoring " — they all become "Monitoring".
+  const rawCategory = (body.category || 'General').trim().replace(/\s+/g, ' ');
+  const category = rawCategory
+    ? rawCategory.charAt(0).toUpperCase() + rawCategory.slice(1)
+    : 'General';
   const icon = body.icon ? body.icon.trim() : null;
 
   if (!name) {
