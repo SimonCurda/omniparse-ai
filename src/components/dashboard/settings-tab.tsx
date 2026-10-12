@@ -1394,54 +1394,89 @@ export function SettingsTab() {
             <div className="space-y-2">
               <Label>Columns</Label>
               <p className="text-xs text-muted-foreground">
-                Select columns and use the arrows to reorder them.
+                Select columns, then drag to reorder (desktop) or use arrows (mobile).
               </p>
-              <div className="space-y-1 border rounded-lg p-2 max-h-60 overflow-y-auto">
-                {EXPORT_COLUMNS.map((col) => {
-                  const selectedIdx = templateColumns.findIndex((c) => c.key === col.key);
-                  const isSelected = selectedIdx >= 0;
-                  return (
+              {/* Available columns — click to add */}
+              <div className="flex flex-wrap gap-1.5 border rounded-lg p-2">
+                {EXPORT_COLUMNS.filter((col) => !templateColumns.some((c) => c.key === col.key)).map((col) => (
+                  <button
+                    key={col.key}
+                    type="button"
+                    onClick={() => toggleTemplateColumn(col.key, col.label)}
+                    className="px-2 py-1 rounded-md text-xs border border-border bg-muted/30 hover:bg-primary/5 hover:border-primary/30 transition-colors"
+                  >
+                    + {col.label}
+                  </button>
+                ))}
+                {templateColumns.length === EXPORT_COLUMNS.length && (
+                  <span className="text-xs text-muted-foreground py-1">All columns selected</span>
+                )}
+              </div>
+              {/* Selected columns — drag to reorder (desktop), arrows on mobile */}
+              {templateColumns.length > 0 && (
+                <div className="space-y-1 border rounded-lg p-2 max-h-60 overflow-y-auto">
+                  {templateColumns.map((col, idx) => (
                     <div
                       key={col.key}
-                      className={
-                        'flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors ' +
-                        (isSelected ? 'bg-primary/5' : '')
-                      }
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.effectAllowed = 'move';
+                        e.dataTransfer.setData('text/plain', String(idx));
+                        (e.currentTarget as HTMLElement).classList.add('opacity-40');
+                      }}
+                      onDragEnd={(e) => {
+                        (e.currentTarget as HTMLElement).classList.remove('opacity-40');
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        const fromIdx = parseInt(e.dataTransfer.getData('text/plain'), 10);
+                        const toIdx = idx;
+                        if (fromIdx === toIdx || isNaN(fromIdx)) return;
+                        setTemplateColumns((prev) => {
+                          const next = [...prev];
+                          const [moved] = next.splice(fromIdx, 1);
+                          next.splice(toIdx, 0, moved);
+                          return next;
+                        });
+                      }}
+                      className="flex items-center gap-2 px-2 py-1.5 rounded-md text-sm bg-primary/5 cursor-grab active:cursor-grabbing hover:bg-primary/10 transition-colors"
                     >
-                      <Checkbox
-                        checked={isSelected}
-                        onCheckedChange={() => toggleTemplateColumn(col.key, col.label)}
-                      />
-                      <span className={isSelected ? 'font-medium' : 'text-muted-foreground'}>{col.label}</span>
-                      <span className="ml-auto flex items-center gap-0.5">
-                        {isSelected && (
-                          <>
-                            <button
-                              type="button"
-                              className="p-0.5 rounded hover:bg-muted disabled:opacity-30"
-                              disabled={selectedIdx === 0}
-                              onClick={() => moveTemplateColumn(selectedIdx, 'up')}
-                              aria-label="Move up"
-                            >
-                              <ArrowUp className="h-3.5 w-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              className="p-0.5 rounded hover:bg-muted disabled:opacity-30"
-                              disabled={selectedIdx === templateColumns.length - 1}
-                              onClick={() => moveTemplateColumn(selectedIdx, 'down')}
-                              aria-label="Move down"
-                            >
-                              <ArrowDown className="h-3.5 w-3.5" />
-                            </button>
-                          </>
-                        )}
-                        {isSelected && <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />}
-                      </span>
+                      <GripVertical className="h-3.5 w-3.5 text-muted-foreground shrink-0 hidden md:block" />
+                      <span className="font-medium flex-1">{col.label}</span>
+                      <button
+                        type="button"
+                        className="p-0.5 rounded hover:bg-muted disabled:opacity-30 md:hidden"
+                        disabled={idx === 0}
+                        onClick={() => moveTemplateColumn(idx, 'up')}
+                        aria-label="Move up"
+                      >
+                        <ArrowUp className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        className="p-0.5 rounded hover:bg-muted disabled:opacity-30 md:hidden"
+                        disabled={idx === templateColumns.length - 1}
+                        onClick={() => moveTemplateColumn(idx, 'down')}
+                        aria-label="Move down"
+                      >
+                        <ArrowDown className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        className="p-0.5 rounded hover:bg-red-500/10 hover:text-red-500"
+                        onClick={() => toggleTemplateColumn(col.key, col.label)}
+                        aria-label="Remove column"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
                     </div>
-                  );
-                })}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
