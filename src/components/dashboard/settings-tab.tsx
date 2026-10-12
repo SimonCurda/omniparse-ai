@@ -45,7 +45,8 @@ const EXPORT_COLUMNS: { key: string; label: string }[] = [
   { key: 'validationStatus', label: 'Validation Status' },
   { key: 'processingTime', label: 'Processing Time' },
   { key: 'approvalStatus', label: 'Approval Status' },
-  { key: 'lifecycleStatus', label: 'Lifecycle Status' },
+  { key: 'lifecycleStatus', label: 'Status' },
+  { key: 'labels', label: 'Labels' },
 ];
 
 type ExportTemplate = {
@@ -1387,6 +1388,7 @@ export function SettingsTab() {
                   <SelectItem value="csv">CSV</SelectItem>
                   <SelectItem value="json">JSON</SelectItem>
                   <SelectItem value="excel">Excel (.xlsx)</SelectItem>
+                  <SelectItem value="pdf">PDF</SelectItem>
                 </SelectContent>
               </Select>
             </div>

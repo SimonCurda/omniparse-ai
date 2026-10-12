@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Name and columns are required.' }, { status: 400 });
     }
 
-    const validFormats = ['csv', 'json', 'excel'];
+    const validFormats = ['csv', 'json', 'excel', 'pdf'];
     const fmt = validFormats.includes(format) ? format : 'csv';
 
     const template = await db.exportTemplate.create({
@@ -109,7 +109,7 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Name and columns are required.' }, { status: 400 });
     }
 
-    const validFormats = ['csv', 'json', 'excel'];
+    const validFormats = ['csv', 'json', 'excel', 'pdf'];
     const fmt = validFormats.includes(format) ? format : 'csv';
 
     const updated = await db.exportTemplate.update({

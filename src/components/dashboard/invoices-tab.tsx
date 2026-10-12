@@ -925,7 +925,14 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
   // invoices where the user has manually marked them as "checked"
   // (customFields.reviewed === true). Pre-selected as default.
 
-  const checkedInvoices = useMemo(() => displayed.filter(isReviewed), [displayed, isReviewed]);
+  // Checked invoices that haven't been exported yet — this is what the
+  // "Checked Only" export uses. Prevents re-exporting already-exported
+  // invoices. If a user wants to re-export, they can use the template
+  // export which uses all checked (regardless of export status).
+  const checkedInvoices = useMemo(
+    () => displayed.filter((inv) => isReviewed(inv) && inv.lifecycleStatus !== 'exported'),
+    [displayed, isReviewed],
+  );
 
   // Unexported invoices — those not yet at lifecycleStatus 'exported'.
   // Replaces the old "All Invoices" export option. Users who want to export
@@ -1028,6 +1035,7 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
         case 'processingTime': return inv.processingTime != null ? `${inv.processingTime.toFixed(1)}s` : '';
         case 'approvalStatus': return inv.approvalStatus || '';
         case 'lifecycleStatus': return inv.lifecycleStatus || '';
+        case 'labels': return labelsToStr(inv);
         default: return '';
       }
     };
@@ -1065,6 +1073,64 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
         markInvoicesExported(rows);
       } catch {
         toast.error('Failed to generate Excel file');
+      }
+      return;
+    }
+
+    if (template.format === 'pdf') {
+      // PDF export using jsPDF + autoTable with the template's columns
+      try {
+        const [{ default: jsPDF }, autoTableMod] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
+        const autoTable = (autoTableMod as unknown as { default: (doc: unknown, opts: unknown) => void }).default
+          || (autoTableMod as unknown as (doc: unknown, opts: unknown) => void);
+        const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+
+        // Load Unicode font for Czech diacritics
+        try {
+          const fontRes = await fetch('/fonts/LiberationSans-Regular.ttf');
+          if (fontRes.ok) {
+            const fontBuf = await fontRes.arrayBuffer();
+            const bytes = new Uint8Array(fontBuf);
+            let binary = '';
+            const chunkSize = 8192;
+            for (let i = 0; i < bytes.length; i += chunkSize) {
+              binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunkSize)));
+            }
+            doc.addFileToVFS('LiberationSans-Regular.ttf', btoa(binary));
+            doc.addFont('LiberationSans-Regular.ttf', 'NotoSans', 'normal');
+            doc.setFont('NotoSans');
+          }
+        } catch {}
+
+        doc.setFontSize(18); doc.setTextColor(245, 158, 11);
+        doc.text('OmniParse AI', 40, 38);
+        doc.setFontSize(13); doc.setTextColor(40);
+        doc.text(template.name, 40, 56);
+        doc.setFontSize(9); doc.setTextColor(120);
+        doc.text(`${rows.length} invoice${rows.length !== 1 ? 's' : ''} · ${new Date().toLocaleString('en-US')}`, 40, 70);
+
+        const head = [headers];
+        const body = rows.map((inv) => cols.map((c) => getFieldValue(inv, c.key)));
+        autoTable(doc, {
+          startY: 85, head, body, theme: 'striped',
+          headStyles: { fillColor: [245, 158, 11], textColor: 255, fontSize: 9 },
+          bodyStyles: { fontSize: 8, cellPadding: 4 },
+          margin: { left: 40, right: 40 },
+          didDrawPage: (data: { pageNumber: number }) => {
+            const pageCount = doc.getNumberOfPages();
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const pageHeight = doc.internal.pageSize.getHeight();
+            doc.setFontSize(8); doc.setTextColor(150);
+            doc.text(`Page ${data.pageNumber} of ${pageCount}`, 40, pageHeight - 20);
+            doc.text('Parsed via OmniParse AI · omniparse-ai.vercel.app', pageWidth - 40, pageHeight - 20, { align: 'right' });
+          },
+        });
+        doc.save(filename);
+        toast.success(`Exported ${rows.length} invoices using "${template.name}"`);
+        markInvoicesExported(rows);
+      } catch (err) {
+        console.error('[exportWithTemplate PDF] error:', err);
+        toast.error('Failed to generate PDF file');
       }
       return;
     }
