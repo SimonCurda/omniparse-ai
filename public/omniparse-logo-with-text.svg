@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 80">
+  <rect x="8" y="8" width="64" height="64" rx="14" fill="#F59E0B"/>
+  <text x="40" y="50" font-family="system-ui,sans-serif" font-size="34" font-weight="bold" fill="#09090B" text-anchor="middle">OP</text>
+  <text x="88" y="52" font-family="system-ui,sans-serif" font-size="28" font-weight="bold" fill="#09090B">OmniParse</text>
+</svg>
