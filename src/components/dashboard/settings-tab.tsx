@@ -1451,25 +1451,25 @@ export function SettingsTab() {
                       <span className="font-medium flex-1">{col.label}</span>
                       <button
                         type="button"
-                        className="p-0.5 rounded hover:bg-muted disabled:opacity-30 md:hidden"
+                        className="p-2 rounded hover:bg-muted disabled:opacity-30 md:hidden touch-manipulation"
                         disabled={idx === 0}
                         onClick={() => moveTemplateColumn(idx, 'up')}
                         aria-label="Move up"
                       >
-                        <ArrowUp className="h-3.5 w-3.5" />
+                        <ArrowUp className="h-4 w-4" />
                       </button>
                       <button
                         type="button"
-                        className="p-0.5 rounded hover:bg-muted disabled:opacity-30 md:hidden"
+                        className="p-2 rounded hover:bg-muted disabled:opacity-30 md:hidden touch-manipulation"
                         disabled={idx === templateColumns.length - 1}
                         onClick={() => moveTemplateColumn(idx, 'down')}
                         aria-label="Move down"
                       >
-                        <ArrowDown className="h-3.5 w-3.5" />
+                        <ArrowDown className="h-4 w-4" />
                       </button>
                       <button
                         type="button"
-                        className="p-0.5 rounded hover:bg-red-500/10 hover:text-red-500"
+                        className="p-2 rounded hover:bg-red-500/10 hover:text-red-500"
                         onClick={() => toggleTemplateColumn(col.key, col.label)}
                         aria-label="Remove column"
                       >

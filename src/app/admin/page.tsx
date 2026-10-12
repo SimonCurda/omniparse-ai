@@ -1537,6 +1537,10 @@ export default function AdminPage() {
                 <LinkCard href="https://console.groq.com" icon={Cpu} title="Groq Console" subtitle="console.groq.com" external />
                 <LinkCard href="https://console.mistral.ai" icon={Sparkles} title="Mistral Console" subtitle="console.mistral.ai" external />
                 <LinkCard href="https://dashboard.stripe.com" icon={CreditCard} title="Stripe Dashboard" subtitle="dashboard.stripe.com" external />
+                {/* Admin-added links with category "Monitoring & Tools" */}
+                {adminLinks.filter((l) => l.category === 'Monitoring & Tools').map((link) => (
+                  <CustomLinkCard key={link.id} link={link} onDelete={() => handleDeleteLink(link.id)} />
+                ))}
               </div>
             </div>
 
@@ -1551,6 +1555,10 @@ export default function AdminPage() {
                 <LinkCard href="/cookie-policy" icon={Cookie} title="Cookie Policy" subtitle="Internal · /cookie-policy" />
                 <LinkCard href="/ai-act-notice" icon={ShieldAlert} title="AI Act Notice" subtitle="Internal · /ai-act-notice" />
                 <LinkCard href="/OmniParse-Legal-Documents-v3.6.pdf" icon={FileText} title="Legal PDF" subtitle="Internal · /OmniParse-Legal-Documents-v3.6.pdf" />
+                {/* Admin-added links with category "Legal & Docs" */}
+                {adminLinks.filter((l) => l.category === 'Legal & Docs').map((link) => (
+                  <CustomLinkCard key={link.id} link={link} onDelete={() => handleDeleteLink(link.id)} />
+                ))}
               </div>
             </div>
 
@@ -1584,6 +1592,10 @@ export default function AdminPage() {
                     </ol>
                   </details>
                 </div>
+                {/* Admin-added links with category "Development" */}
+                {adminLinks.filter((l) => l.category === 'Development').map((link) => (
+                  <CustomLinkCard key={link.id} link={link} onDelete={() => handleDeleteLink(link.id)} />
+                ))}
               </div>
             </div>
 
@@ -1609,10 +1621,16 @@ export default function AdminPage() {
             )}
             {!adminLinksLoading && adminLinks.length > 0 && (
               (() => {
-                // Group adminLinks by category, preserving the order in which
-                // categories first appear in the (already-sorted) list.
+                // Group adminLinks by category, but SKIP categories that
+                // already exist as hardcoded sections (Monitoring & Tools,
+                // Legal & Docs, Development). Those links will be rendered
+                // inline in the hardcoded sections below.
+                const HARDCODED_CATEGORIES = new Set(['Monitoring & Tools', 'Legal & Docs', 'Development']);
                 const categories: { name: string; links: AdminLink[] }[] = [];
                 for (const link of adminLinks) {
+                  // Skip links that belong to hardcoded categories — they
+                  // render in the hardcoded sections instead.
+                  if (HARDCODED_CATEGORIES.has(link.category)) continue;
                   let bucket = categories.find((c) => c.name === link.category);
                   if (!bucket) {
                     bucket = { name: link.category, links: [] };
@@ -1686,13 +1704,17 @@ export default function AdminPage() {
                   list="link-category-suggestions"
                 />
                 <datalist id="link-category-suggestions">
-                  {/* Suggestions are filled from existing categories at render time */}
+                  {/* Hardcoded categories that already exist on the page */}
+                  <option value="Monitoring & Tools" />
+                  <option value="Legal & Docs" />
+                  <option value="Development" />
+                  {/* Plus any categories from admin-added links */}
                   {Array.from(new Set(adminLinks.map((l) => l.category))).map((c) => (
                     <option key={c} value={c} />
                   ))}
                 </datalist>
                 <p className="mt-1 text-[11px] text-muted-foreground">
-                  Free-form label. Links with the same category appear under one section heading.
+                  Pick an existing category or type a new one. Links with the same category appear under one section.
                 </p>
               </div>
               <div>
