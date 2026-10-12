@@ -167,6 +167,8 @@ export default function AdminPage() {
   const [modelHealthRunning, setModelHealthRunning] = useState(false);
   const [backupLoading, setBackupLoading] = useState(false);
   const [githubBackupLoading, setGithubBackupLoading] = useState(false);
+  const [sessionTimeout, setSessionTimeout] = useState('7d');
+  const [sessionTimeoutSaving, setSessionTimeoutSaving] = useState<string | null>(null);
   const [sortField, setSortField] = useState<SortField>('risk');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 
@@ -249,8 +251,37 @@ export default function AdminPage() {
   }, [secret]);
 
   useEffect(() => {
-    if (tab === 'flags') fetchFeatureFlags();
-  }, [tab, fetchFeatureFlags]);
+    if (tab === 'flags') {
+      fetchFeatureFlags();
+      // Also fetch session timeout setting
+      fetch(`/api/admin/settings?key=${encodeURIComponent(secret)}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => { if (data?.sessionTimeout) setSessionTimeout(data.sessionTimeout); })
+        .catch(() => {});
+    }
+  }, [tab, fetchFeatureFlags, secret]);
+
+  const handleSetSessionTimeout = async (timeout: string) => {
+    setSessionTimeoutSaving(timeout);
+    try {
+      const res = await fetch(`/api/admin/settings?key=${encodeURIComponent(secret)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionTimeout: timeout }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSessionTimeout(timeout);
+        toast.success(`Session timeout set to ${timeout === 'never' ? 'Never (1 year)' : timeout}`);
+      } else {
+        toast.error(data.error || 'Failed to update session timeout');
+      }
+    } catch {
+      toast.error('Network error');
+    } finally {
+      setSessionTimeoutSaving(null);
+    }
+  };
 
   const handleToggleFlag = async (flag: string, nextEnabled: boolean) => {
     // Optimistically flip the local row so the toggle feels instant; revert
@@ -1262,6 +1293,37 @@ export default function AdminPage() {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Session Timeout Control — shown at the bottom of the Feature Flags tab */}
+        {tab === 'flags' && (
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-6 mt-4">
+            <h3 className="text-lg font-semibold mb-2">Session Timeout</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Controls how long users stay logged in after signing in. New logins will use this timeout.
+              Existing tokens are not affected (they keep their original expiry).
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {(['5m', '10m', '15m', '30m', '1h', '1d', '7d', 'never'] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => handleSetSessionTimeout(t)}
+                  disabled={sessionTimeoutSaving === t}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    sessionTimeout === t
+                      ? 'bg-amber-500 text-white'
+                      : 'bg-card border border-border text-muted-foreground hover:bg-muted/50'
+                  }`}
+                >
+                  {sessionTimeoutSaving === t ? <Loader2 className="h-3 w-3 animate-spin inline mr-1" /> : null}
+                  {t === 'never' ? 'Never (1 year)' : t}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground mt-3">
+              Current: <strong>{sessionTimeout === 'never' ? 'Never (1 year)' : sessionTimeout}</strong>. Changes take effect on next login.
+            </p>
           </div>
         )}
 

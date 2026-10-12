@@ -31,8 +31,9 @@ export async function POST(req: NextRequest) {
     const existing = await db.user.findUnique({ where: { email: email.toLowerCase() } });
     if (existing) {
       // Don't reveal that the email is already registered (prevent enumeration)
+      // But give a hint that they should try logging in instead.
       return NextResponse.json({
-        message: 'If this email is not already registered, an account has been created. Please check your email for verification (coming soon).'
+        message: 'If this email is not already registered, an account has been created. If you already have an account, please sign in instead.'
       }, { status: 200 });
     }
 

@@ -1447,11 +1447,11 @@ export function SettingsTab() {
                       }}
                       className="flex items-center gap-2 px-2 py-1.5 rounded-md text-sm bg-primary/5 cursor-grab active:cursor-grabbing hover:bg-primary/10 transition-colors"
                     >
-                      <GripVertical className="h-3.5 w-3.5 text-muted-foreground shrink-0 hidden md:block" />
+                      <GripVertical className="h-3.5 w-3.5 text-muted-foreground shrink-0 hidden lg:block" />
                       <span className="font-medium flex-1">{col.label}</span>
                       <button
                         type="button"
-                        className="p-2 rounded hover:bg-muted disabled:opacity-30 md:hidden touch-manipulation"
+                        className="p-2 rounded hover:bg-muted disabled:opacity-30 lg:hidden touch-manipulation"
                         disabled={idx === 0}
                         onClick={() => moveTemplateColumn(idx, 'up')}
                         aria-label="Move up"
@@ -1460,7 +1460,7 @@ export function SettingsTab() {
                       </button>
                       <button
                         type="button"
-                        className="p-2 rounded hover:bg-muted disabled:opacity-30 md:hidden touch-manipulation"
+                        className="p-2 rounded hover:bg-muted disabled:opacity-30 lg:hidden touch-manipulation"
                         disabled={idx === templateColumns.length - 1}
                         onClick={() => moveTemplateColumn(idx, 'down')}
                         aria-label="Move down"

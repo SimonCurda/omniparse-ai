@@ -33,7 +33,37 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
 }
 
 export function signToken(payload: JWTPayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
+  // Session timeout is controlled from the admin panel via the
+  // setting_session_timeout FeatureFlag. Default: 7d.
+  // The timeout is read synchronously from a module-level cache that's
+  // refreshed every 30 seconds by the feature-flags module.
+  const timeout = _currentSessionTimeout || '7d';
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: timeout as any });
+}
+
+// Module-level cache for the session timeout. Updated asynchronously
+// by refreshSessionTimeout(). Defaults to '7d' on cold start.
+let _currentSessionTimeout: string | null = null;
+let _timeoutCacheTime = 0;
+const TIMEOUT_CACHE_TTL_MS = 30_000;
+
+export async function refreshSessionTimeout(): Promise<void> {
+  if (_currentSessionTimeout && Date.now() - _timeoutCacheTime < TIMEOUT_CACHE_TTL_MS) return;
+  try {
+    const { db } = await import('@/lib/db');
+    const row = await db.featureFlag.findUnique({
+      where: { flag: 'setting_session_timeout' },
+    });
+    _currentSessionTimeout = row?.updatedBy || '7d';
+    _timeoutCacheTime = Date.now();
+  } catch {
+    // DB not available — keep the default
+  }
+}
+
+// Initialize on first import (non-blocking)
+if (typeof globalThis !== 'undefined') {
+  refreshSessionTimeout().catch(() => {});
 }
 
 export function verifyToken(token: string): JWTPayload | null {
