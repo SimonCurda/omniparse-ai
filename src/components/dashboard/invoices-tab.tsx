@@ -167,6 +167,26 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
   const [sortBy, setSortBy] = useState<SortKey>('createdAt');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 
+  // Export templates (Plus+ only) — fetched once on mount
+  interface ExportTemplate {
+    id: string;
+    name: string;
+    format: string;
+    columns: { key: string; label: string; width: number }[];
+  }
+  const [exportTemplates, setExportTemplates] = useState<ExportTemplate[]>([]);
+  const canUseTemplates = ['plus', 'business', 'enterprise'].includes(plan);
+
+  useEffect(() => {
+    if (!canUseTemplates) return;
+    const token = localStorage.getItem('op_token');
+    if (!token) return;
+    fetch('/api/export-templates', { headers: { Authorization: 'Bearer ' + token }, cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => { if (Array.isArray(data)) setExportTemplates(data); })
+      .catch(() => {});
+  }, [canUseTemplates]);
+
   // Lifecycle status
   const [customStatuses, setCustomStatuses] = useState<Array<{ id: string; name: string; color: string; isBasic: boolean }>>([]);
   const [statusChanging, setStatusChanging] = useState<string | null>(null);
@@ -983,6 +1003,86 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
   const exportUnexportedPDF = () => {
     if (unexportedInvoices.length === 0) { toast.error('No unexported invoices to export'); return; }
     generatePDF(unexportedInvoices, 'unexported-invoices.pdf', 'Unexported Invoices');
+  };
+
+  // ─── Export using a custom template ──────────────────────────────
+  // Takes a template (name, format, columns) and exports the given rows
+  // using only the columns specified in the template, in the right order.
+  // Supports CSV, JSON, and Excel formats.
+  const exportWithTemplate = async (template: ExportTemplate, rows: InvoiceRow[]) => {
+    if (rows.length === 0) { toast.error('No invoices to export'); return; }
+
+    // Map invoice fields to their values, keyed by the template column key
+    const getFieldValue = (inv: InvoiceRow, key: string): string => {
+      switch (key) {
+        case 'vendor': return inv.vendor || '';
+        case 'invNumber': return inv.invNumber || '';
+        case 'invDate': return inv.invDate || '';
+        case 'dueDate': return inv.dueDate || '';
+        case 'amount': return inv.amount != null ? String(inv.amount) : '';
+        case 'vatAmount': return inv.vatAmount != null ? String(inv.vatAmount) : '';
+        case 'total': return inv.total != null ? String(inv.total) : '';
+        case 'currency': return inv.currency || '';
+        case 'confidence': return inv.confidence != null ? String(Math.round(inv.confidence * 100)) + '%' : '';
+        case 'validationStatus': return inv.validationStatus || '';
+        case 'processingTime': return inv.processingTime != null ? `${inv.processingTime.toFixed(1)}s` : '';
+        case 'approvalStatus': return inv.approvalStatus || '';
+        case 'lifecycleStatus': return inv.lifecycleStatus || '';
+        default: return '';
+      }
+    };
+
+    const cols = template.columns;
+    const headers = cols.map((c) => c.label);
+    const filename = `${template.name.toLowerCase().replace(/\s+/g, '-')}-export.${template.format === 'excel' ? 'xlsx' : template.format}`;
+
+    if (template.format === 'json') {
+      const data = rows.map((inv) => {
+        const obj: Record<string, string> = {};
+        cols.forEach((c) => { obj[c.label] = getFieldValue(inv, c.key); });
+        return obj;
+      });
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename; a.click();
+      URL.revokeObjectURL(url);
+      toast.success(`Exported ${rows.length} invoices using "${template.name}"`);
+      markInvoicesExported(rows);
+      return;
+    }
+
+    if (template.format === 'excel') {
+      try {
+        const XLSX = await import('xlsx');
+        const wsData = [headers, ...rows.map((inv) => cols.map((c) => getFieldValue(inv, c.key)))];
+        const ws = XLSX.utils.aoa_to_sheet(wsData);
+        ws['!cols'] = cols.map((c) => ({ wch: Math.min(Math.max(c.width, 8), 50) }));
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, template.name.slice(0, 31));
+        XLSX.writeFile(wb, filename);
+        toast.success(`Exported ${rows.length} invoices using "${template.name}"`);
+        markInvoicesExported(rows);
+      } catch {
+        toast.error('Failed to generate Excel file');
+      }
+      return;
+    }
+
+    // CSV (default)
+    const esc = (v: unknown) => {
+      const s = String(v ?? '');
+      return s.includes(',') || s.includes('"') || s.includes('\n') ? '"' + s.replace(/"/g, '""') + '"' : s;
+    };
+    const csvHeader = headers.map(esc).join(',');
+    const csvRows = rows.map((inv) => cols.map((c) => esc(getFieldValue(inv, c.key))).join(',')).join('\n');
+    const blob = new Blob([csvHeader + '\n' + csvRows], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${rows.length} invoices using "${template.name}"`);
+    markInvoicesExported(rows);
   };
 
   const exportCheckedCSV = () => {
@@ -2154,6 +2254,24 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
               <DropdownMenuItem onClick={() => exportUnexportedPDF()} disabled={unexportedInvoices.length === 0}>
                 <FileText className="mr-2 h-4 w-4" /> PDF
               </DropdownMenuItem>
+              {/* Custom templates (Plus+ only) */}
+              {canUseTemplates && exportTemplates.length > 0 && (
+                <>
+                  <DropdownMenuSeparator />
+                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                    Custom Templates
+                  </div>
+                  {exportTemplates.map((tpl) => (
+                    <DropdownMenuItem
+                      key={tpl.id}
+                      onClick={() => exportWithTemplate(tpl, checkedInvoices.length > 0 ? checkedInvoices : unexportedInvoices)}
+                      disabled={checkedInvoices.length === 0 && unexportedInvoices.length === 0}
+                    >
+                      <FileJson className="mr-2 h-4 w-4" /> {tpl.name} ({tpl.format.toUpperCase()})
+                    </DropdownMenuItem>
+                  ))}
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
