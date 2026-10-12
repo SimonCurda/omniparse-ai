@@ -82,3 +82,44 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+// PUT /api/export-templates?id=xxx — update an existing template
+export async function PUT(req: NextRequest) {
+  try {
+    const auth = await getUserFromRequest(req);
+    if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const user = await db.user.findUnique({ where: { id: auth.userId }, select: { plan: true } });
+    if (!user || !hasFeature(user.plan, 'custom_export_templates')) {
+      return NextResponse.json({ error: 'Custom export templates require Plus plan or higher.' }, { status: 403 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get('id');
+    if (!id) return NextResponse.json({ error: 'Template id is required.' }, { status: 400 });
+
+    // Verify ownership
+    const existing = await db.exportTemplate.findFirst({ where: { id, userId: auth.userId } });
+    if (!existing) return NextResponse.json({ error: 'Template not found' }, { status: 404 });
+
+    const body = await req.json();
+    const { name, columns, format } = body;
+
+    if (!name || !Array.isArray(columns) || columns.length === 0) {
+      return NextResponse.json({ error: 'Name and columns are required.' }, { status: 400 });
+    }
+
+    const validFormats = ['csv', 'json', 'excel'];
+    const fmt = validFormats.includes(format) ? format : 'csv';
+
+    const updated = await db.exportTemplate.update({
+      where: { id },
+      data: { name, columns: JSON.parse(JSON.stringify(columns)), format: fmt },
+    });
+
+    return NextResponse.json(updated);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}

@@ -22,7 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { CreditCard, Loader2, Download, Trash2, Shield, Eye, EyeOff, Plus, X, Sparkles, Lock, Clock, GripVertical, ArrowUp, ArrowDown, Keyboard, LogOut, Code, Copy, RefreshCw, ExternalLink } from 'lucide-react';
+import { CreditCard, Loader2, Download, Trash2, Shield, Eye, EyeOff, Plus, X, Sparkles, Lock, Clock, GripVertical, ArrowUp, ArrowDown, Keyboard, LogOut, Code, Copy, RefreshCw, ExternalLink, PencilRuler } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAppStore } from '@/stores/app-store';
 import { DEFAULT_SHORTCUTS, saveShortcuts } from '@/lib/shortcuts';
@@ -265,6 +265,7 @@ export function SettingsTab() {
   const [templateColumns, setTemplateColumns] = useState<ColumnDraft[]>([]);
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [deletingTemplateId, setDeletingTemplateId] = useState<string | null>(null);
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
 
   // Data retention state
   const [retentionDays, setRetentionDays] = useState<number | null>(null);
@@ -424,6 +425,15 @@ export function SettingsTab() {
     setTemplateName('');
     setTemplateFormat('csv');
     setTemplateColumns([]);
+    setEditingTemplateId(null);
+    setTemplateDialogOpen(true);
+  }, []);
+
+  const openEditTemplateDialog = useCallback((template: ExportTemplate) => {
+    setTemplateName(template.name);
+    setTemplateFormat(template.format);
+    setTemplateColumns(template.columns.map((c) => ({ key: c.key, label: c.label, width: c.width })));
+    setEditingTemplateId(template.id);
     setTemplateDialogOpen(true);
   }, []);
 
@@ -460,19 +470,30 @@ export function SettingsTab() {
     if (!token) { toast.error('Please log in again.'); return; }
     setSavingTemplate(true);
     try {
-      const res = await fetch('/api/export-templates', {
-        method: 'POST',
+      const isEditing = !!editingTemplateId;
+      const url = isEditing
+        ? `/api/export-templates?id=${encodeURIComponent(editingTemplateId!)}`
+        : '/api/export-templates';
+      const method = isEditing ? 'PUT' : 'POST';
+      const res = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
         body: JSON.stringify({ name: templateName.trim(), format: templateFormat, columns: templateColumns }),
       });
       if (res.ok) {
-        const created = await res.json();
-        setExportTemplates((prev) => [...prev, created]);
+        const saved = await res.json();
+        if (isEditing) {
+          setExportTemplates((prev) => prev.map((t) => t.id === editingTemplateId ? saved : t));
+          toast.success('Template updated.');
+        } else {
+          setExportTemplates((prev) => [...prev, saved]);
+          toast.success('Export template created.');
+        }
         setTemplateDialogOpen(false);
-        toast.success('Export template created.');
+        setEditingTemplateId(null);
       } else {
         const data = await res.json().catch(() => ({}));
-        toast.error(data.error || 'Failed to create template.');
+        toast.error(data.error || 'Failed to save template.');
       }
     } catch {
       toast.error('Network error.');
@@ -941,9 +962,19 @@ export function SettingsTab() {
                       <Button
                         variant="ghost"
                         size="icon"
+                        className="h-7 w-7 shrink-0"
+                        onClick={() => openEditTemplateDialog(t)}
+                        title="Edit template"
+                      >
+                        <PencilRuler className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         className="h-7 w-7 shrink-0 text-red-500 hover:text-red-600"
                         disabled={deletingTemplateId === t.id}
                         onClick={() => handleDeleteTemplate(t.id)}
+                        title="Delete template"
                       >
                         {deletingTemplateId === t.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
                       </Button>
@@ -1329,7 +1360,7 @@ export function SettingsTab() {
       <Dialog open={templateDialogOpen} onOpenChange={setTemplateDialogOpen}>
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>New Export Template</DialogTitle>
+            <DialogTitle>{editingTemplateId ? 'Edit Template' : 'New Export Template'}</DialogTitle>
             <DialogDescription>
               Choose a name, format, and select which columns to include.
             </DialogDescription>
@@ -1430,7 +1461,7 @@ export function SettingsTab() {
               ) : (
                 <>
                   <Plus className="mr-2 h-4 w-4" />
-                  Create Template
+                  {editingTemplateId ? 'Save Changes' : 'Create Template'}
                 </>
               )}
             </Button>

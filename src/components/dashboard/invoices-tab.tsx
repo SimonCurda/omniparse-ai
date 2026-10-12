@@ -907,6 +907,84 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
 
   const checkedInvoices = useMemo(() => displayed.filter(isReviewed), [displayed, isReviewed]);
 
+  // Unexported invoices — those not yet at lifecycleStatus 'exported'.
+  // Replaces the old "All Invoices" export option. Users who want to export
+  // everything can use Select All + export checked.
+  const unexportedInvoices = useMemo(
+    () => displayed.filter((inv) => inv.lifecycleStatus !== 'exported'),
+    [displayed],
+  );
+
+  // ─── Export Unexported ───────────────────────────────────────────
+  // Same as the "all" exports but filtered to unexported invoices only.
+  const exportUnexportedCSV = () => {
+    if (unexportedInvoices.length === 0) { toast.error('No unexported invoices to export'); return; }
+    const header = 'Vendor,Invoice #,Date,Amount,VAT,Total,Currency,Status,Confidence,Validation Status,Processing Time,Labels\n';
+    const esc = (v: unknown) => {
+      const s = String(v ?? '');
+      return s.includes(',') || s.includes('"') || s.includes('\n') ? '"' + s.replace(/"/g, '""') + '"' : s;
+    };
+    const rows = unexportedInvoices.map((inv) =>
+      [inv.vendor, inv.invNumber, inv.invDate, inv.amount, inv.vatAmount, inv.total, inv.currency, inv.status, inv.confidence, inv.validationStatus ?? '', inv.processingTime != null ? `${inv.processingTime.toFixed(1)}s` : '', labelsToStr(inv)].map(esc).join(',')
+    ).join('\n');
+    const blob = new Blob([header + rows], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'unexported-invoices.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${unexportedInvoices.length} unexported invoices to CSV`);
+    markInvoicesExported(unexportedInvoices);
+  };
+
+  const exportUnexportedJSON = () => {
+    if (unexportedInvoices.length === 0) { toast.error('No unexported invoices to export'); return; }
+    const blob = new Blob([JSON.stringify(unexportedInvoices, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'unexported-invoices.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${unexportedInvoices.length} unexported invoices to JSON`);
+    markInvoicesExported(unexportedInvoices);
+  };
+
+  const exportUnexportedExcel = async () => {
+    if (unexportedInvoices.length === 0) { toast.error('No unexported invoices to export'); return; }
+    try {
+      const XLSX = await import('xlsx');
+      const wsData = [
+        ['Vendor', 'Invoice #', 'Date', 'Amount', 'VAT', 'Total', 'Currency', 'Status', 'Confidence (%)', 'Validation Status', 'Processing Time', 'Labels'],
+        ...unexportedInvoices.map((inv) => [
+          inv.vendor || '', inv.invNumber || '', inv.invDate || '',
+          inv.amount ?? '', inv.vatAmount ?? '', inv.total ?? '',
+          inv.currency || 'USD', inv.isDuplicate ? 'Duplicate' : inv.status === 'review' ? 'Review' : 'Done',
+          inv.confidence ?? '', inv.validationStatus ?? 'N/A',
+          inv.processingTime != null ? `${inv.processingTime.toFixed(1)}s` : '', labelsToStr(inv),
+        ]),
+      ];
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      ws['!cols'] = wsData[0].map((_, colIdx) => {
+        const maxLen = Math.max(...wsData.map((row) => String(row[colIdx] ?? '').length));
+        return { wch: Math.min(Math.max(maxLen + 2, 8), 50) };
+      });
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Unexported');
+      XLSX.writeFile(wb, 'unexported-invoices.xlsx');
+      toast.success(`Exported ${unexportedInvoices.length} unexported invoices to Excel`);
+      markInvoicesExported(unexportedInvoices);
+    } catch {
+      toast.error('Failed to generate Excel file');
+    }
+  };
+
+  const exportUnexportedPDF = () => {
+    if (unexportedInvoices.length === 0) { toast.error('No unexported invoices to export'); return; }
+    generatePDF(unexportedInvoices, 'unexported-invoices.pdf', 'Unexported Invoices');
+  };
+
   const exportCheckedCSV = () => {
     if (checkedInvoices.length === 0) { toast.error('No checked invoices to export'); return; }
     const header = 'Vendor,Invoice #,Date,Amount,VAT,Total,Currency,Status,Confidence,Validation Status,Processing Time,Labels\n';
@@ -2060,20 +2138,20 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
                 <FileText className="mr-2 h-4 w-4" /> PDF
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              {/* All invoices */}
+              {/* Unexported invoices — replaces "All Invoices" */}
               <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
-                All Invoices ({displayed.length})
+                Unexported ({unexportedInvoices.length})
               </div>
-              <DropdownMenuItem onClick={exportCSV}>
+              <DropdownMenuItem onClick={() => exportUnexportedCSV()} disabled={unexportedInvoices.length === 0}>
                 <FileJson className="mr-2 h-4 w-4" /> CSV
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={exportJSON}>
+              <DropdownMenuItem onClick={() => exportUnexportedJSON()} disabled={unexportedInvoices.length === 0}>
                 <FileJson className="mr-2 h-4 w-4" /> JSON
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={exportExcel}>
+              <DropdownMenuItem onClick={() => exportUnexportedExcel()} disabled={unexportedInvoices.length === 0}>
                 <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel (.xlsx)
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={exportPDF}>
+              <DropdownMenuItem onClick={() => exportUnexportedPDF()} disabled={unexportedInvoices.length === 0}>
                 <FileText className="mr-2 h-4 w-4" /> PDF
               </DropdownMenuItem>
             </DropdownMenuContent>
