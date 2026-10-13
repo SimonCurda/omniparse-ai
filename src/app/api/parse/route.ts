@@ -1443,7 +1443,26 @@ export async function POST(req: NextRequest) {
       }
 
       if (approvalStatus !== 'none') {
-        await db.invoice.update({ where: { id: invoice.id }, data: { approvalStatus, approvalRuleId: matchedRuleId } });
+        // When auto-approved, also mark the invoice as "reviewed" (checked)
+        // so it shows up as checked in the invoices tab and is included in
+        // "Export Checked" exports. The user set up an auto-approve rule,
+        // so their intent is clear: these invoices don't need manual review.
+        const updateData: Record<string, unknown> = { approvalStatus, approvalRuleId: matchedRuleId };
+        if (approvalStatus === 'auto_approved') {
+          // Merge the reviewed flag into existing customFields
+          const existingCustomFields = (invoice.customFields as Record<string, unknown> | null) ?? {};
+          updateData.customFields = {
+            ...existingCustomFields,
+            reviewed: true,
+            reviewedAt: new Date().toISOString(),
+            autoApproved: true, // marker so we know this was auto-checked, not manually
+          };
+          // Also bump lifecycle to 'approved' (same as manual check)
+          if (!invoice.lifecycleStatus || invoice.lifecycleStatus === '' || invoice.lifecycleStatus === 'pending') {
+            updateData.lifecycleStatus = 'approved';
+          }
+        }
+        await db.invoice.update({ where: { id: invoice.id }, data: updateData });
       }
       approvalCheckResult = { approvalStatus, matchedRuleId };
     }

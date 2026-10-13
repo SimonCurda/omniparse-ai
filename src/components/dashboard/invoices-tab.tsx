@@ -207,7 +207,10 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
 
   // Helper: was this invoice manually marked as checked by the user?
   const isReviewed = (inv: InvoiceRow): boolean =>
-    Boolean((inv.customFields as Record<string, unknown> | null)?.reviewed === true);
+    Boolean(
+      (inv.customFields as Record<string, unknown> | null)?.reviewed === true ||
+      inv.approvalStatus === 'auto_approved'
+    );
 
   const filtered = filter === 'all'
     ? invoices

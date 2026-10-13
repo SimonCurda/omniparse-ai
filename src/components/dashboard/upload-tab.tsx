@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
-import { Upload, FileText, Sparkles, Loader2, AlertCircle, ShieldCheck, ShieldAlert, ShieldX, Timer, CheckCircle, TriangleAlert, Bug, Trash2 } from 'lucide-react';
+import { Upload, FileText, Sparkles, Loader2, AlertCircle, ShieldCheck, ShieldAlert, ShieldX, Timer, CheckCircle, TriangleAlert, Bug, Trash2, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAppStore } from '@/stores/app-store';
 import type { InvoiceRow } from '@/stores/app-store';
@@ -48,6 +48,7 @@ export function UploadTab() {
   // Persisted in localStorage so user only has to confirm once per device.
   // Reset on logout (see auth-view.tsx where op_token is removed).
   const [legalConsent, setLegalConsent] = useState(false);
+  const [legalConsentExpanded, setLegalConsentExpanded] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { setInvoices, invoices, user } = useAppStore();
 
@@ -134,13 +135,20 @@ export function UploadTab() {
   useEffect(() => {
     try {
       const saved = localStorage.getItem('op_legal_consent');
-      if (saved === 'true') setLegalConsent(true);
+      if (saved === 'true') {
+        setLegalConsent(true);
+        setLegalConsentExpanded(false); // Start collapsed if already consented
+      }
     } catch { /* localStorage unavailable */ }
   }, []);
 
   const handleLegalConsentChange = (checked: boolean | 'indeterminate') => {
     const value = checked === true;
     setLegalConsent(value);
+    // Collapse the disclaimer after consent is given (but user can expand it again)
+    if (value) {
+      setLegalConsentExpanded(false);
+    }
     try {
       localStorage.setItem('op_legal_consent', value ? 'true' : 'false');
     } catch { /* localStorage unavailable */ }
@@ -365,41 +373,56 @@ export function UploadTab() {
       {/* GDPR data transfer notice + consent checkbox
           Required before user can upload documents containing personal data
           (e.g. vendor names, email addresses) that will be processed by
-          US-based AI providers (OpenRouter, Groq, Google Gemini). */ }
+          US-based AI providers (OpenRouter, Groq, Google Gemini).
+          Collapses after consent is given (but user can expand it anytime). */ }
       <Card data-glow data-glow-border-only className={'glass-card border-l-4 ' + (legalConsent ? 'border-l-emerald-500 bg-emerald-500/5' : 'border-l-amber-500 bg-amber-500/5')}>
         <CardContent className="p-4">
           <div className="flex items-start gap-3">
             <TriangleAlert className={'h-5 w-5 shrink-0 mt-0.5 ' + (legalConsent ? 'text-emerald-500' : 'text-amber-500')} />
             <div className="flex-1 min-w-0">
-              <h3 className="text-sm font-semibold mb-1">
-                {legalConsent ? 'Data transfer consent confirmed' : 'Data transfer notice — please read before uploading'}
-              </h3>
-              <p className="text-xs text-muted-foreground leading-relaxed mb-2">
-                Uploaded documents are processed by AI providers: <strong>Mistral (Paris, EU)</strong> is used
-                first; <strong>Groq (US)</strong> has confirmed Standard Contractual Clauses (SCCs) in effect
-                as of September 12, 2026. <strong>OpenRouter</strong> and <strong>Google</strong> (US) are
-                fallbacks pending SCC verification. Processing by AI providers is governed by their applicable
-                terms and data-processing agreements.
-              </p>
-              <p className="text-xs text-muted-foreground leading-relaxed mb-3">
-                Documents may contain personal data of multiple data subjects (vendor names, employee names,
-                email addresses, bank details). You are responsible for ensuring you have a valid legal basis
-                under GDPR Art. 6 for processing and transferring such data. If processing falls through to
-                OpenRouter or Google (pending SCC verification), exercise caution with highly sensitive
-                personal data.
-              </p>
-              <label className="flex items-start gap-2 cursor-pointer">
-                <Checkbox
-                  checked={legalConsent}
-                  onCheckedChange={handleLegalConsentChange}
-                  className="mt-0.5"
-                />
-                <span className="text-xs text-foreground leading-relaxed">
-                  I understand that my documents may be processed by AI providers in the EU (Mistral) and
-                  US (Groq with SCCs, OpenRouter, Google). I confirm I have a legal basis for any personal
-                  data contained in my uploaded documents.
-                </span>
-              </label>
+              {/* Collapsible header — click to expand/collapse */}
+              <button
+                type="button"
+                onClick={() => setLegalConsentExpanded((v) => !v)}
+                className="flex items-center gap-2 w-full text-left"
+              >
+                <h3 className="text-sm font-semibold mb-0">
+                  {legalConsent ? 'Data transfer consent confirmed' : 'Data transfer notice — please read before uploading'}
+                </h3>
+                <ChevronDown className={'h-4 w-4 text-muted-foreground transition-transform ' + (legalConsentExpanded ? '' : 'rotate-180')} />
+              </button>
+
+              {/* Collapsible content — hidden after consent, but expandable */}
+              {legalConsentExpanded && (
+                <>
+                  <p className="text-xs text-muted-foreground leading-relaxed mb-2 mt-2">
+                    Uploaded documents are processed by AI providers: <strong>Mistral (Paris, EU)</strong> is used
+                    first; <strong>Groq (US)</strong> has confirmed Standard Contractual Clauses (SCCs) in effect
+                    as of September 12, 2026. <strong>OpenRouter</strong> and <strong>Google</strong> (US) are
+                    fallbacks pending SCC verification. Processing by AI providers is governed by their applicable
+                    terms and data-processing agreements.
+                  </p>
+                  <p className="text-xs text-muted-foreground leading-relaxed mb-3">
+                    Documents may contain personal data of multiple data subjects (vendor names, employee names,
+                    email addresses, bank details). You are responsible for ensuring you have a valid legal basis
+                    under GDPR Art. 6 for processing and transferring such data. If processing falls through to
+                    OpenRouter or Google (pending SCC verification), exercise caution with highly sensitive
+                    personal data.
+                  </p>
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <Checkbox
+                      checked={legalConsent}
+                      onCheckedChange={handleLegalConsentChange}
+                      className="mt-0.5"
+                    />
+                    <span className="text-xs text-foreground leading-relaxed">
+                      I understand that my documents may be processed by AI providers in the EU (Mistral) and
+                      US (Groq with SCCs, OpenRouter, Google). I confirm I have a legal basis for any personal
+                      data contained in my uploaded documents.
+                    </span>
+                  </label>
+                </>
+              )}
             </div>
           </div>
         </CardContent>
