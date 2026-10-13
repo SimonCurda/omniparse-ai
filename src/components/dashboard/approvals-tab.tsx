@@ -127,7 +127,7 @@ function ApprovalsContent({ plan }: { plan: string }) {
     const token = getToken();
     if (!token) return;
     setRulesLoading(true);
-    fetch('/api/approval-rules', { headers: { Authorization: 'Bearer ' + token } })
+    fetch('/api/approval-rules', { headers: { Authorization: 'Bearer ' + token }, cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : { rules: [] }))
       .then((data) => setRules(Array.isArray(data) ? data : (data.rules || [])))
       .catch(() => {})
@@ -139,7 +139,7 @@ function ApprovalsContent({ plan }: { plan: string }) {
     if (!token) return;
     setApprovalsLoading(true);
     const params = status && status !== 'all' ? `?status=${status}` : '';
-    fetch('/api/approvals' + params, { headers: { Authorization: 'Bearer ' + token } })
+    fetch('/api/approvals' + params, { headers: { Authorization: 'Bearer ' + token }, cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : []))
       .then((data) => setApprovals(Array.isArray(data) ? data : []))
       .catch(() => {})
