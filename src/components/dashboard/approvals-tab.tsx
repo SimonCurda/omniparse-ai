@@ -52,6 +52,13 @@ const PLAN_LABELS: Record<string, string> = {
 
 const MAX_RULES = 20;
 
+// Common currencies for the dropdown — user can also type a custom one
+const COMMON_CURRENCIES = [
+  'USD', 'EUR', 'CZK', 'GBP', 'CHF', 'PLN', 'SEK', 'NOK', 'DKK',
+  'JPY', 'CNY', 'CAD', 'AUD', 'NZD', 'INR', 'BRL', 'MXN', 'RUB',
+  'TRY', 'AED',
+];
+
 interface ApprovalRule {
   id: string;
   name: string;
@@ -125,6 +132,9 @@ function ApprovalsContent({ plan }: { plan: string }) {
   }>({ name: '', minAmount: '', maxAmount: '', currency: '', vendor: '', action: 'flag_for_review' });
   const [savingRule, setSavingRule] = useState(false);
 
+  // Vendor list from existing invoices (for the vendor dropdown)
+  const [vendors, setVendors] = useState<string[]>([]);
+
   // Approve/Reject dialog
   const [actionDialog, setActionDialog] = useState<{
     open: boolean;
@@ -160,6 +170,21 @@ function ApprovalsContent({ plan }: { plan: string }) {
   useEffect(() => {
     fetchRules();
     fetchApprovals();
+    // Fetch vendor list from invoices (for the vendor dropdown in rules)
+    const token = getToken();
+    if (token) {
+      fetch('/api/invoices', { headers: { Authorization: 'Bearer ' + token }, cache: 'no-store' })
+        .then((r) => (r.ok ? r.json() : []))
+        .then((data) => {
+          if (Array.isArray(data)) {
+            const uniqueVendors = Array.from(new Set(
+              data.map((inv: { vendor?: string | null }) => inv.vendor).filter(Boolean)
+            )).sort() as string[];
+            setVendors(uniqueVendors);
+          }
+        })
+        .catch(() => {});
+    }
   }, [fetchRules, fetchApprovals]);
 
   const openNewRuleDialog = () => {
@@ -529,22 +554,34 @@ function ApprovalsContent({ plan }: { plan: string }) {
                 <Label htmlFor="rule-currency">Currency (optional)</Label>
                 <Input
                   id="rule-currency"
-                  placeholder="e.g. CZK, EUR, USD"
+                  placeholder="Any currency"
                   value={newRule.currency}
                   onChange={(e) => setNewRule((prev) => ({ ...prev, currency: e.target.value.toUpperCase() }))}
                   className="font-mono"
+                  list="currency-suggestions"
                 />
-                <p className="text-[11px] text-muted-foreground">Leave empty to match any currency</p>
+                <datalist id="currency-suggestions">
+                  {COMMON_CURRENCIES.map((c) => (
+                    <option key={c} value={c} />
+                  ))}
+                </datalist>
+                <p className="text-[11px] text-muted-foreground">Type a code (e.g. CZK) or pick from list. Leave empty for any currency.</p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="rule-vendor">Vendor (optional)</Label>
                 <Input
                   id="rule-vendor"
-                  placeholder="e.g. Google, Amazon"
+                  placeholder="Any vendor"
                   value={newRule.vendor}
                   onChange={(e) => setNewRule((prev) => ({ ...prev, vendor: e.target.value }))}
+                  list="vendor-suggestions"
                 />
-                <p className="text-[11px] text-muted-foreground">Case-insensitive partial match</p>
+                <datalist id="vendor-suggestions">
+                  {vendors.map((v) => (
+                    <option key={v} value={v} />
+                  ))}
+                </datalist>
+                <p className="text-[11px] text-muted-foreground">Pick from your invoices or type a new one. Case-insensitive partial match.</p>
               </div>
             </div>
             <div className="space-y-2">
