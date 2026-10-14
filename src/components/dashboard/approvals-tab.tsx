@@ -33,6 +33,7 @@ import {
   ShieldBan,
   Clock,
   Send,
+  PencilRuler,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAppStore } from '@/stores/app-store';
@@ -56,6 +57,8 @@ interface ApprovalRule {
   name: string;
   minAmount?: number | null;
   maxAmount?: number | null;
+  currency?: string | null;
+  vendor?: string | null;
   action: 'auto_approve' | 'flag_for_review' | 'block';
   active: boolean;
 }
@@ -109,9 +112,17 @@ function ApprovalsContent({ plan }: { plan: string }) {
   const [approvalsLoading, setApprovalsLoading] = useState(true);
   const [approvalFilter, setApprovalFilter] = useState('all');
 
-  // Add rule dialog
+  // Add/edit rule dialog
   const [showAddRule, setShowAddRule] = useState(false);
-  const [newRule, setNewRule] = useState<{ name: string; minAmount: string; maxAmount: string; action: 'auto_approve' | 'flag_for_review' | 'block' }>({ name: '', minAmount: '', maxAmount: '', action: 'flag_for_review' });
+  const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
+  const [newRule, setNewRule] = useState<{
+    name: string;
+    minAmount: string;
+    maxAmount: string;
+    currency: string;
+    vendor: string;
+    action: 'auto_approve' | 'flag_for_review' | 'block';
+  }>({ name: '', minAmount: '', maxAmount: '', currency: '', vendor: '', action: 'flag_for_review' });
   const [savingRule, setSavingRule] = useState(false);
 
   // Approve/Reject dialog
@@ -151,6 +162,25 @@ function ApprovalsContent({ plan }: { plan: string }) {
     fetchApprovals();
   }, [fetchRules, fetchApprovals]);
 
+  const openNewRuleDialog = () => {
+    setEditingRuleId(null);
+    setNewRule({ name: '', minAmount: '', maxAmount: '', currency: '', vendor: '', action: 'flag_for_review' });
+    setShowAddRule(true);
+  };
+
+  const openEditRuleDialog = (rule: ApprovalRule) => {
+    setEditingRuleId(rule.id);
+    setNewRule({
+      name: rule.name,
+      minAmount: rule.minAmount != null ? String(rule.minAmount) : '',
+      maxAmount: rule.maxAmount != null ? String(rule.maxAmount) : '',
+      currency: rule.currency || '',
+      vendor: rule.vendor || '',
+      action: rule.action,
+    });
+    setShowAddRule(true);
+  };
+
   const handleAddRule = async () => {
     if (!newRule.name.trim()) {
       toast.error('Rule name is required');
@@ -159,31 +189,41 @@ function ApprovalsContent({ plan }: { plan: string }) {
     const token = getToken();
     if (!token) return;
 
-    if (rules.length >= MAX_RULES) {
+    if (!editingRuleId && rules.length >= MAX_RULES) {
       toast.error(`Maximum ${MAX_RULES} rules allowed`);
       return;
     }
 
     setSavingRule(true);
     try {
-      const res = await fetch('/api/approval-rules', {
-        method: 'POST',
+      const payload = {
+        name: newRule.name,
+        minAmount: newRule.minAmount ? Number(newRule.minAmount) : null,
+        maxAmount: newRule.maxAmount ? Number(newRule.maxAmount) : null,
+        currency: newRule.currency.trim() || null,
+        vendor: newRule.vendor.trim() || null,
+        action: newRule.action,
+      };
+
+      const isEditing = !!editingRuleId;
+      const url = isEditing ? '/api/approval-rules' : '/api/approval-rules';
+      const method = isEditing ? 'PUT' : 'POST';
+      const body = isEditing ? { ...payload, id: editingRuleId } : payload;
+
+      const res = await fetch(url, {
+        method,
         headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: newRule.name,
-          minAmount: newRule.minAmount ? Number(newRule.minAmount) : null,
-          maxAmount: newRule.maxAmount ? Number(newRule.maxAmount) : null,
-          action: newRule.action,
-        }),
+        body: JSON.stringify(body),
       });
       if (res.ok) {
-        toast.success('Rule created');
+        toast.success(isEditing ? 'Rule updated' : 'Rule created');
         setShowAddRule(false);
-        setNewRule({ name: '', minAmount: '', maxAmount: '', action: 'flag_for_review' });
+        setEditingRuleId(null);
+        setNewRule({ name: '', minAmount: '', maxAmount: '', currency: '', vendor: '', action: 'flag_for_review' });
         fetchRules();
       } else {
         const data = await res.json();
-        toast.error(data.error || 'Failed to create rule');
+        toast.error(data.error || 'Failed to save rule');
       }
     } catch {
       toast.error('Network error');
@@ -284,7 +324,7 @@ function ApprovalsContent({ plan }: { plan: string }) {
               <span className="text-xs text-muted-foreground">
                 {rules.length}/{MAX_RULES} rules used ({PLAN_LABELS[plan] || plan})
               </span>
-              <Button size="sm" onClick={() => setShowAddRule(true)}>
+              <Button size="sm" onClick={openNewRuleDialog}>
                 <Plus className="h-4 w-4 mr-1" /> Add Rule
               </Button>
             </div>
@@ -314,14 +354,25 @@ function ApprovalsContent({ plan }: { plan: string }) {
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {rule.minAmount != null && rule.maxAmount != null
-                        ? `${fmtCurrency(rule.minAmount)} — ${fmtCurrency(rule.maxAmount)}`
+                        ? `${fmtCurrency(rule.minAmount, rule.currency)} — ${fmtCurrency(rule.maxAmount, rule.currency)}`
                         : rule.minAmount != null
-                          ? `Above ${fmtCurrency(rule.minAmount)}`
+                          ? `Above ${fmtCurrency(rule.minAmount, rule.currency)}`
                           : rule.maxAmount != null
-                            ? `Up to ${fmtCurrency(rule.maxAmount)}`
+                            ? `Up to ${fmtCurrency(rule.maxAmount, rule.currency)}`
                             : 'Any amount'}
+                      {rule.currency && <span className="ml-1 text-amber-500">· {rule.currency}</span>}
+                      {rule.vendor && <span className="ml-1 text-blue-500">· vendor contains "{rule.vendor}"</span>}
                     </p>
                   </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 shrink-0"
+                    onClick={() => openEditRuleDialog(rule)}
+                    title="Edit rule"
+                  >
+                    <PencilRuler className="h-4 w-4 text-muted-foreground" />
+                  </Button>
                   <Switch checked={rule.active} onCheckedChange={() => toggleRule(rule)} />
                   <Button
                     variant="ghost"
@@ -431,11 +482,11 @@ function ApprovalsContent({ plan }: { plan: string }) {
         </CardContent>
       </Card>
 
-      {/* Add Rule Dialog */}
-      <Dialog open={showAddRule} onOpenChange={(open) => { if (!open) setShowAddRule(false); }}>
+      {/* Add/Edit Rule Dialog */}
+      <Dialog open={showAddRule} onOpenChange={(open) => { if (!open) { setShowAddRule(false); setEditingRuleId(null); } }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Add Approval Rule</DialogTitle>
+            <DialogTitle>{editingRuleId ? 'Edit Rule' : 'Add Approval Rule'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
@@ -473,6 +524,29 @@ function ApprovalsContent({ plan }: { plan: string }) {
                 />
               </div>
             </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="rule-currency">Currency (optional)</Label>
+                <Input
+                  id="rule-currency"
+                  placeholder="e.g. CZK, EUR, USD"
+                  value={newRule.currency}
+                  onChange={(e) => setNewRule((prev) => ({ ...prev, currency: e.target.value.toUpperCase() }))}
+                  className="font-mono"
+                />
+                <p className="text-[11px] text-muted-foreground">Leave empty to match any currency</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="rule-vendor">Vendor (optional)</Label>
+                <Input
+                  id="rule-vendor"
+                  placeholder="e.g. Google, Amazon"
+                  value={newRule.vendor}
+                  onChange={(e) => setNewRule((prev) => ({ ...prev, vendor: e.target.value }))}
+                />
+                <p className="text-[11px] text-muted-foreground">Case-insensitive partial match</p>
+              </div>
+            </div>
             <div className="space-y-2">
               <Label>Action</Label>
               <Select
@@ -491,10 +565,10 @@ function ApprovalsContent({ plan }: { plan: string }) {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddRule(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => { setShowAddRule(false); setEditingRuleId(null); }}>Cancel</Button>
             <Button onClick={handleAddRule} disabled={savingRule}>
               {savingRule ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
-              Save Rule
+              {editingRuleId ? 'Save Changes' : 'Save Rule'}
             </Button>
           </DialogFooter>
         </DialogContent>

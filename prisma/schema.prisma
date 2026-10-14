@@ -238,6 +238,10 @@ model ApprovalRule {
   // Condition: amount threshold ranges
   minAmount Float?
   maxAmount Float?
+  // Optional currency filter — if set, rule only matches invoices with this currency
+  currency  String?
+  // Optional vendor filter — if set, rule only matches invoices from this vendor (case-insensitive partial match)
+  vendor    String?
   // Action: auto_approve, flag_for_review, block
   action    String
   active    Boolean  @default(true)

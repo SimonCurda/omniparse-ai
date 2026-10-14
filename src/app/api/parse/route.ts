@@ -1423,7 +1423,17 @@ export async function POST(req: NextRequest) {
       const matching = rules.filter((rule) => {
         const min = rule.minAmount ?? -Infinity;
         const max = rule.maxAmount ?? Infinity;
-        return total >= min && total <= max;
+        const amountMatch = total >= min && total <= max;
+
+        // Currency filter — if rule has a currency, invoice must match (case-insensitive)
+        const currencyMatch = !rule.currency ||
+          (invoice.currency?.toUpperCase() === rule.currency.toUpperCase());
+
+        // Vendor filter — if rule has a vendor, invoice vendor must contain it (case-insensitive)
+        const vendorMatch = !rule.vendor ||
+          (invoice.vendor && invoice.vendor.toLowerCase().includes(rule.vendor.toLowerCase()));
+
+        return amountMatch && currencyMatch && vendorMatch;
       });
 
       let approvalStatus = 'none';

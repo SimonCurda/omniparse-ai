@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { name, minAmount, maxAmount, action, active } = body;
+    const { name, minAmount, maxAmount, action, active, currency, vendor } = body;
 
     // Validate name
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
@@ -72,10 +72,10 @@ export async function POST(req: NextRequest) {
       data: {
         userId: user.id,
         name: name.trim(),
-        // BUG FIX: typeof check (NOT !== undefined) — Number(null)===0
-        // would otherwise corrupt null bounds into 0 bounds.
         minAmount: typeof minAmount === 'number' ? minAmount : null,
         maxAmount: typeof maxAmount === 'number' ? maxAmount : null,
+        currency: typeof currency === 'string' && currency.trim() ? currency.trim().toUpperCase() : null,
+        vendor: typeof vendor === 'string' && vendor.trim() ? vendor.trim() : null,
         action,
         active: active !== undefined ? Boolean(active) : true,
       },
@@ -98,7 +98,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { id, name, minAmount, maxAmount, action, active } = body;
+    const { id, name, minAmount, maxAmount, action, active, currency, vendor } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'Rule id is required' }, { status: 400 });
@@ -124,11 +124,12 @@ export async function PUT(req: NextRequest) {
       where: { id },
       data: {
         ...(name !== undefined ? { name: name.trim() } : {}),
-        // Same bug fix as POST: typeof check, NOT Number()
         ...(minAmount !== undefined ? { minAmount: typeof minAmount === 'number' ? minAmount : null } : {}),
         ...(maxAmount !== undefined ? { maxAmount: typeof maxAmount === 'number' ? maxAmount : null } : {}),
         ...(action !== undefined ? { action } : {}),
         ...(active !== undefined ? { active: Boolean(active) } : {}),
+        ...(currency !== undefined ? { currency: typeof currency === 'string' && currency.trim() ? currency.trim().toUpperCase() : null } : {}),
+        ...(vendor !== undefined ? { vendor: typeof vendor === 'string' && vendor.trim() ? vendor.trim() : null } : {}),
       },
     });
 
