@@ -109,47 +109,47 @@ body {
 }
 
 /* Light mode: warm gradient background + strong card shadows */
-:root body {
+:root:not(.dark) body {
   background: linear-gradient(180deg, #faf6f0 0%, #f0ece6 50%, #ebe7e1 100%);
   background-attachment: fixed;
   min-height: 100vh;
 }
 
-:root .glass-card {
+:root:not(.dark) .glass-card {
   box-shadow: 0 2px 8px rgba(120,100,60,0.08), 0 1px 3px rgba(0,0,0,0.04);
   transition: box-shadow 0.2s ease, transform 0.1s ease;
 }
 
-:root .glass-card:hover {
+:root:not(.dark) .glass-card:hover {
   box-shadow: 0 8px 24px rgba(120,100,60,0.12), 0 2px 8px rgba(0,0,0,0.05);
 }
 
-:root .border-border\/50 {
+:root:not(.dark) .border-border\/50 {
   border-color: rgba(214, 208, 200, 0.6);
 }
 
 /* Light mode: make primary buttons richer */
-:root .bg-primary {
+:root:not(.dark) .bg-primary {
   background-color: #d97706;
 }
 
-:root .bg-primary:hover {
+:root:not(.dark) .bg-primary:hover {
   background-color: #b45309;
 }
 
 /* Light mode: navbar gets a warm frosted glass effect */
-:root .backdrop-blur-xl {
+:root:not(.dark) .backdrop-blur-xl {
   background-color: rgba(255, 252, 247, 0.85);
 }
 
 /* Light mode: stronger border on inputs for better visibility */
-:root input,
-:root textarea {
+:root:not(.dark) input,
+:root:not(.dark) textarea {
   border-color: #c8c2ba;
 }
 
-:root input:focus,
-:root textarea:focus {
+:root:not(.dark) input:focus,
+:root:not(.dark) textarea:focus {
   border-color: #d97706;
   box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.12);
 }
