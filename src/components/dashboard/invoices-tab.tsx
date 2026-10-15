@@ -89,6 +89,47 @@ import { useAppStore } from '@/stores/app-store';
 import type { InvoiceRow } from '@/stores/app-store';
 import { calculateAging } from '@/lib/invoice-engine';
 
+// Pre-built export templates for popular accounting software.
+// These are hardcoded presets — no DB entry needed. They use the same
+// exportWithTemplate() function as user-created templates.
+const PRESET_TEMPLATES: Record<string, { id: string; name: string; format: string; columns: { key: string; label: string; width: number }[] }> = {
+  // QuickBooks Online vendor bill import CSV format
+  // Reference: https://quickbooks.intuit.com/learn-support/en-us/help-topic/0058
+  quickbooks: {
+    id: 'preset-quickbooks',
+    name: 'QuickBooks',
+    format: 'csv',
+    columns: [
+      { key: 'vendor', label: 'Vendor', width: 120 },
+      { key: 'invNumber', label: 'Bill Number', width: 100 },
+      { key: 'invDate', label: 'Bill Date', width: 100 },
+      { key: 'dueDate', label: 'Due Date', width: 100 },
+      { key: 'amount', label: 'Amount', width: 100 },
+      { key: 'vatAmount', label: 'Tax Amount', width: 100 },
+      { key: 'total', label: 'Total', width: 100 },
+      { key: 'currency', label: 'Currency', width: 80 },
+      { key: 'lifecycleStatus', label: 'Status', width: 80 },
+    ],
+  },
+  // Xero bill import CSV format
+  // Reference: https://central.xero.com/s/article/Import-bills
+  xero: {
+    id: 'preset-xero',
+    name: 'Xero',
+    format: 'csv',
+    columns: [
+      { key: 'vendor', label: 'ContactName', width: 120 },
+      { key: 'invNumber', label: 'InvoiceNumber', width: 100 },
+      { key: 'invDate', label: 'InvoiceDate', width: 100 },
+      { key: 'dueDate', label: 'DueDate', width: 100 },
+      { key: 'total', label: 'Total', width: 100 },
+      { key: 'vatAmount', label: 'TaxTotal', width: 100 },
+      { key: 'currency', label: 'CurrencyCode', width: 80 },
+      { key: 'lifecycleStatus', label: 'Status', width: 80 },
+    ],
+  },
+};
+
 const LABEL_DOT_CLASSES: Record<string, string> = {
   amber: 'bg-amber-500', blue: 'bg-blue-500', emerald: 'bg-emerald-500',
   red: 'bg-red-500', purple: 'bg-purple-500', pink: 'bg-pink-500',
@@ -2322,6 +2363,23 @@ export function InvoicesTab({ invoices, searchQuery }: { invoices: InvoiceRow[];
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => exportUnexportedPDF()} disabled={unexportedInvoices.length === 0}>
                 <FileText className="mr-2 h-4 w-4" /> PDF
+              </DropdownMenuItem>
+              {/* Pre-built accounting export templates — available to all users */}
+              <DropdownMenuSeparator />
+              <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                Accounting Export
+              </div>
+              <DropdownMenuItem
+                onClick={() => exportWithTemplate(PRESET_TEMPLATES.quickbooks, checkedInvoices.length > 0 ? checkedInvoices : unexportedInvoices)}
+                disabled={checkedInvoices.length === 0 && unexportedInvoices.length === 0}
+              >
+                <FileJson className="mr-2 h-4 w-4" /> QuickBooks CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => exportWithTemplate(PRESET_TEMPLATES.xero, checkedInvoices.length > 0 ? checkedInvoices : unexportedInvoices)}
+                disabled={checkedInvoices.length === 0 && unexportedInvoices.length === 0}
+              >
+                <FileJson className="mr-2 h-4 w-4" /> Xero CSV
               </DropdownMenuItem>
               {/* Custom templates (Plus+ only) */}
               {canUseTemplates && exportTemplates.length > 0 && (

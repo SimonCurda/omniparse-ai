@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
 import { db } from '@/lib/db';
 import { getUserFromRequest, hasFeature, PLAN_LIMITS } from '@/lib/auth';
+import { fireWebhook } from '@/lib/webhook';
 import { checkMonthlyParseLimit, incrementMonthlyParseCount } from '@/lib/parse-limit';
 import {
   runValidationRules,
@@ -1510,6 +1511,19 @@ export async function POST(req: NextRequest) {
         console.warn('[parse-debug] Failed to save success debug log:', logErr instanceof Error ? logErr.message : String(logErr));
       }
     }
+
+    // Fire webhook: invoice.parsed
+    fireWebhook(auth.userId, 'invoice.parsed', {
+      invoiceId: invoice.id,
+      vendor: invoice.vendor,
+      total: invoice.total,
+      currency: invoice.currency,
+      status: invoice.status,
+      approvalStatus: approvalCheckResult?.approvalStatus ?? 'none',
+      lifecycleStatus: invoice.lifecycleStatus,
+      confidence: invoice.confidence,
+      filename: invoice.filename,
+    }).catch(() => {});
 
     return NextResponse.json({
       id: invoice.id,

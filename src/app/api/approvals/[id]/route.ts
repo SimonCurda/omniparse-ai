@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getUserFromRequest, hasFeature } from '@/lib/auth';
+import { fireWebhook } from '@/lib/webhook';
 
 const VALID_ACTIONS = ['approve', 'reject'];
 
@@ -54,6 +55,17 @@ export async function POST(
         details: note ? { note } : {},
       },
     });
+
+    // Fire webhook: invoice.approved
+    fireWebhook(user.id, 'invoice.approved', {
+      invoiceId: id,
+      vendor: invoice.vendor,
+      total: invoice.total,
+      currency: invoice.currency,
+      approvalStatus,
+      action,
+      note: note || null,
+    }).catch(() => {});
 
     return NextResponse.json(updated);
   } catch (err) {

@@ -22,7 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { CreditCard, Loader2, Download, Trash2, Shield, Eye, EyeOff, Plus, X, Sparkles, Lock, Clock, GripVertical, ArrowUp, ArrowDown, Keyboard, LogOut, Code, Copy, RefreshCw, ExternalLink, PencilRuler } from 'lucide-react';
+import { CreditCard, Loader2, Download, Trash2, Shield, Eye, EyeOff, Plus, X, Sparkles, Lock, Clock, GripVertical, ArrowUp, ArrowDown, Keyboard, LogOut, Code, Copy, RefreshCw, ExternalLink, PencilRuler, Webhook, Send } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAppStore } from '@/stores/app-store';
 import { DEFAULT_SHORTCUTS, saveShortcuts } from '@/lib/shortcuts';
@@ -92,6 +92,9 @@ export function SettingsTab() {
         }
         if (data?.retentionDays !== undefined) {
           setRetentionDays(data.retentionDays);
+        }
+        if (data?.webhookUrl !== undefined) {
+          setWebhookUrl(data.webhookUrl || '');
         }
         setSettingsLoaded(true);
       })
@@ -271,6 +274,11 @@ export function SettingsTab() {
   // Data retention state
   const [retentionDays, setRetentionDays] = useState<number | null>(null);
   const [savingRetention, setSavingRetention] = useState(false);
+
+  // Webhook state
+  const [webhookUrl, setWebhookUrl] = useState('');
+  const [webhookSaving, setWebhookSaving] = useState(false);
+  const [webhookTesting, setWebhookTesting] = useState(false);
 
   // Handlers
 
@@ -547,6 +555,53 @@ export function SettingsTab() {
       toast.error('Network error.');
     } finally {
       setSavingRetention(false);
+    }
+  };
+
+  const handleSaveWebhook = async () => {
+    const token = localStorage.getItem('op_token');
+    if (!token) { toast.error('Please log in again.'); return; }
+    setWebhookSaving(true);
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify({ webhookUrl: webhookUrl.trim() || null }),
+      });
+      if (res.ok) {
+        toast.success(webhookUrl.trim() ? 'Webhook URL saved.' : 'Webhook disabled.');
+      } else {
+        toast.error('Failed to save webhook.');
+      }
+    } catch {
+      toast.error('Network error.');
+    } finally {
+      setWebhookSaving(false);
+    }
+  };
+
+  const handleTestWebhook = async () => {
+    if (!webhookUrl.trim()) return;
+    setWebhookTesting(true);
+    try {
+      const res = await fetch(webhookUrl.trim(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event: 'webhook.test',
+          timestamp: new Date().toISOString(),
+          data: { message: 'Test webhook from OmniParse AI' },
+        }),
+      });
+      if (res.ok || res.status === 200 || res.status === 201 || res.status === 202) {
+        toast.success('Test webhook delivered successfully.');
+      } else {
+        toast.error(`Webhook returned HTTP ${res.status}. Check the URL.`);
+      }
+    } catch {
+      toast.error('Failed to send test webhook. Check the URL.');
+    } finally {
+      setWebhookTesting(false);
     }
   };
 
@@ -1141,6 +1196,49 @@ export function SettingsTab() {
               <Loader2 className="h-4 w-4 animate-spin" /> Loading API key…
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Webhook Integration Card */}
+      <Card data-glow data-glow-border-only className="glass-card border-border/50">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Webhook className="h-5 w-5 text-amber-500" />
+            Webhooks
+          </CardTitle>
+          <CardDescription>
+            Send invoice events to Zapier, Make.com, or any URL that accepts webhooks.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="webhook-url">Webhook URL</Label>
+            <Input
+              id="webhook-url"
+              type="url"
+              placeholder="https://hooks.zapier.com/hooks/catch/..."
+              value={webhookUrl}
+              onChange={(e) => setWebhookUrl(e.target.value)}
+              disabled={webhookSaving}
+              className="font-mono text-xs"
+            />
+            <p className="text-xs text-muted-foreground">
+              Events sent: invoice.parsed, invoice.approved, invoice.exported.
+              Leave empty to disable webhooks.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={handleSaveWebhook} disabled={webhookSaving} size="sm">
+              {webhookSaving ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-2 h-3.5 w-3.5" />}
+              Save Webhook
+            </Button>
+            {webhookUrl && (
+              <Button onClick={handleTestWebhook} disabled={webhookTesting} variant="outline" size="sm">
+                {webhookTesting ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Send className="mr-2 h-3.5 w-3.5" />}
+                Send Test
+              </Button>
+            )}
+          </div>
         </CardContent>
       </Card>
 

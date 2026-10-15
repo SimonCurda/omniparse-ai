@@ -64,6 +64,12 @@ export async function PUT(req: NextRequest) {
           ? body.retentionDays
           : null)
         : currentSettings.retentionDays ?? null,
+      // Persist webhookUrl — validate it's a string or null
+      webhookUrl: body.webhookUrl !== undefined
+        ? (typeof body.webhookUrl === 'string' && body.webhookUrl.trim().startsWith('http')
+          ? body.webhookUrl.trim()
+          : null)
+        : currentSettings.webhookUrl ?? null,
     };
 
     await db.user.update({
