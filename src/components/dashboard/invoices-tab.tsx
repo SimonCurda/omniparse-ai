@@ -94,7 +94,9 @@ import { calculateAging } from '@/lib/invoice-engine';
 // exportWithTemplate() function as user-created templates.
 const PRESET_TEMPLATES: Record<string, { id: string; name: string; format: string; columns: { key: string; label: string; width: number }[] }> = {
   // QuickBooks Online vendor bill import CSV format
-  // Reference: https://quickbooks.intuit.com/learn-support/en-us/help-topic/0058
+  // Required columns: Bill Date, Due Date, Vendor, Bill Number, Line Amount, Account
+  // Reference: https://quickbooks.intuit.com/community/ + Dancing Numbers guide
+  // Date format: MM/DD/YYYY
   quickbooks: {
     id: 'preset-quickbooks',
     name: 'QuickBooks',
@@ -104,15 +106,18 @@ const PRESET_TEMPLATES: Record<string, { id: string; name: string; format: strin
       { key: 'invNumber', label: 'Bill Number', width: 100 },
       { key: 'invDate', label: 'Bill Date', width: 100 },
       { key: 'dueDate', label: 'Due Date', width: 100 },
-      { key: 'amount', label: 'Amount', width: 100 },
+      { key: 'amount', label: 'Line Amount', width: 100 },
       { key: 'vatAmount', label: 'Tax Amount', width: 100 },
-      { key: 'total', label: 'Total', width: 100 },
+      { key: 'total', label: 'Total Amount', width: 100 },
       { key: 'currency', label: 'Currency', width: 80 },
-      { key: 'lifecycleStatus', label: 'Status', width: 80 },
     ],
   },
   // Xero bill import CSV format
-  // Reference: https://central.xero.com/s/article/Import-bills
+  // Required columns: ContactName, InvoiceNumber (rest optional)
+  // Other important columns: InvoiceDate, DueDate, Description, Quantity,
+  //   UnitAmount, AccountCode, TaxType
+  // Date format: DD/MM/YYYY
+  // Reference: https://central.xero.com/0/article/Import-bills-and-credit-notes-US
   xero: {
     id: 'preset-xero',
     name: 'Xero',
