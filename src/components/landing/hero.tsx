@@ -39,14 +39,14 @@ function RotatingHeadline() {
   }, []);
 
   return (
-    <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-tight">
+    <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-tight text-foreground">
       Invoice parsing,{' '}
       <span className="relative inline-block">
         {/* The rotating phrase — keyed by index so it re-mounts and replays
             the CSS animation on each change. */}
         <span
           key={index}
-          className="text-amber-500 inline-block animate-headline-fade"
+          className="text-primary inline-block animate-headline-fade"
         >
           {ROTATING_TAGLINES[index]}
         </span>
@@ -82,7 +82,7 @@ export function Hero({ onAuth }: { onAuth: (v: 'login' | 'signup') => void }) {
           Free forever for up to 15 invoices/month. No credit card required.{' '}
           <a
             href="#pricing"
-            className="text-amber-500 hover:text-amber-600 underline underline-offset-2 transition-colors"
+            className="text-primary hover:text-primary/80 underline underline-offset-2 transition-colors"
           >
             View plans →
           </a>

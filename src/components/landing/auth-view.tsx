@@ -305,7 +305,11 @@ export function AuthView({ mode, onSwitch, onBack }: { mode: 'login' | 'signup';
                   <Checkbox
                     id="terms"
                     checked={termsAccepted}
-                    onCheckedChange={(checked) => setTermsAccepted(checked === true)}
+                    onCheckedChange={(checked) => {
+                      setTermsAccepted(checked === true);
+                      setAgeConfirmed(checked === true);
+                      setEmailOwnershipConfirmed(checked === true);
+                    }}
                     disabled={loading}
                     className="mt-0.5"
                   />
@@ -313,39 +317,11 @@ export function AuthView({ mode, onSwitch, onBack }: { mode: 'login' | 'signup';
                     htmlFor="terms"
                     className="text-xs text-muted-foreground font-normal leading-relaxed cursor-pointer"
                   >
-                    I agree to the{' '}
-                    <a
-                      href="/terms-of-service"
-                      target="_blank"
-                      rel="noopener"
-                      className="text-amber-600 hover:underline"
-                    >
-                      Terms of Service
-                    </a>
+                    I am at least 18 years old and I agree to the{' '}
+                    <a href="/terms-of-service" target="_blank" rel="noopener" className="text-amber-600 hover:underline">Terms of Service</a>
                     {' '}and{' '}
-                    <a
-                      href="/privacy-policy"
-                      target="_blank"
-                      rel="noopener"
-                      className="text-amber-600 hover:underline"
-                    >
-                      Privacy Policy
-                    </a>
-                  </Label>
-                </div>
-                <div className="flex items-start gap-2">
-                  <Checkbox
-                    id="age"
-                    checked={ageConfirmed}
-                    onCheckedChange={(checked) => setAgeConfirmed(checked === true)}
-                    disabled={loading}
-                    className="mt-0.5"
-                  />
-                  <Label
-                    htmlFor="age"
-                    className="text-xs text-muted-foreground font-normal leading-relaxed cursor-pointer"
-                  >
-                    I confirm I am at least 18 years old (or have parental/guardian consent where applicable law permits)
+                    <a href="/privacy-policy" target="_blank" rel="noopener" className="text-amber-600 hover:underline">Privacy Policy</a>
+                    . I confirm the email I entered is my own, working email that I can access for password recovery.
                   </Label>
                 </div>
                 <div className="flex items-start gap-2">
@@ -360,44 +336,10 @@ export function AuthView({ mode, onSwitch, onBack }: { mode: 'login' | 'signup';
                     htmlFor="withdrawal"
                     className="text-xs text-muted-foreground font-normal leading-relaxed cursor-pointer"
                   >
-                    I acknowledge that OmniParse is a digital service that begins immediately upon my first
-                    use of AI features (upload, scan, or chat). I expressly consent to OmniParse beginning
-                    performance during the 14-day withdrawal period, and I acknowledge that I will lose my
-                    right of withdrawal once the service has started, pursuant to § 1837(j) of the Czech
-                    Civil Code and Art. 16(m) of Directive 2011/83/EU.{' '}
-                    <a
-                      href="/terms-of-service#right-of-withdrawal"
-                      target="_blank"
-                      rel="noopener"
-                      className="text-amber-600 hover:underline"
-                    >
-                      Learn more →
-                    </a>
-                  </Label>
-                </div>
-                <div className="flex items-start gap-2">
-                  <Checkbox
-                    id="email-ownership"
-                    checked={emailOwnershipConfirmed}
-                    onCheckedChange={(checked) => setEmailOwnershipConfirmed(checked === true)}
-                    disabled={loading}
-                    className="mt-0.5"
-                  />
-                  <Label
-                    htmlFor="email-ownership"
-                    className="text-xs text-muted-foreground font-normal leading-relaxed cursor-pointer"
-                  >
-                    I confirm that the email address I have entered is my own, working email address that I
-                    have access to. I understand that password reset links are sent exclusively to this
-                    address, and that if I lose access to it I may be unable to recover my account.{' '}
-                    <a
-                      href="/terms-of-service#account-security"
-                      target="_blank"
-                      rel="noopener"
-                      className="text-amber-600 hover:underline"
-                    >
-                      Learn more →
-                    </a>
+                    I understand OmniParse is a digital service that starts immediately. I consent to
+                    losing my 14-day withdrawal right once I use AI features, per § 1837(j) Czech Civil
+                    Code and Art. 16(m) EU Directive 2011/83.{' '}
+                    <a href="/terms-of-service#right-of-withdrawal" target="_blank" rel="noopener" className="text-amber-600 hover:underline">Learn more →</a>
                   </Label>
                 </div>
               </div>
