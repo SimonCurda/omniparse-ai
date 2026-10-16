@@ -368,10 +368,10 @@ export function DashboardShell() {
                 key={item.key}
                 onClick={() => setActiveDashTab(item.key)}
                 className={
-                  "relative flex-1 flex items-center justify-center gap-1.5 px-2 sm:px-3 py-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap focus:outline-none focus-visible:outline-none " +
+                  "relative flex-1 flex items-center justify-center gap-1.5 px-2 sm:px-3 py-3 text-sm font-medium border-b-2 whitespace-nowrap focus:outline-none focus-visible:outline-none " +
                   (activeDashTab === item.key
                     ? 'border-amber-500 text-amber-500'
-                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/30')
+                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/30 hover:transition-colors')
                 }
               >
                 <item.icon className="h-4 w-4 shrink-0" />
