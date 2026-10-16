@@ -22,7 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { CreditCard, Loader2, Download, Trash2, Shield, Eye, EyeOff, Plus, X, Sparkles, Lock, Clock, GripVertical, ArrowUp, ArrowDown, Keyboard, LogOut, Code, Copy, RefreshCw, ExternalLink, PencilRuler, Webhook, Send } from 'lucide-react';
+import { CreditCard, Loader2, Download, Trash2, Shield, Eye, EyeOff, Plus, X, Sparkles, Lock, Clock, GripVertical, ArrowUp, ArrowDown, Keyboard, LogOut, Code, Copy, RefreshCw, ExternalLink, PencilRuler, Webhook, Send, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAppStore } from '@/stores/app-store';
 import { DEFAULT_SHORTCUTS, saveShortcuts } from '@/lib/shortcuts';
