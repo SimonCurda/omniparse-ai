@@ -3,6 +3,9 @@ import { db } from '@/lib/db';
 export const FEATURE_FLAG_DEFAULTS: Record<string, boolean> = {
   show_cost_per_invoice: true,
   show_normalized_toggle: true,
+  // Entity selector is hidden by default until multi-entity features ship.
+  // Admin can flip it ON from the admin panel to preview/develop.
+  show_entity_selector: false,
 };
 
 let _flagCache: { data: Record<string, boolean> | null; timestamp: number } = {
@@ -33,4 +36,5 @@ export function invalidateFeatureFlagCache(): void {
 export const ALL_KNOWN_FLAGS: Array<{ flag: string; label: string; description: string; defaultEnabled: boolean }> = [
   { flag: 'show_cost_per_invoice', label: 'Show "Cost Per Invoice" to users', description: 'When ON, the analytics tab shows the Cost Per Invoice metric. When OFF, hidden from users.', defaultEnabled: true },
   { flag: 'show_normalized_toggle', label: 'Show "Show Normalized" toggle on invoices tab', description: 'When ON, users see a "Show Normalized" toggle. When OFF, hidden.', defaultEnabled: true },
+  { flag: 'show_entity_selector', label: 'Show "Entity selector" bar on dashboard', description: 'When ON, Business/Enterprise users see the Entity selector bar below the header. When OFF (default), the bar is hidden — no real multi-entity feature yet, so it is pure distraction. Flip ON to preview/develop.', defaultEnabled: false },
 ];

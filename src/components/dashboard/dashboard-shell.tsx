@@ -57,6 +57,9 @@ export function DashboardShell() {
   const [searchMobileOpen, setSearchMobileOpen] = useState(false);
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
   const [pendingReviewCount, setPendingReviewCount] = useState(0);
+  // Entity selector visibility is admin-controlled via feature flag
+  // `show_entity_selector`. Default is OFF (no real multi-entity feature yet).
+  const [showEntitySelector, setShowEntitySelector] = useState(false);
   const tabsScrollRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   // Mirror visibleTabs in a ref so the keydown handler (which is memoized
@@ -119,6 +122,18 @@ export function DashboardShell() {
         .then((data) => {
           const arr = Array.isArray(data) ? data : [];
           setPendingReviewCount(arr.length);
+        })
+        .catch(() => {});
+
+      // Fetch public feature flags — currently used to gate the Entity
+      // selector bar. Default is OFF (no real multi-entity feature yet);
+      // admin can flip it via the admin panel.
+      fetch('/api/feature-flags', { headers: { Authorization: 'Bearer ' + token } })
+        .then((r) => r.ok ? r.json() : null)
+        .then((data) => {
+          if (data && typeof data.show_entity_selector === 'boolean') {
+            setShowEntitySelector(data.show_entity_selector);
+          }
         })
         .catch(() => {});
     }
@@ -329,8 +344,8 @@ export function DashboardShell() {
         </div>
       </header>
 
-      {/* Entity selector (Business+ only) */}
-      {(plan === 'business' || plan === 'enterprise') && (
+      {/* Entity selector (Business+ only AND admin-controlled via feature flag) */}
+      {showEntitySelector && (plan === 'business' || plan === 'enterprise') && (
         <div className="border-b border-border px-4 py-2 bg-background/80 flex items-center gap-2">
           <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
           <Select defaultValue="default">

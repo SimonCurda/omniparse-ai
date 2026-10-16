@@ -7,7 +7,7 @@ import { getAllFeatureFlags } from '@/lib/feature-flags';
 // don't expose the flag table to anonymous callers (even though the values
 // are not secret, gating keeps the surface area minimal).
 //
-// Returns: { show_cost_per_invoice: boolean, show_normalized_toggle: boolean }
+// Returns: { show_cost_per_invoice: boolean, show_normalized_toggle: boolean, show_entity_selector: boolean }
 export async function GET(req: NextRequest) {
   try {
     const auth = await getUserFromRequest(req);
@@ -20,6 +20,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       show_cost_per_invoice: !!all.show_cost_per_invoice,
       show_normalized_toggle: !!all.show_normalized_toggle,
+      show_entity_selector: !!all.show_entity_selector,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
