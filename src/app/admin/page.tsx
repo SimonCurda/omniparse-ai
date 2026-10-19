@@ -1200,13 +1200,15 @@ export default function AdminPage() {
                   <span className="text-muted-foreground">→</span>
                   <span className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 font-medium">Groq (US, SCCs)</span>
                   <span className="text-muted-foreground">→</span>
-                  <span className="px-3 py-1 rounded-full bg-amber-500/10 text-amber-600 font-medium line-through">OpenRouter</span>
+                  <span className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 font-medium">OpenRouter (US, DPA+SCCs, chat fallback)</span>
                   <span className="text-muted-foreground">→</span>
                   <span className="px-3 py-1 rounded-full bg-amber-500/10 text-amber-600 font-medium line-through">Google Gemini</span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
-                  OpenRouter and Google Gemini are skipped unless explicitly enabled. If both Mistral and Groq
-                  fail, the chat returns an error (no fallback to disabled providers).
+                  OpenRouter is enabled as a chat fallback (DPA self-executing under ToS §10.2; EU SCC
+                  Module 2 under DPA §13.2; training-blocking + Zero Data Retention routing enabled in
+                  OpenRouter Privacy Settings). If Mistral, Groq, and OpenRouter all fail, the chat
+                  returns an error (no fallback to Google Gemini unless explicitly enabled).
                 </p>
               </div>
             </div>

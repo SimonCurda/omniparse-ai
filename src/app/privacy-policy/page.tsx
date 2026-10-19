@@ -199,22 +199,29 @@ export default function PrivacyPolicyPage() {
           <li><strong>Supabase Inc.</strong> (Ireland, EU) — Primary database hosting (PostgreSQL). Processes: all stored account data, invoices, chat messages. DPA built into Terms of Service (effective August 1, 2026) — automatically applies to all customers, no separate signature required. <a href="https://supabase.com/legal/customer-resources/data-processing-addendum" target="_blank" rel="noopener">Supabase DPA</a>. Subprocessor change notifications: <a href="https://supabase.com/legal/customer-resources/subprocessor-list" target="_blank" rel="noopener">supabase.com/legal/customer-resources/subprocessor-list</a>.</li>
           <li><strong>Mistral AI</strong> (Paris, France — EU) — Primary AI inference provider. Processes: uploaded document content (transiently) for vision extraction, chat messages (transiently). <strong>EU-based — no SCC required.</strong> Training opt-out (<code>usage_options.enable_training=false</code>) is sent on every request when <code>MISTRAL_DISABLE_TRAINING=true</code> (default). <a href="https://mistral.ai/legal/privacy-policy" target="_blank" rel="noopener">Mistral Privacy Policy</a>.</li>
           <li><strong>Groq Inc.</strong> (United States) — Secondary AI inference provider (after Mistral). Processes: uploaded document content (transiently), chat messages (transiently). <strong>SCCs confirmed</strong> (EU SCC Module 2, self-executing upon acceptance of Groq Services Agreement; DPA dated October 15, 2025). DPA accessible at <a href="https://console.groq.com" target="_blank" rel="noopener">console.groq.com</a>. Governing law: Ireland. <em>Note: Groq is optional in our configuration — operators may deploy in EU-only mode (Mistral only) by leaving GROQ_API_KEY unset.</em></li>
+          <li><strong>OpenRouter Inc.</strong> (United States) — Tertiary AI inference provider (after Groq) for the chat fallback cascade. Processes: chat messages (transiently) only — OpenRouter is not in the invoice vision-extraction cascade. <strong>DPA in place:</strong> self-executing under OpenRouter&apos;s Terms of Service §10.2, available at <a href="https://openrouter.ai/data-processing-agreement" target="_blank" rel="noopener">openrouter.ai/data-processing-agreement</a>. <strong>EU Standard Contractual Clauses (Module 2)</strong> in place under DPA §13.2, with UK Addendum (§13.3) and Switzerland (§13.4) also covered. <strong>No storage:</strong> OpenRouter does not store prompts or responses unless Input & Output Logging is enabled — it is disabled in our configuration, so inputs/outputs are deleted promptly after the response is generated (DPA §2.4). <strong>Training blocked:</strong> we have enabled OpenRouter&apos;s &quot;Block endpoints that train on request data&quot; setting (both free and paid), &quot;Block free endpoints that publish prompts&quot;, and &quot;Zero Data Retention only&quot; routing — meaning underlying model providers cannot train on or publish customer content. A Schrems II Transfer Impact Assessment has been completed and documented internally.</li>
           <li><strong>Google LLC</strong> (United States, DPF-certified) — Final fallback AI inference provider. Models used: Gemini 2.0 Flash, Gemini 2.5 Flash, Gemini 1.5 Flash. <strong>DISABLED BY DEFAULT</strong> — uses Google&apos;s AI Studio free-tier endpoint (<code>generativelanguage.googleapis.com</code>), whose data-handling terms are weaker than Google Cloud Vertex AI (which has a self-executing DPA). Operator must set <code>ENABLE_GOOGLE_GEMINI=true</code> after reviewing Google AI Studio terms. For production with EU personal data, operators are strongly encouraged to migrate to Vertex AI instead. Google LLC itself is DPF-certified. <a href="https://cloud.google.com/terms/data-processing-addendum" target="_blank" rel="noopener">Google Cloud DPA</a> (applies to Vertex AI path, not AI Studio free tier).</li>
           <li><strong>Stripe Inc.</strong> (United States, DPF-certified) — Payment processing for paid plans. Processes: email, billing details. Stripe may process payment and transaction information for its own legally defined purposes, including payment security, fraud prevention and regulatory compliance. Depending on the processing activity, Stripe may act as an independent controller rather than solely as a processor on behalf of OmniParse. Stripe&apos;s own privacy and cookie notices apply to processing carried out by Stripe. <a href="https://stripe.com/legal/dpa" target="_blank" rel="noopener">Stripe DPA</a>.</li>
         </ul>
         <p>
-          <strong>OpenRouter — DISABLED by default.</strong> OpenRouter is an AI inference aggregator
-          that routes requests to underlying model providers (Meta, Nvidia, Google, etc.). OpenRouter&apos;s
-          free-tier models (all model IDs ending in <code>:free</code>) typically permit training on
-          prompt content, and there is no DPA or SCC in place with OpenRouter as of September 2026.
-          <strong>OpenRouter is therefore disabled by default in our production configuration</strong>
-          (the <code>ENABLE_OPENROUTER</code> environment variable must be explicitly set to
-          <code>true</code> by the operator after completing their own DPA/SCC review). When disabled,
-          OpenRouter is never called — document content and chat messages are never transmitted to
-          OpenRouter or its underlying providers.
+          <strong>OpenRouter — enabled as a chat fallback.</strong> OpenRouter is an AI inference aggregator
+          that routes requests to underlying model providers (Meta, Nvidia, Mistral, Qwen, etc.). The
+          OpenRouter Data Processing Agreement (self-executing under their Terms of Service §10.2;
+          available at <a href="https://openrouter.ai/data-processing-agreement" target="_blank" rel="noopener">openrouter.ai/data-processing-agreement</a>)
+          is in place, and EU Standard Contractual Clauses (Module 2 — Controller to Processor) are in
+          effect under DPA §13.2, with UK Addendum (§13.3) and Switzerland (§13.4) also covered. OpenRouter
+          does not store prompts or responses unless Input & Output Logging is enabled — it is disabled in
+          our configuration, so inputs/outputs are deleted promptly after the response is generated (DPA §2.4).
+          We have configured OpenRouter&apos;s Privacy Settings to <strong>block all endpoints that train
+          on request data</strong> (both free and paid), <strong>block free endpoints that publish prompts</strong>,
+          and <strong>restrict routing to Zero Data Retention endpoints only</strong> — meaning underlying
+          model providers cannot train on, retain, or publish customer content. A Schrems II Transfer
+          Impact Assessment has been completed and documented internally. OpenRouter is used only as a
+          fallback for the chat feature when the primary provider (Groq) is rate-limited or unavailable;
+          OpenRouter is not used for invoice vision extraction.
         </p>
         <p>
-          <strong>AI vision cascade (production default):</strong> Mistral (EU, primary) → Groq (US, SCCs confirmed, secondary). OpenRouter and Google Gemini are <strong>disabled by default</strong> and only used if the operator explicitly enables them after completing their own DPA/SCC review (OpenRouter) or AI Studio terms review (Google Gemini).
+          <strong>AI cascade (production default):</strong> Vision extraction: Mistral (EU, primary) → Groq (US, SCCs confirmed, secondary). Chat: Groq (primary) → OpenRouter (US, DPA + SCCs + ZDR, fallback). Google Gemini (AI Studio free tier) is <strong>disabled by default</strong> and only used if the operator explicitly enables it after completing their own AI Studio terms review.
         </p>
         <p>
           <strong>SCC Status (as of September 18, 2026):</strong>
@@ -225,17 +232,17 @@ export default function PrivacyPolicyPage() {
             <li><strong>Mistral AI</strong> — Established in the European Union (Paris, France). OmniParse will verify the applicable processing locations, subprocessors and remote-access arrangements for the specific Mistral service used. Where a restricted transfer outside the EEA occurs, OmniParse will implement an appropriate GDPR Chapter V transfer mechanism and supplementary safeguards where required.</li>
             <li><strong>Google LLC (Gemini)</strong> — Google Gemini through the Google AI Studio free-tier endpoint is <strong>disabled by default</strong> and is not used for customer content in the default production configuration. The Google Cloud DPA and Vertex AI contractual terms do not automatically apply to the Google AI Studio free-tier endpoint. OmniParse will not enable this provider for customer content until the applicable service terms, data-use conditions, processing locations and transfer safeguards have been reviewed and documented. If Google-based processing is required for EU personal data, OmniParse will evaluate an appropriate enterprise service and contractual configuration, such as Vertex AI, before enabling it. Migration does not by itself establish compliance; the actual configuration and applicable agreements must be verified.</li>
             <li><strong>Stripe Inc.</strong> (United States) — DPF-certified. DPA available at stripe.com/legal/dpa.</li>
-            <li><strong>OpenRouter</strong> — <strong>DISABLED by default</strong>. Not used in production unless operator explicitly sets ENABLE_OPENROUTER=true after completing DPA/SCC review. When disabled, no data is transferred to OpenRouter or its underlying providers.</li>
+            <li><strong>OpenRouter</strong> — <strong>DPA + SCCs in place.</strong> DPA self-executing under OpenRouter ToS §10.2 (available at <a href="https://openrouter.ai/data-processing-agreement" target="_blank" rel="noopener">openrouter.ai/data-processing-agreement</a>). EU SCC Module 2 in place under DPA §13.2; UK Addendum (§13.3) and Switzerland (§13.4) also covered. OpenRouter does not store prompts/responses unless Input & Output Logging is enabled (disabled in our configuration). We have enabled OpenRouter&apos;s &quot;Block endpoints that train on request data&quot; (free + paid), &quot;Block free endpoints that publish prompts&quot;, and &quot;Zero Data Retention only&quot; routing. Used as a chat fallback only.</li>
           </ul>
         </p>
         <p>
-          <strong>EU users:</strong> AI processing via Mistral (EU-based) and Groq (US-based, SCCs confirmed)
-          has appropriate safeguards in place under GDPR. Google is DPF-certified. OpenRouter is disabled
-          by default. However, users should note that documents uploaded to the Service may contain
-          personal data of multiple data subjects (e.g. vendor names, employee names, email addresses,
-          bank details). The user uploading such documents is responsible for ensuring they have a valid
-          legal basis under GDPR Art. 6 for processing that data, and that the transfer to AI providers
-          is lawful under Chapter V.
+          <strong>EU users:</strong> AI processing via Mistral (EU-based), Groq (US-based, SCCs confirmed),
+          and OpenRouter (US-based, DPA + SCCs confirmed) has appropriate safeguards in place under GDPR.
+          Google Gemini (AI Studio free tier) remains disabled by default. However, users should note that
+          documents uploaded to the Service may contain personal data of multiple data subjects (e.g. vendor
+          names, employee names, email addresses, bank details). The user uploading such documents is
+          responsible for ensuring they have a valid legal basis under GDPR Art. 6 for processing that data,
+          and that the transfer to AI providers is lawful under Chapter V.
         </p>
         <p>
           <strong>Model training — production configuration:</strong> OmniParse sends
@@ -244,10 +251,11 @@ export default function PrivacyPolicyPage() {
           identical across Mistral service tiers. OmniParse will use a Mistral configuration for
           customer content only after verifying the applicable contractual terms, training controls
           and processing conditions. Google Gemini (AI Studio free tier, whose data-handling terms
-          are weaker than Google Cloud Vertex AI) is disabled by default. OpenRouter (which has no
-          training opt-out on free-tier models) is also disabled by default. Groq&apos;s data-handling
-          terms are governed by the Groq DPA and SCCs. Operators who change this configuration must
-          update this Policy accordingly.
+          are weaker than Google Cloud Vertex AI) is disabled by default. OpenRouter is enabled as a
+          chat fallback with training-blocking and Zero Data Retention routing enabled in its Privacy
+          Settings — meaning underlying model providers cannot train on or publish customer content.
+          Groq&apos;s data-handling terms are governed by the Groq DPA and SCCs. Operators who change
+          this configuration must update this Policy accordingly.
         </p>
         <p>
           <strong>Important — transfer mechanism availability:</strong> The availability of transfer
@@ -393,11 +401,12 @@ export default function PrivacyPolicyPage() {
           <li><strong>Vercel Inc.</strong> (United States, DPF-certified) — Web hosting and serverless function execution</li>
           <li><strong>Mistral AI</strong> (Paris, France — EU) — Primary AI processing</li>
           <li><strong>Groq Inc.</strong> (United States, SCCs confirmed) — Secondary AI processing</li>
+          <li><strong>OpenRouter Inc.</strong> (United States, DPA + SCCs in place) — Tertiary AI processing (chat fallback only)</li>
           <li><strong>Stripe Inc.</strong> (United States, DPF-certified) — Payment processing, where applicable</li>
         </ul>
         <p className="text-sm mt-2"><strong>Optional providers disabled by default:</strong></p>
         <ul className="list-disc pl-6 space-y-1 text-sm mt-2">
-          <li><strong>Google Gemini</strong> (AI Studio free tier) and <strong>OpenRouter</strong> are not used for customer content in the default production configuration. They may only be enabled following an internal review of applicable terms, processing locations, transfer mechanisms and data-use conditions. The subprocessor list and relevant customer notices will be updated before such processing is activated, where required.</li>
+          <li><strong>Google Gemini</strong> (AI Studio free tier) is not used for customer content in the default production configuration. It may only be enabled following an internal review of applicable terms, processing locations, transfer mechanisms and data-use conditions. The subprocessor list and relevant customer notices will be updated before such processing is activated, where required.</li>
         </ul>
         <p className="text-sm mt-2"><em>Note:</em> If a provider is enabled without updating the contractual terms or notices applicable to an existing B2B customer, the customer&apos;s authorization and notification rights under §11.8 must be addressed. Mere toggling of an environment variable is not, by itself, legal authorization.</p>
         <h3 className="text-base font-semibold mt-4 mb-2">11.4 Data Subject Rights</h3>
@@ -431,26 +440,26 @@ export default function PrivacyPolicyPage() {
           For US recipients self-certified under the DPF, the DPF alone provides a valid transfer
           mechanism and SCCs are not additionally required. For US recipients NOT DPF-certified,
           Standard Contractual Clauses (SCCs) consistent with the Schrems II ruling, together with a
-          Transfer Impact Assessment (TIA), are required. <strong>OpenRouter is DISABLED by
-          default</strong> — no personal data is transferred to OpenRouter unless the operator
-          explicitly enables it after completing DPA/SCC review. <strong>SCC status by provider (as of
-          September 18, 2026):</strong>
+          Transfer Impact Assessment (TIA), are required. <strong>OpenRouter is enabled as a chat fallback</strong>
+          — DPA and SCCs are in place (see below). <strong>SCC status by provider (as of
+          October 4, 2026):</strong>
         </p>
         <ul className="list-disc pl-6 space-y-1 text-sm mt-2">
           <li><strong>Groq Inc.</strong> — SCCs confirmed in effect (DPA dated October 15, 2025; EU SCC Module 2 self-executing upon acceptance of Groq Services Agreement). DPA accessible at <a href="https://console.groq.com" target="_blank" rel="noopener">console.groq.com</a>. Governing law: Ireland. Competent authority: Irish Data Protection Commission. 72-hour breach notification. Groq&apos;s DPF certification status is pending verification at <a href="https://www.dataprivacyframework.gov" target="_blank" rel="noopener">dataprivacyframework.gov</a>; SCCs remain in place as a safeguard.</li>
           <li><strong>Mistral AI</strong> — EU-based (Paris, France). No Chapter V transfer issue; no SCC required. Training opt-out (<code>usage_options.enable_training=false</code>) sent on every request when MISTRAL_DISABLE_TRAINING=true (default).</li>
-          <li><strong>Google LLC</strong> — Google Cloud DPA self-executing upon acceptance of Google Cloud Terms; available at <a href="https://cloud.google.com/terms/data-processing-addendum" target="_blank" rel="noopener">cloud.google.com/terms/data-processing-addendum</a>. Google LLC is DPF-certified (verified September 2026); SCCs serve as fallback should the DPF be invalidated by Schrems III.</li>
+          <li><strong>OpenRouter Inc.</strong> — <strong>DPA + SCCs in place.</strong> DPA self-executing under OpenRouter ToS §10.2 (available at <a href="https://openrouter.ai/data-processing-agreement" target="_blank" rel="noopener">openrouter.ai/data-processing-agreement</a>). EU SCC Module 2 in place under DPA §13.2; UK Addendum (§13.3) and Switzerland (§13.4) also covered. OpenRouter does not store prompts/responses unless Input & Output Logging is enabled (disabled in our configuration; inputs/outputs deleted promptly after response per DPA §2.4). We have enabled OpenRouter&apos;s &quot;Block endpoints that train on request data&quot; (free + paid), &quot;Block free endpoints that publish prompts&quot;, and &quot;Zero Data Retention only&quot; routing. A Schrems II Transfer Impact Assessment has been completed and documented internally. Used as a chat fallback only (not used for invoice vision extraction).</li>
+          <li><strong>Google LLC</strong> — Google Cloud DPA self-executing upon acceptance of Google Cloud Terms; available at <a href="https://cloud.google.com/terms/data-processing-addendum" target="_blank" rel="noopener">cloud.google.com/terms/data-processing-addendum</a>. Google LLC is DPF-certified (verified September 2026); SCCs serve as fallback should the DPF be invalidated by Schrems III. <em>Note: Google Gemini via AI Studio free-tier endpoint remains DISABLED by default — the Google Cloud DPA applies to the Vertex AI path, not the AI Studio free tier.</em></li>
           <li><strong>Vercel Inc.</strong> — Vercel is DPF-certified. DPA available at <a href="https://vercel.com/legal/dpa" target="_blank" rel="noopener">vercel.com/legal/dpa</a>.</li>
           <li><strong>Stripe Inc.</strong> — Stripe is DPF-certified. DPA available at <a href="https://stripe.com/legal/dpa" target="_blank" rel="noopener">stripe.com/legal/dpa</a>.</li>
-          <li><strong>OpenRouter</strong> — <strong>DISABLED BY DEFAULT</strong>. No personal data is transferred to OpenRouter unless the operator explicitly sets ENABLE_OPENROUTER=true. Before enabling, the operator must complete a DPA with OpenRouter, verify SCCs or DPF certification, switch to paid-tier models (to disable training), and update this Policy.</li>
         </ul>
         <p className="text-sm mt-2">
-          OmniParse has confirmed SCCs with Groq (US-based) and uses Mistral (EU-based) as the primary
-          provider. The cascade prioritizes Mistral first, then Groq — both have appropriate safeguards.
-          Google is covered by the DPF. OpenRouter is disabled by default and not used unless the
-          operator explicitly enables it. Users should be aware that documents may contain personal data
-          of multiple data subjects — the user is responsible for ensuring they have a valid legal basis
-          for processing and transferring such data under GDPR Art. 6 and Chapter V.
+          OmniParse has confirmed SCCs with Groq (US-based) and OpenRouter (US-based), and uses Mistral
+          (EU-based) as the primary provider. The cascade prioritizes Mistral first, then Groq, then
+          OpenRouter — all have appropriate safeguards. Google Gemini (AI Studio free tier) remains
+          disabled by default and is not used unless the operator explicitly enables it. Users should be
+          aware that documents may contain personal data of multiple data subjects — the user is
+          responsible for ensuring they have a valid legal basis for processing and transferring such
+          data under GDPR Art. 6 and Chapter V.
         </p>
         <h3 className="text-base font-semibold mt-4 mb-2">11.7 Duration and Deletion</h3>
         <p className="text-sm">
