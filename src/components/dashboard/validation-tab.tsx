@@ -638,7 +638,7 @@ export function ValidationTab() {
                                   : 'border-amber-500/30 text-amber-600 dark:text-amber-400 text-[10px] px-1.5'
                               }
                             >
-                              {RULE_LABELS[issue.rule]?.label ?? issue.rule}
+                              {RULE_LABELS[issue.rule]?.label ?? (issue.rule?.startsWith('custom:') ? issue.rule.slice(7) : issue.rule)}
                             </Badge>
                           </div>
                           <p className="text-xs text-muted-foreground mt-1 line-clamp-2">

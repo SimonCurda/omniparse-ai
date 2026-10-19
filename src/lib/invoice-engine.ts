@@ -335,6 +335,180 @@ export function runValidationRules(
   };
 }
 
+// ---- 1b. CUSTOM VALIDATION RULES (Pro+ user-defined IF/THEN rules) ----
+
+/**
+ * Shape of a custom rule's stored conditionJson.
+ * Mirrors what /api/custom-rules POST validates and what the validation-tab
+ * UI builds. Persisted in the CustomRule.conditionJson column.
+ */
+export interface CustomRuleConditionJson {
+  type: 'and' | 'or';
+  conditions: Array<{
+    field: string;        // 'vendor' | 'total' | 'amount' | 'vatAmount' | 'invDate' | 'dueDate' | 'currency' | 'invNumber'
+    operator: 'equals' | 'contains' | 'greater_than' | 'less_than' | 'not_empty' | 'is_empty';
+    value?: string | number; // omitted for not_empty / is_empty
+  }>;
+}
+
+export interface CustomRuleEvaluationResult {
+  ruleId: string;
+  ruleName: string;
+  action: 'flag_as_warning' | 'flag_as_error' | 'block';
+  matchedConditions: string[]; // human-readable strings, one per matched condition
+}
+
+/**
+ * Evaluate a single condition against invoice data.
+ * Returns true if the condition matches.
+ *
+ * Type coercion rules:
+ *  - For numeric fields (total/amount/vatAmount) and numeric operators
+ *    (greater_than/less_than), the condition value is coerced to Number.
+ *  - For string fields and string operators (equals/contains), comparison
+ *    is case-insensitive.
+ *  - not_empty / is_empty work on any field.
+ */
+function evaluateCondition(
+  cond: CustomRuleConditionJson['conditions'][number],
+  data: {
+    vendor?: string | null;
+    invNumber?: string | null;
+    invDate?: string | null;
+    dueDate?: string | null;
+    amount?: number | null;
+    vatAmount?: number | null;
+    total?: number | null;
+    currency?: string | null;
+  },
+): boolean {
+  // Map UI field names → invoice data field names
+  const fieldMap: Record<string, unknown> = {
+    vendor: data.vendor,
+    total: data.total,
+    amount: data.amount,
+    vatAmount: data.vatAmount,
+    invDate: data.invDate,
+    dueDate: data.dueDate,
+    currency: data.currency,
+    invNumber: data.invNumber,
+  };
+  const rawValue = fieldMap[cond.field];
+  const numericFields = ['total', 'amount', 'vatAmount'];
+  const isNumericField = numericFields.includes(cond.field);
+
+  switch (cond.operator) {
+    case 'not_empty':
+      return rawValue !== null && rawValue !== undefined && String(rawValue).trim() !== '';
+    case 'is_empty':
+      return rawValue === null || rawValue === undefined || String(rawValue).trim() === '';
+    case 'equals': {
+      if (rawValue === null || rawValue === undefined) return false;
+      if (isNumericField) {
+        const n = Number(rawValue);
+        const target = Number(cond.value);
+        if (Number.isNaN(n) || Number.isNaN(target)) return false;
+        return Math.abs(n - target) < 0.01;
+      }
+      return String(rawValue).toLowerCase().trim() === String(cond.value).toLowerCase().trim();
+    }
+    case 'contains': {
+      if (rawValue === null || rawValue === undefined) return false;
+      if (isNumericField) return false; // 'contains' doesn't apply to numbers
+      return String(rawValue).toLowerCase().includes(String(cond.value).toLowerCase());
+    }
+    case 'greater_than': {
+      if (rawValue === null || rawValue === undefined) return false;
+      const n = Number(rawValue);
+      const target = Number(cond.value);
+      if (Number.isNaN(n) || Number.isNaN(target)) return false;
+      return n > target;
+    }
+    case 'less_than': {
+      if (rawValue === null || rawValue === undefined) return false;
+      const n = Number(rawValue);
+      const target = Number(cond.value);
+      if (Number.isNaN(n) || Number.isNaN(target)) return false;
+      return n < target;
+    }
+    default:
+      return false;
+  }
+}
+
+/**
+ * Evaluate all active custom rules against invoice data.
+ * Returns the list of rules whose conditions matched (1+ matched for 'or',
+ * all matched for 'and'). The caller decides what to do with the matches —
+ * typically: append to validationResults, override approvalStatus if 'block'.
+ */
+export function evaluateCustomRules(
+  rules: Array<{
+    id: string;
+    name: string;
+    conditionJson: unknown;
+    action: string;
+  }>,
+  data: {
+    vendor?: string | null;
+    invNumber?: string | null;
+    invDate?: string | null;
+    dueDate?: string | null;
+    amount?: number | null;
+    vatAmount?: number | null;
+    total?: number | null;
+    currency?: string | null;
+  },
+): CustomRuleEvaluationResult[] {
+  const matches: CustomRuleEvaluationResult[] = [];
+
+  for (const rule of rules) {
+    // Defensive parse — conditionJson is stored as a Prisma Json value,
+    // which arrives as an already-parsed object. Validate the shape.
+    const cj = rule.conditionJson as CustomRuleConditionJson | null;
+    if (!cj || typeof cj !== 'object' || !Array.isArray(cj.conditions) || cj.conditions.length === 0) {
+      continue;
+    }
+    if (cj.type !== 'and' && cj.type !== 'or') continue;
+
+    // Evaluate each condition
+    const evaluated = cj.conditions.map((cond) => ({
+      cond,
+      matched: evaluateCondition(cond, data),
+    }));
+
+    const ruleMatched = cj.type === 'and'
+      ? evaluated.every((e) => e.matched)
+      : evaluated.some((e) => e.matched);
+
+    if (!ruleMatched) continue;
+
+    // Build human-readable matched-condition strings for the audit trail
+    const matchedStrings = evaluated
+      .filter((e) => e.matched)
+      .map((e) => {
+        const v = e.cond.value === undefined || e.cond.value === ''
+          ? ''
+          : ` ${e.cond.value}`;
+        return `${e.cond.field} ${e.cond.operator}${v}`;
+      });
+
+    // Action must be one of the documented values; ignore invalid actions
+    if (rule.action !== 'flag_as_warning' && rule.action !== 'flag_as_error' && rule.action !== 'block') {
+      continue;
+    }
+
+    matches.push({
+      ruleId: rule.id,
+      ruleName: rule.name,
+      action: rule.action,
+      matchedConditions: matchedStrings,
+    });
+  }
+
+  return matches;
+}
+
 // ---- 2. VARIANCE TOLERANCE CHECKING ----
 
 export function runVarianceChecks(

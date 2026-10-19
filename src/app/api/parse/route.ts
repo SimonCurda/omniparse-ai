@@ -11,6 +11,7 @@ import {
   checkTampering,
   extractImageMetadata,
   buildCustomFieldPrompt,
+  evaluateCustomRules,
   DEFAULT_SETTINGS,
   type UserSettings,
   type ImageMetadata,
@@ -1476,6 +1477,122 @@ export async function POST(req: NextRequest) {
         await db.invoice.update({ where: { id: invoice.id }, data: updateData });
       }
       approvalCheckResult = { approvalStatus, matchedRuleId };
+    }
+
+    // ---- Custom Validation Rules (Pro+ user-defined IF/THEN rules) ────────
+    // Custom rules are stored in CustomRule table (conditionJson + action).
+    // Unlike approval rules, custom rules can match on ANY field (vendor,
+    // amount, total, currency, dates, etc.) and have 3 actions:
+    //   - flag_as_warning: append warning to validationResults, no approval impact
+    //   - flag_as_error:   append error to validationResults, no approval impact
+    //   - block:           append error AND override approvalStatus to 'blocked'
+    //
+    // This evaluation runs AFTER the approval workflow so that a 'block' custom
+    // rule can override an 'auto_approve' approval rule (defense-in-depth: the
+    // user explicitly said "block anything matching this pattern", so it wins).
+    //
+    // CRITICAL: Before this block was added, custom rules were stored in the DB
+    // and shown in the UI but NEVER EVALUATED — users could create rules that
+    // silently did nothing. This block fixes that.
+    let customRuleResults: Array<{ ruleId: string; ruleName: string; action: string; matchedConditions: string[] }> = [];
+    if (hasFeature(user.plan, 'custom_validation_rules')) {
+      const customRules = await db.customRule.findMany({
+        where: { userId: auth.userId, active: true },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      if (customRules.length > 0) {
+        const customMatches = evaluateCustomRules(
+          customRules.map((r) => ({
+            id: r.id,
+            name: r.name,
+            conditionJson: r.conditionJson,
+            action: r.action,
+          })),
+          {
+            vendor: sanitizedVendor,
+            invNumber: sanitizedInvNumber,
+            invDate: sanitizedInvDate,
+            dueDate: sanitizedDueDate,
+            amount: typeof parsed.amount === 'number' ? parsed.amount : null,
+            vatAmount: typeof parsed.vatAmount === 'number' ? parsed.vatAmount : null,
+            total: typeof parsed.total === 'number' ? parsed.total : null,
+            currency: sanitizedCurrency,
+          },
+        );
+
+        if (customMatches.length > 0) {
+          // Append to the invoice's validationResults so the warnings/errors
+          // show up in the validation tab UI alongside the built-in rules.
+          // We re-read the saved invoice's validationResults (which were
+          // written at invoice.create time) and merge in the custom matches.
+          customRuleResults = customMatches;
+
+          const newRuleResults = customMatches.map((m) => {
+            const severity: 'warning' | 'error' = m.action === 'flag_as_warning' ? 'warning' : 'error';
+            return {
+              rule: `custom:${m.ruleName}`,
+              severity,
+              message: `Custom rule "${m.ruleName}" matched: ${m.matchedConditions.join('; ')}.${m.action === 'block' ? ' This invoice is BLOCKED from approval.' : ''}`,
+              field: 'custom',
+            };
+          });
+
+          // Re-read current validationResults, append our new rules, save back
+          const existingResults = (invoice.validationResults as { rules?: Array<{ rule: string; severity: string; message: string; field?: string }> } | null) ?? { rules: [] };
+          const mergedRules = [...(existingResults.rules || []), ...newRuleResults];
+
+          // Recompute validation status — if any custom rule added an error, bump to 'fail';
+          // if any added a warning and current is 'pass', bump to 'warning'.
+          let newValidationStatus = validationStatus;
+          if (newRuleResults.some((r) => r.severity === 'error')) {
+            newValidationStatus = 'fail';
+          } else if (newRuleResults.some((r) => r.severity === 'warning') && newValidationStatus === 'pass') {
+            newValidationStatus = 'warning';
+          }
+
+          // Check if any custom rule says 'block' — if so, override approvalStatus
+          const blockMatch = customMatches.find((m) => m.action === 'block');
+          const updateData: Record<string, unknown> = {
+            validationResults: { ...existingResults, rules: mergedRules },
+            validationStatus: newValidationStatus,
+            // Mirror the original status-derivation logic from line 1351 so the
+            // `status` column stays consistent with the bumped `validationStatus`.
+            // Custom rule errors/warnings always push to 'review' (same as built-in rules).
+            status: newValidationStatus === 'fail' ? 'review' : newValidationStatus === 'warning' ? 'review' : (invoice.status || 'review'),
+          };
+          if (blockMatch) {
+            updateData.approvalStatus = 'blocked';
+            updateData.approvalRuleId = blockMatch.ruleId;
+            // Reflect the override in the returned approvalCheckResult too
+            if (approvalCheckResult) {
+              approvalCheckResult.approvalStatus = 'blocked';
+              approvalCheckResult.matchedRuleId = blockMatch.ruleId;
+            } else {
+              approvalCheckResult = { approvalStatus: 'blocked', matchedRuleId: blockMatch.ruleId };
+            }
+          }
+
+          await db.invoice.update({ where: { id: invoice.id }, data: updateData });
+
+          // Audit log entry for the custom rule match
+          await db.auditLog.create({
+            data: {
+              userId: auth.userId,
+              invoiceId: invoice.id,
+              action: 'custom_rule_matched',
+              details: {
+                matches: customMatches.map((m) => ({
+                  ruleId: m.ruleId,
+                  ruleName: m.ruleName,
+                  action: m.action,
+                  matchedConditions: m.matchedConditions,
+                })),
+              },
+            },
+          });
+        }
+      }
     }
 
     // ---- Audit Log (always) ----
