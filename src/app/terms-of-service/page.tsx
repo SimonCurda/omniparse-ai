@@ -204,7 +204,7 @@ export default function TermsOfServicePage() {
           communications, or tax filings based on them.
         </p>
         <p>
-          <strong>AI providers:</strong> OmniParse uses third-party AI providers for vision extraction and text generation. The primary provider is <strong>Mistral AI</strong> (Paris, France — EU-based; transfers are expected to remain within the EEA, subject to Mistral&apos;s applicable terms). <strong>Groq Inc.</strong> (US-based) has confirmed Standard Contractual Clauses (SCCs) in effect (EU SCC Module 2, self-executing under Groq&apos;s DPA dated October 15, 2025). <strong>OpenRouter Inc.</strong> (US-based) is enabled as a chat fallback — its Data Processing Agreement (self-executing under OpenRouter ToS §10.2; available at <a href="https://openrouter.ai/data-processing-agreement" target="_blank" rel="noopener">openrouter.ai/data-processing-agreement</a>) is in place, with EU Standard Contractual Clauses (Module 2) under DPA §13.2 (UK Addendum §13.3 and Switzerland §13.4 also covered). We have enabled OpenRouter&apos;s &quot;Block endpoints that train on request data&quot; (free + paid), &quot;Block free endpoints that publish prompts&quot;, and &quot;Zero Data Retention only&quot; routing — meaning underlying model providers cannot train on or publish customer content. OpenRouter is used only as a chat fallback when Groq is rate-limited; it is not in the invoice vision-extraction cascade. <strong>Google Gemini</strong> (US-based, AI Studio free tier) is <strong>disabled by default</strong> and is not used unless the operator explicitly enables it after completing an AI Studio terms review. These providers may experience rate limits, outages, or model deprecations that affect the availability and quality of AI features. We do not control and are not responsible for the behavior of these upstream models beyond our integration layer.
+          <strong>AI providers:</strong> OmniParse uses third-party AI providers for vision extraction and text generation. The primary provider is <strong>Mistral AI</strong> (Paris, France — EU-based; transfers are expected to remain within the EEA, subject to Mistral&apos;s applicable terms). <strong>Groq Inc.</strong> (US-based) has confirmed Standard Contractual Clauses (SCCs) in effect (EU SCC Module 2, self-executing under Groq&apos;s DPA dated October 15, 2025). <strong>OpenRouter</strong> (US-based) and <strong>Google Gemini</strong> (US-based, AI Studio free tier) are <strong>disabled by default</strong> and are not used unless the operator explicitly enables them after completing their own DPA/SCC review (OpenRouter) or AI Studio terms review (Google Gemini). These providers may experience rate limits, outages, or model deprecations that affect the availability and quality of AI features. We do not control and are not responsible for the behavior of these upstream models beyond our integration layer.
         </p>
         <p>
           See our <a href="/ai-act-notice" className="underline">AI Transparency Notice</a> for full
@@ -370,14 +370,11 @@ export default function TermsOfServicePage() {
         <p>
           We do not warrant that the Service will be uninterrupted, error-free, or free of harmful
           components. We do not warrant that AI extraction results will be accurate or complete.
-          AI providers (Mistral, Groq, OpenRouter) may experience rate limits, model deprecations, or outages
+          AI providers (Mistral, Groq) may experience rate limits, model deprecations, or outages
           that affect availability of AI features. Mistral is EU-based (Paris, France); Groq is
-          US-based (SCCs confirmed). OpenRouter is US-based and enabled as a chat fallback — its DPA
-          (self-executing under OpenRouter ToS §10.2) and EU SCC Module 2 (DPA §13.2) are in place, and
-          we have enabled training-blocking and Zero Data Retention routing in OpenRouter&apos;s Privacy
-          Settings. Google Gemini (US-based, AI Studio free tier) is <strong>disabled by default</strong>
-          and is not used unless explicitly enabled by the operator after completing an AI Studio terms
-          review.
+          US-based. OpenRouter and Google Gemini are <strong>disabled by default</strong> and are
+          not used unless explicitly enabled by the operator after completing their own DPA/SCC
+          review (OpenRouter) or AI Studio terms review (Google Gemini).
         </p>
       </section>
 
