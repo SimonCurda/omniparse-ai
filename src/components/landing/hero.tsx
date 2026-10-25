@@ -52,20 +52,26 @@ function RotatingHeadline() {
 export function Hero({ onAuth }: { onAuth: (v: 'login' | 'signup') => void }) {
   const { t } = useI18n();
 
-  // The hero subtitle contains a {strong}...{/strong} pair around "any currency".
-  // We split on those markers and wrap the middle chunk in <strong>.
+  // The hero subtitle has inline {strong}...{/strong} markers around the
+  // "any currency" phrase. We split on those markers and wrap the middle
+  // chunk in <strong>. The strong text itself lives INSIDE the translation
+  // string (between the markers), so we don't need a separate key for it.
+  // Using [\s\S] instead of /s flag so this works on older TS targets.
   const subtitle = t('hero.subtitle');
-  const strongText = t('hero.strong.anyCurrency');
-  const [before, after] = subtitle.split('{strong}');
+  const strongMatch = subtitle.match(/^([\s\S]*?)\{strong\}([\s\S]+?)\{\/strong\}([\s\S]*)$/);
 
   return (
     <section className="pt-32 pb-24 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl 2xl:max-w-5xl mx-auto text-center">
         <RotatingHeadline />
         <p className="mt-6 text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-          {before}
-          <strong className="text-foreground">{strongText}</strong>
-          {after?.replace('{/strong}', '')}
+          {strongMatch ? (
+            <>
+              {strongMatch[1]}
+              <strong className="text-foreground">{strongMatch[2]}</strong>
+              {strongMatch[3]}
+            </>
+          ) : subtitle}
         </p>
         <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
           <Button size="lg" className="text-base px-8" onClick={() => onAuth('signup')}>

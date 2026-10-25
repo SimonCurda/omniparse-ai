@@ -23,6 +23,7 @@ function CellValue({ value, highlight }: { value: string | boolean; highlight?: 
 
 /** Mobile: tappable row that expands to show tooltip text */
 function MobileFeatureRow({ row }: { row: typeof COMPARISON_DATA[number] }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   return (
     <div data-glow className="glass-card rounded-xl border border-border bg-card overflow-hidden">
@@ -33,14 +34,14 @@ function MobileFeatureRow({ row }: { row: typeof COMPARISON_DATA[number] }) {
         aria-expanded={open}
       >
         <div className="flex items-center gap-1.5 text-sm font-medium">
-          {row.feature}
+          {row.featureKey ? t(row.featureKey) : row.feature}
           {row.tooltip && <Info className="h-3 w-3 text-muted-foreground/50 shrink-0" />}
         </div>
         <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && row.tooltip && (
         <div className="px-4 py-2.5 bg-muted/30 border-b border-border">
-          <p className="text-xs text-muted-foreground leading-relaxed">{row.tooltip}</p>
+          <p className="text-xs text-muted-foreground leading-relaxed">{row.tooltipKey ? t(row.tooltipKey) : row.tooltip}</p>
         </div>
       )}
       <div className="grid grid-cols-2">
@@ -112,12 +113,12 @@ export function ComparisonSection() {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div className="p-3 flex items-center gap-1.5 text-sm cursor-help border-b border-border">
-                      {row.feature}
+                      {row.featureKey ? t(row.featureKey) : row.feature}
                       <Info className="h-3 w-3 text-muted-foreground/50 shrink-0" />
                     </div>
                   </TooltipTrigger>
                   <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed">
-                    {row.tooltip}
+                    {row.tooltipKey ? t(row.tooltipKey) : row.tooltip}
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>

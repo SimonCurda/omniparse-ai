@@ -1,6 +1,7 @@
 'use client';
 
 import { FileText, ArrowRight, Sparkles, Table2, BarChart3, Shield, Braces } from 'lucide-react';
+import { useI18n } from '@/lib/i18n';
 
 /**
  * Animated hero visual showing the invoice processing flow.
@@ -8,6 +9,7 @@ import { FileText, ArrowRight, Sparkles, Table2, BarChart3, Shield, Braces } fro
  * Staggered CSS animations, responsive layout, theme-aware.
  */
 export function HeroVisual() {
+  const { t } = useI18n();
   return (
     <>
       {/* ---------- inline keyframes (no globals.css changes) ---------- */}
@@ -62,7 +64,7 @@ export function HeroVisual() {
           {/* Step 1 – Upload */}
           <StepCard
             step={1}
-            label="Upload"
+            label={t('hero.visual.upload')}
             icon={<FileText className="h-6 w-6 text-amber-500" />}
           />
 
@@ -74,7 +76,7 @@ export function HeroVisual() {
             <span className="hero-glow pointer-events-none absolute -inset-4 rounded-full bg-amber-500/15 blur-2xl" />
             <StepCard
               step={2}
-              label="AI Processing"
+              label={t('hero.visual.aiProcessing')}
               icon={<Sparkles className="h-6 w-6 text-amber-500 hero-sparkle" />}
               glow
             />
@@ -85,7 +87,7 @@ export function HeroVisual() {
           {/* Step 3 – Extracted Data */}
           <StepCard
             step={3}
-            label="Extracted Data"
+            label={t('hero.visual.extractedData')}
             icon={<Braces className="h-6 w-6 text-amber-500" />}
           />
 
@@ -94,7 +96,7 @@ export function HeroVisual() {
           {/* Step 4 – Confidence */}
           <StepCard
             step={4}
-            label="Confidence"
+            label={t('hero.visual.confidence')}
             icon={<BarChart3 className="h-6 w-6 text-emerald-500" />}
             bar
           />
@@ -104,7 +106,7 @@ export function HeroVisual() {
           {/* Step 5 – Valid */}
           <StepCard
             step={5}
-            label="Valid"
+            label={t('hero.visual.valid')}
             icon={
               <span className="relative">
                 <Shield className="h-6 w-6 text-emerald-500" />
@@ -121,7 +123,7 @@ export function HeroVisual() {
           <div className="relative">
             <StepCard
               step={1}
-              label="Upload"
+              label={t('hero.visual.upload')}
               icon={<FileText className="h-6 w-6 text-amber-500" />}
             />
           </div>
@@ -131,7 +133,7 @@ export function HeroVisual() {
             <span className="hero-glow pointer-events-none absolute -inset-4 rounded-full bg-amber-500/15 blur-2xl" />
             <StepCard
               step={2}
-              label="AI Processing"
+              label={t('hero.visual.aiProcessing')}
               icon={<Sparkles className="h-6 w-6 text-amber-500 hero-sparkle" />}
               glow
             />
@@ -140,14 +142,14 @@ export function HeroVisual() {
 
           <StepCard
             step={3}
-            label="Extracted Data"
+            label={t('hero.visual.extractedData')}
             icon={<Braces className="h-6 w-6 text-amber-500" />}
           />
           <MobileConnector step={3} />
 
           <StepCard
             step={4}
-            label="Confidence"
+            label={t('hero.visual.confidence')}
             icon={<BarChart3 className="h-6 w-6 text-emerald-500" />}
             bar
           />
@@ -155,7 +157,7 @@ export function HeroVisual() {
 
           <StepCard
             step={5}
-            label="Valid"
+            label={t('hero.visual.valid')}
             icon={
               <span className="relative">
                 <Shield className="h-6 w-6 text-emerald-500" />
