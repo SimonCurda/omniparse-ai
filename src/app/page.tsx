@@ -78,6 +78,9 @@ export default function Home() {
               emailVerified: data.user.emailVerified,
               emailVerifiedRequired: data.user.emailVerifiedRequired,
               debugEnabled: data.user.debugEnabled,
+              stripeCurrentPeriodEnd: data.user.stripeCurrentPeriodEnd,
+              stripePriceId: data.user.stripePriceId,
+              billingInterval: data.user.billingInterval,
             });
             setInvoices([]);
             setView('dashboard');
@@ -148,6 +151,9 @@ export default function Home() {
                       emailVerified: meData.user.emailVerified,
                       emailVerifiedRequired: meData.user.emailVerifiedRequired,
                       debugEnabled: meData.user.debugEnabled,
+                      stripeCurrentPeriodEnd: meData.user.stripeCurrentPeriodEnd,
+                      stripePriceId: meData.user.stripePriceId,
+                      billingInterval: meData.user.billingInterval,
                     });
                   }
                 })
@@ -182,6 +188,9 @@ export default function Home() {
               emailVerified: data.user.emailVerified,
               emailVerifiedRequired: data.user.emailVerifiedRequired,
               debugEnabled: data.user.debugEnabled,
+              stripeCurrentPeriodEnd: data.user.stripeCurrentPeriodEnd,
+              stripePriceId: data.user.stripePriceId,
+              billingInterval: data.user.billingInterval,
             });
             // Token is valid — restore the dashboard view immediately
             setView('dashboard');

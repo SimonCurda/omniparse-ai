@@ -47,13 +47,18 @@ export interface UserProfile {
   name: string;
   plan: string;
   createdAt: string;
-  stripeCurrentPeriodEnd?: string | null;
   hasPassword?: boolean;
   googleId?: boolean;
   githubId?: boolean;
   emailVerified?: string | null;
   emailVerifiedRequired?: boolean;
   debugEnabled?: boolean;
+  // Stripe billing info (returned by /api/auth/me — safe to expose; price IDs
+  // are not secrets). The Settings UI uses these to show the current interval
+  // + next renewal date + "Manage billing" button.
+  stripePriceId?: string | null;
+  stripeCurrentPeriodEnd?: string | null;
+  billingInterval?: 'monthly' | 'annual' | null;
 }
 
 export type ArtifactType = "table" | "chart-bar" | "chart-line" | "chart-pie" | "summary";

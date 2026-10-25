@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getUserFromRequest, isEmailVerified } from '@/lib/auth';
+import { lookupByPriceId } from '@/lib/stripe-prices';
 
 export async function GET(req: Request) {
   const auth = await getUserFromRequest(req);
@@ -10,7 +11,7 @@ export async function GET(req: Request) {
 
   const user = await db.user.findUnique({
     where: { id: auth.userId },
-    select: { id: true, email: true, name: true, plan: true, createdAt: true, googleId: true, githubId: true, password: true, emailVerified: true, debugEnabled: true },
+    select: { id: true, email: true, name: true, plan: true, createdAt: true, googleId: true, githubId: true, password: true, emailVerified: true, debugEnabled: true, stripePriceId: true, stripeCurrentPeriodEnd: true },
   });
 
   if (!user) {
@@ -32,6 +33,16 @@ export async function GET(req: Request) {
       emailVerified: user.emailVerified,
       emailVerifiedRequired: !isEmailVerified(user.emailVerified, user.createdAt),
       debugEnabled: user.debugEnabled === true,
+      // Stripe billing info — needed by Settings UI to show the current
+      // interval (monthly vs annual) + next renewal date + "Manage billing"
+      // button. The interval is derived server-side from the price ID via
+      // the single source-of-truth map in src/lib/stripe-prices.ts, so the
+      // client doesn't need to know individual price IDs.
+      stripePriceId: user.stripePriceId,
+      stripeCurrentPeriodEnd: user.stripeCurrentPeriodEnd,
+      billingInterval: user.stripePriceId
+        ? lookupByPriceId(user.stripePriceId)?.interval ?? null
+        : null,
     },
   });
 }

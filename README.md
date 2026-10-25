@@ -32,11 +32,60 @@ bun run dev
 ## Tech stack
 
 - **Next.js 16** (App Router) + React 19 + TypeScript + Tailwind CSS 4
-- **Prisma 6** + **Supabase Postgres**
-- **Groq** (Llama + Qwen) for AI vision & chat
-- **Stripe** for billing
+- **Prisma 6** + **Supabase Postgres** (region: eu-central-1)
+- **Mistral** (EU — Paris, primary AI provider) + **Groq** (secondary, US-SCC) for AI vision & chat
+- **Stripe** for billing + Customer Portal + Stripe Tax (EU VAT / OSS)
+- **Resend** for transactional email
 - **shadcn/ui** for components
 - Custom JWT + bcrypt auth (Supabase Auth migration planned post-launch)
+
+## Recent features (October 2026)
+
+### Stripe billing (production-ready)
+- 8 prices (4 plans × monthly/annual) via `STRIPE_PRICE_ID_*` env vars
+- Customer Portal: self-serve cancellation + plan changes + invoice download
+- Stripe Tax enabled at checkout — EU VAT collected automatically per
+  consumer country, OSS-ready CSV export at `/api/export/oss`
+- Idempotent webhook handler (`/api/stripe/webhook`) — derives plan from
+  price ID (not metadata), handles `subscription.created/updated/paused/deleted`,
+  `invoice.payment_succeeded/failed`
+- `consent_collection: { terms_of_service: 'auto' }` — records ToS
+  acceptance at checkout (chargeback defense)
+- Customer lookup by email — no duplicate Stripe customers on re-subscribe
+
+### i18n (English + Czech)
+- Lightweight React Context provider (`src/lib/i18n/`)
+- Language toggle in navbar (globe icon, dropdown)
+- Browser-language auto-detection on first visit
+- Persisted in localStorage + cookie
+- Translation dictionary in `src/lib/i18n/translations.ts` — to add a new
+  language, add the code to `Language` + add a flat key→value map
+
+### Multi-language invoice parsing (CZ/SK/DE/PL/HU/FR/ES/EN + more)
+- Updated Mistral prompt to detect + return `documentLanguage` (ISO 639-1)
+- Vendor names + line item descriptions preserved in the original language
+  (NOT translated)
+- `Invoice.documentLanguage` field in Prisma + migration
+- Filterable + groupable in future analytics
+
+### EU compliance utilities
+- **SEPA XML export** (`/api/export/sepa`) — ISO 20022 pain.001.001.09
+  credit transfer init file, importable into Fio / KB / Ceska Sporitelna /
+  Raiffeisen / Revolut Business / ING / Commerzbank
+- **VIES validation** (`/api/vies/validate`) — verifies EU VAT IDs
+  against the EU Commission's VIES REST API. 10 req/min/user rate limit
+  to avoid VIES throttling
+- **OSS return CSV** (`/api/export/oss`) — aggregates Stripe Tax
+  invoices for the OSS quarterly VAT return. Admin-only (covers all
+  customers). Output matches the EU OSS standard schema used by Czech
+  finanční úřad
+
+### Czech accounting exports
+- **Money S3/S5 XML** (`/api/export/cz-accounting/money-s3`)
+- **iDoklad CSV** (`/api/export/cz-accounting/idoklad`)
+- **Fakturoid CSV** (`/api/export/cz-accounting/fakturoid`)
+- Auto-detects IČO / DIČ / IC (foreign EU VAT) from invoice `customFields`
+- Flexi (ABRA Flexi) integration is TODO — needs REST API + credentials
 
 ## Deploy to Vercel
 

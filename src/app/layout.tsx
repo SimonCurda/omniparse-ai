@@ -5,6 +5,7 @@ import { Toaster } from 'sonner';
 import { ThemeProvider } from 'next-themes';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { CrashLoggerInit } from '@/components/crash-logger-init';
+import { I18nProvider } from '@/lib/i18n';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -236,10 +237,12 @@ export default function RootLayout({
       >
         <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:p-4 focus:bg-background focus:border focus:rounded">Skip to main content</a>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <CrashLoggerInit />
-          <ErrorBoundary>
-            {children}
-          </ErrorBoundary>
+          <I18nProvider>
+            <CrashLoggerInit />
+            <ErrorBoundary>
+              {children}
+            </ErrorBoundary>
+          </I18nProvider>
         </ThemeProvider>
         <Toaster
           position="bottom-right"

@@ -247,6 +247,17 @@ export function SettingsTab() {
 
   // Billing state
   const [upgrading, setUpgrading] = useState(false);
+  const [managingBilling, setManagingBilling] = useState(false);
+  // Plan picker state — defaults to the plan one tier above the user's current
+  // plan (e.g. free → pro, pro → plus). If user is on Enterprise, no upgrade
+  // is available, so this stays at 'enterprise' and the picker is hidden.
+  const [selectedPlan, setSelectedPlan] = useState<string>(() => {
+    if (!user) return 'pro';
+    const order = ['free', 'pro', 'plus', 'business', 'enterprise'];
+    const idx = order.indexOf(user.plan);
+    return order[Math.min(idx + 1, order.length - 1)];
+  });
+  const [selectedInterval, setSelectedInterval] = useState<'monthly' | 'annual'>('monthly');
 
   // Export state
   const [exporting, setExporting] = useState(false);
@@ -359,7 +370,7 @@ export function SettingsTab() {
     }
   };
 
-  const handleUpgrade = async () => {
+  const handleUpgrade = async (plan: string, interval: 'monthly' | 'annual') => {
     setUpgrading(true);
     try {
       const headers = getAuthHeaders();
@@ -370,11 +381,11 @@ export function SettingsTab() {
       const res = await fetch('/api/stripe/checkout', {
         method: 'POST',
         headers,
-        body: JSON.stringify({ plan: 'pro' }),
+        body: JSON.stringify({ plan, interval }),
       });
       if (res.status === 503) {
         toast.info(
-          'Billing is ready to connect. Set your STRIPE_SECRET_KEY and STRIPE_PRO_PRICE_ID environment variables to enable paid plans.'
+          'Billing is being set up. The operator needs to configure Stripe price IDs (see .env.example STRIPE_PRICE_ID_* vars).'
         );
         return;
       }
@@ -391,6 +402,34 @@ export function SettingsTab() {
       toast.error('Network error. Please try again.');
     } finally {
       setUpgrading(false);
+    }
+  };
+
+  const handleManageBilling = async () => {
+    setManagingBilling(true);
+    try {
+      const headers = getAuthHeaders();
+      if (!headers) {
+        toast.error('Please log in again.');
+        return;
+      }
+      const res = await fetch('/api/stripe/portal', {
+        method: 'POST',
+        headers,
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error || 'Failed to open billing portal.');
+        return;
+      }
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    } catch {
+      toast.error('Network error. Please try again.');
+    } finally {
+      setManagingBilling(false);
     }
   };
 
@@ -857,17 +896,24 @@ export function SettingsTab() {
       <Card data-glow data-glow-border-only className="glass-card border-border/50">
         <CardHeader>
           <CardTitle className="text-lg">Billing</CardTitle>
-          <CardDescription>Manage your subscription and usage</CardDescription>
+          <CardDescription>Manage your subscription, plan and usage</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-5">
+          {/* Current plan + renewal date */}
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium">Current Plan</p>
               <p className="text-sm text-muted-foreground mt-0.5">
                 {plan === 'free'
                   ? `Free plan. ${invoiceCount} of ${planLimit} invoices used this month.`
-                  : `${planLabel} plan active. ${invoiceCount === 0 ? 'No' : invoiceCount} invoices processed.`}
+                  : `${planLabel} plan active. ${invoiceCount === 0 ? 'No' : invoiceCount} invoices processed this month.`}
               </p>
+              {plan !== 'free' && user?.stripeCurrentPeriodEnd && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Next renewal: {new Date(user.stripeCurrentPeriodEnd).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+                  {user?.billingInterval ? ` · ${user.billingInterval} billing` : ''}
+                </p>
+              )}
             </div>
             <Badge
               variant="secondary"
@@ -881,36 +927,134 @@ export function SettingsTab() {
             </Badge>
           </div>
 
-          {plan === 'free' && (
-            <Button onClick={handleUpgrade} disabled={upgrading} className="w-full sm:w-auto">
-              {upgrading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Redirecting...
-                </>
-              ) : (
-                <>
-                  <CreditCard className="mr-2 h-4 w-4" />
-                  Upgrade to Pro
-                </>
-              )}
-            </Button>
-          )}
-
+          {/* Usage bar */}
           <div className="rounded-lg bg-muted/50 p-4 space-y-1">
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Invoices this period</span>
               <span className="font-medium">
-                {invoiceCount}/{planLimit}
+                {invoiceCount}/{planLimit === Infinity ? '∞' : planLimit}
               </span>
             </div>
             <div className="w-full bg-muted rounded-full h-2">
               <div
                 className="bg-amber-500 h-2 rounded-full transition-all"
-                style={{ width: `${Math.min(100, (invoiceCount / planLimit) * 100)}%` }}
+                style={{ width: `${Math.min(100, planLimit === Infinity ? 0 : (invoiceCount / planLimit) * 100)}%` }}
               />
             </div>
           </div>
+
+          {/* Manage billing (paid users only) */}
+          {plan !== 'free' && (
+            <Button onClick={handleManageBilling} disabled={managingBilling} variant="outline" className="w-full sm:w-auto">
+              {managingBilling ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Opening portal...
+                </>
+              ) : (
+                <>
+                  <CreditCard className="mr-2 h-4 w-4" />
+                  Manage billing
+                </>
+              )}
+            </Button>
+          )}
+
+          {/* Upgrade picker — only shown for users not on Enterprise */}
+          {plan !== 'enterprise' && (
+            <div className="border-t border-border pt-4 space-y-3">
+              <p className="text-sm font-medium">Upgrade plan</p>
+
+              {/* Plan selector */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {(['pro', 'plus', 'business', 'enterprise'] as const)
+                  .filter(p => {
+                    // Hide plans at or below the user's current tier
+                    const order = ['free', 'pro', 'plus', 'business', 'enterprise'];
+                    return order.indexOf(p) > order.indexOf(plan);
+                  })
+                  .map(p => {
+                    const labels: Record<string, string> = { pro: 'Pro', plus: 'Plus', business: 'Business', enterprise: 'Enterprise' };
+                    const prices: Record<string, { monthly: number; annual: number }> = {
+                      pro: { monthly: 49, annual: 39 },
+                      plus: { monthly: 99, annual: 79 },
+                      business: { monthly: 199, annual: 159 },
+                      enterprise: { monthly: 499, annual: 399 },
+                    };
+                    const isActive = selectedPlan === p;
+                    return (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setSelectedPlan(p)}
+                        className={`rounded-lg border p-3 text-left transition-all ${
+                          isActive
+                            ? 'border-amber-500 bg-amber-500/5'
+                            : 'border-border hover:border-border/80 hover:bg-muted/50'
+                        }`}
+                      >
+                        <div className="text-sm font-semibold">{labels[p]}</div>
+                        <div className="text-xs text-muted-foreground mt-0.5">
+                          ${selectedInterval === 'monthly' ? prices[p].monthly : prices[p].annual}/mo
+                        </div>
+                      </button>
+                    );
+                  })}
+              </div>
+
+              {/* Interval toggle */}
+              <div className="inline-flex items-center gap-3 bg-muted/60 rounded-full p-1">
+                <button
+                  type="button"
+                  onClick={() => setSelectedInterval('monthly')}
+                  className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all ${
+                    selectedInterval === 'monthly'
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Monthly
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedInterval('annual')}
+                  className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all ${
+                    selectedInterval === 'annual'
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Annual
+                  <span className="ml-1.5 text-[10px] font-semibold text-emerald-500">Save 20%</span>
+                </button>
+              </div>
+
+              {/* Upgrade button */}
+              <Button
+                onClick={() => handleUpgrade(selectedPlan, selectedInterval)}
+                disabled={upgrading}
+                className="w-full sm:w-auto"
+              >
+                {upgrading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Redirecting...
+                  </>
+                ) : (
+                  <>
+                    <CreditCard className="mr-2 h-4 w-4" />
+                    Upgrade to {(() => {
+                      const labels: Record<string, string> = { pro: 'Pro', plus: 'Plus', business: 'Business', enterprise: 'Enterprise' };
+                      return labels[selectedPlan] || selectedPlan;
+                    })()} ({selectedInterval})
+                  </>
+                )}
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                EU VAT is calculated and collected at checkout via Stripe Tax. Cancel anytime from the customer portal — EU consumers retain their 14-day withdrawal right.
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
