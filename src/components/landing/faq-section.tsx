@@ -6,59 +6,45 @@ import {
   AccordionTrigger,
   AccordionContent,
 } from '@/components/ui/accordion';
+import { useI18n } from '@/lib/i18n';
 
-const faqs = [
-  {
-    q: 'How accurate is the AI extraction?',
-    a: 'Our vision-language model typically achieves 95-99% accuracy on standard invoices. Accuracy depends on document quality — clear PDFs and photos work best. Every field includes a confidence score so you know exactly what to verify.',
-  },
-  {
-    q: 'What file formats are supported?',
-    a: 'PDF invoices, receipts, and document photos in JPEG, PNG, and WebP format. Maximum file size is 10MB per document.',
-  },
-  {
-    q: 'Is my data secure?',
-    a: 'Yes. Documents are processed per-request and are not used to train AI models. Built with GDPR, EU AI Act & PIPEDA principles — including data export, account deletion, and audit logging. You can delete your data at any time.',
-  },
-  {
-    q: 'Can I export the extracted data?',
-    a: 'Free plans support CSV export. Pro and above add JSON and Excel (.xlsx) export with styled columns. Plus and higher plans include custom export templates to match your accounting system\'s format.',
-  },
-  {
-    q: 'What happens if the AI makes a mistake?',
-    a: 'Every extracted field has a confidence score. Low-confidence fields are flagged automatically. Pro plan and above let you manually edit extracted data and re-validate. The validation engine runs 8+ built-in rules to catch common errors.',
-  },
-  {
-    q: 'Do you offer a free plan?',
-    a: 'Yes — the Free plan includes 15 invoices per month with AI extraction, confidence scores, tampering detection, and CSV export. No credit card required.',
-  },
+// 6 FAQ pairs keyed by index — translations are in src/lib/i18n/translations.ts
+// under faq.q1 ... faq.q6 + faq.a1 ... faq.a6.
+const FAQ_KEYS = [
+  { q: 'faq.q1', a: 'faq.a1' },
+  { q: 'faq.q2', a: 'faq.a2' },
+  { q: 'faq.q3', a: 'faq.a3' },
+  { q: 'faq.q4', a: 'faq.a4' },
+  { q: 'faq.q5', a: 'faq.a5' },
+  { q: 'faq.q6', a: 'faq.a6' },
 ];
 
 export function FaqSection() {
+  const { t } = useI18n();
   return (
     <section className="py-24 px-4 sm:px-6 lg:px-8">
       <div className="max-w-3xl 2xl:max-w-4xl mx-auto">
         <div className="text-center mb-12">
           <h2 className="text-3xl sm:text-4xl font-bold text-foreground">
-            Frequently Asked Questions
+            {t('faq.title')}
           </h2>
           <p className="mt-4 text-lg text-muted-foreground">
-            Everything you need to know about OmniParse.
+            {t('faq.subtitle')}
           </p>
         </div>
 
         <Accordion type="single" collapsible className="w-full">
-          {faqs.map((faq, i) => (
+          {FAQ_KEYS.map((faq, i) => (
             <AccordionItem
               key={i}
               value={`faq-${i}`}
               className="border-border"
             >
               <AccordionTrigger className="text-base font-medium text-foreground">
-                {faq.q}
+                {t(faq.q)}
               </AccordionTrigger>
               <AccordionContent className="text-muted-foreground">
-                {faq.a}
+                {t(faq.a)}
               </AccordionContent>
             </AccordionItem>
           ))}

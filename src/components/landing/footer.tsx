@@ -1,8 +1,12 @@
 'use client';
 
 import Link from 'next/link';
+import { useI18n } from '@/lib/i18n';
 
 export function Footer() {
+  const { t } = useI18n();
+  const year = new Date().getFullYear();
+
   return (
     <footer className="border-t border-border py-12 px-4 sm:px-6 lg:px-8 bg-background">
       <div className="max-w-7xl 2xl:max-w-[1760px] mx-auto">
@@ -15,35 +19,35 @@ export function Footer() {
               <span className="font-semibold text-lg">OmniParse</span>
             </div>
             <p className="text-sm text-muted-foreground max-w-sm leading-relaxed">
-              AI-powered invoice parsing and analysis. Upload documents, extract structured data, and chat with AI about your invoices.
+              {t('footer.tagline')}
             </p>
           </div>
           <div>
-            <h4 className="font-semibold text-sm mb-4">Product</h4>
+            <h4 className="font-semibold text-sm mb-4">{t('footer.section.product')}</h4>
             <ul className="space-y-2 text-sm text-muted-foreground">
-              <li><a href="#features" className="hover:text-foreground transition-colors">Features</a></li>
-              <li><a href="#pricing" className="hover:text-foreground transition-colors">Pricing</a></li>
-              <li><a href="#comparison" className="hover:text-foreground transition-colors">Compare</a></li>
-              <li><Link href="/compare" className="hover:text-foreground transition-colors">vs Competitors</Link></li>
-              <li><Link href="/blog" className="hover:text-foreground transition-colors">Blog</Link></li>
+              <li><a href="#features" className="hover:text-foreground transition-colors">{t('footer.link.features')}</a></li>
+              <li><a href="#pricing" className="hover:text-foreground transition-colors">{t('footer.link.pricing')}</a></li>
+              <li><a href="#comparison" className="hover:text-foreground transition-colors">{t('footer.link.compare')}</a></li>
+              <li><Link href="/compare" className="hover:text-foreground transition-colors">{t('footer.link.vsCompetitors')}</Link></li>
+              <li><Link href="/blog" className="hover:text-foreground transition-colors">{t('footer.link.blog')}</Link></li>
             </ul>
           </div>
           <div>
-            <h4 className="font-semibold text-sm mb-4">Resources</h4>
+            <h4 className="font-semibold text-sm mb-4">{t('footer.section.resources')}</h4>
             <ul className="space-y-2 text-sm text-muted-foreground">
-              <li><Link href="/api-docs" className="hover:text-foreground transition-colors">API Documentation</Link></li>
-              <li><Link href="/api-test" className="hover:text-foreground transition-colors">API Tester</Link></li>
-              <li><Link href="/about" className="hover:text-foreground transition-colors">About</Link></li>
-              <li><Link href="/contact" className="hover:text-foreground transition-colors">Contact</Link></li>
+              <li><Link href="/api-docs" className="hover:text-foreground transition-colors">{t('footer.link.apiDocs')}</Link></li>
+              <li><Link href="/api-test" className="hover:text-foreground transition-colors">{t('footer.link.apiTester')}</Link></li>
+              <li><Link href="/about" className="hover:text-foreground transition-colors">{t('footer.link.about')}</Link></li>
+              <li><Link href="/contact" className="hover:text-foreground transition-colors">{t('footer.link.contact')}</Link></li>
             </ul>
           </div>
           <div>
-            <h4 className="font-semibold text-sm mb-4">Legal</h4>
+            <h4 className="font-semibold text-sm mb-4">{t('footer.section.legal')}</h4>
             <ul className="space-y-2 text-sm text-muted-foreground">
-              <li><Link href="/privacy-policy" className="hover:text-foreground transition-colors">Privacy Policy</Link></li>
-              <li><Link href="/terms-of-service" className="hover:text-foreground transition-colors">Terms of Service</Link></li>
-              <li><Link href="/cookie-policy" className="hover:text-foreground transition-colors">Cookie Policy</Link></li>
-              <li><Link href="/ai-act-notice" className="hover:text-foreground transition-colors">AI Act Notice</Link></li>
+              <li><Link href="/privacy-policy" className="hover:text-foreground transition-colors">{t('footer.link.privacyPolicy')}</Link></li>
+              <li><Link href="/terms-of-service" className="hover:text-foreground transition-colors">{t('footer.link.termsOfService')}</Link></li>
+              <li><Link href="/cookie-policy" className="hover:text-foreground transition-colors">{t('footer.link.cookiePolicy')}</Link></li>
+              <li><Link href="/ai-act-notice" className="hover:text-foreground transition-colors">{t('footer.link.aiActNotice')}</Link></li>
               <li>
                 <a
                   href="/OmniParse-Legal-Documents-v3.6.pdf"
@@ -51,7 +55,7 @@ export function Footer() {
                   rel="noopener"
                   className="hover:text-foreground transition-colors inline-flex items-center gap-1"
                 >
-                  Legal Documents PDF
+                  {t('footer.link.legalPdf')}
                   <svg className="h-3 w-3 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                 </a>
               </li>
@@ -59,21 +63,19 @@ export function Footer() {
                 <button
                   type="button"
                   onClick={() => {
-                    // Clear the consent record so the banner re-appears on next page load
                     try { localStorage.removeItem('omniparse_cookie_consent'); } catch {}
-                    // Reload to re-trigger the banner
                     window.location.reload();
                   }}
                   className="hover:text-foreground transition-colors text-left"
                 >
-                  Cookie Settings
+                  {t('footer.link.cookieSettings')}
                 </button>
               </li>
             </ul>
           </div>
         </div>
         <div className="mt-8 pt-8 border-t border-border text-center text-sm text-muted-foreground">
-          &copy; {new Date().getFullYear()} OmniParse. All rights reserved.
+          {t('footer.copyright', { year: String(year) })}
         </div>
       </div>
     </footer>

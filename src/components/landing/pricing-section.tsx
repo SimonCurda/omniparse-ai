@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Check, X, Sparkles, Zap, Star, Building2, Crown, Pencil, FileDown, TrendingUp, Shield, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
+import { useI18n } from '@/lib/i18n';
 
 interface PlanFeature {
   text: string;
@@ -195,15 +196,16 @@ function ScrollShadow({ children, className }: { children: React.ReactNode; clas
 }
 
 export function PricingSection({ onAuth }: { onAuth: (v: 'login' | 'signup') => void }) {
+  const { t } = useI18n();
   const [annual, setAnnual] = useState(false);
 
   return (
     <section id="pricing" className="py-24 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl 2xl:max-w-[1760px] mx-auto">
         <div className="text-center mb-10">
-          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">Choose Your Plan</h2>
+          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">{t('pricing.title')}</h2>
           <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
-            Start free. Upgrade when you need more volume, editing, or team features.
+            {t('pricing.subtitle')}
           </p>
 
           {/* Annual / Monthly toggle */}
@@ -216,7 +218,7 @@ export function PricingSection({ onAuth }: { onAuth: (v: 'login' | 'signup') => 
                   : 'text-muted-foreground hover:text-foreground'
               }`}
             >
-              Monthly
+              {t('pricing.monthly')}
             </button>
             <button
               onClick={() => setAnnual(true)}
@@ -226,23 +228,23 @@ export function PricingSection({ onAuth }: { onAuth: (v: 'login' | 'signup') => 
                   : 'text-muted-foreground hover:text-foreground'
               }`}
             >
-              Annual
-              <span className="ml-1.5 text-xs font-semibold text-emerald-500">Save 20%</span>
+              {t('pricing.annual')}
+              <span className="ml-1.5 text-xs font-semibold text-emerald-500">{t('pricing.save')}</span>
             </button>
           </div>
         </div>
 
         {/* Upgrade lever callouts */}
         <div className="mb-8">
-          <h3 className="text-center text-base font-semibold mb-4">Most noticeable upgrades</h3>
+          <h3 className="text-center text-base font-semibold mb-4">{t('pricing.upgrade.title')}</h3>
           <div className="grid grid-cols-2 lg:grid-cols-4 2xl:grid-cols-5 gap-3 max-w-5xl 2xl:max-w-7xl mx-auto">
             <div data-glow className="glass-card flex items-start gap-2.5 rounded-lg border border-border bg-card p-3">
               <div className="rounded-full bg-emerald-500/10 p-1.5 mt-0.5">
                 <Pencil className="h-3.5 w-3.5 text-emerald-500" />
               </div>
               <div>
-                <p className="text-xs font-medium">Free → Pro</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">Fix AI extraction errors yourself</p>
+                <p className="text-xs font-medium">{t('pricing.upgrade.freeToPro')}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">{t('pricing.upgrade.freeToPro.desc')}</p>
               </div>
             </div>
             <div data-glow className="glass-card flex items-start gap-2.5 rounded-lg border border-border bg-card p-3">
@@ -250,8 +252,8 @@ export function PricingSection({ onAuth }: { onAuth: (v: 'login' | 'signup') => 
                 <FileDown className="h-3.5 w-3.5 text-amber-500" />
               </div>
               <div>
-                <p className="text-xs font-medium">Pro → Plus</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">Custom export templates for your GL codes</p>
+                <p className="text-xs font-medium">{t('pricing.upgrade.proToPlus')}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">{t('pricing.upgrade.proToPlus.desc')}</p>
               </div>
             </div>
             <div data-glow className="glass-card flex items-start gap-2.5 rounded-lg border border-border bg-card p-3">
@@ -259,8 +261,8 @@ export function PricingSection({ onAuth }: { onAuth: (v: 'login' | 'signup') => 
                 <TrendingUp className="h-3.5 w-3.5 text-red-500" />
               </div>
               <div>
-                <p className="text-xs font-medium">Plus → Business</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">Detect vendor price hikes automatically</p>
+                <p className="text-xs font-medium">{t('pricing.upgrade.plusToBusiness')}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">{t('pricing.upgrade.plusToBusiness.desc')}</p>
               </div>
             </div>
             <div data-glow className="glass-card flex items-start gap-2.5 rounded-lg border border-border bg-card p-3">
@@ -268,8 +270,8 @@ export function PricingSection({ onAuth }: { onAuth: (v: 'login' | 'signup') => 
                 <Shield className="h-3.5 w-3.5 text-purple-500" />
               </div>
               <div>
-                <p className="text-xs font-medium">Business → Enterprise</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">Immutable audit logs, unlimited everything</p>
+                <p className="text-xs font-medium">{t('pricing.upgrade.businessToEnterprise')}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">{t('pricing.upgrade.businessToEnterprise.desc')}</p>
               </div>
             </div>
           </div>
@@ -358,9 +360,9 @@ export function PricingSection({ onAuth }: { onAuth: (v: 'login' | 'signup') => 
           })}
         </div>
         <p className="text-center text-sm text-muted-foreground mt-8">
-          All plans include data export, account deletion & audit logging. Built with GDPR, EU AI Act & PIPEDA principles. No credit card required for Free.
+          {t('pricing.note')}
           <br className="hidden sm:block" />
-          Prices shown in USD. Hard limits on all tiers — no overage charges. Annual billing billed upfront (20% off).
+          {t('pricing.note.pricing')}
         </p>
       </div>
     </section>

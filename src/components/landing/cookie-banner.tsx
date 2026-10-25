@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Cookie, X, Settings2 } from 'lucide-react';
+import { useI18n } from '@/lib/i18n';
 
 const CONSENT_KEY = 'omniparse_cookie_consent';
 
@@ -93,6 +94,7 @@ function applyConsentToStorage(record: ConsentRecord) {
 }
 
 export function CookieBanner() {
+  const { t } = useI18n();
   const [visible, setVisible] = useState(false);
   const [showPrefs, setShowPrefs] = useState(false);
   const [prefs, setPrefs] = useState(DEFAULT_PREFERENCES);
@@ -140,28 +142,38 @@ export function CookieBanner() {
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
           <Cookie className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
           <p className="text-sm text-muted-foreground flex-1">
-            We use local storage for your preferences and authentication. No tracking cookies
-            are active by default. See our{' '}
-            <Link
-              href="/cookie-policy"
-              className="text-amber-600 hover:underline font-medium"
-              target="_blank"
-              rel="noopener"
-            >
-              Cookie Policy
-            </Link>{' '}
-            for details.
+            {(() => {
+              // The cookie text contains a {link} placeholder where the
+              // Cookie Policy link should go. We split on {link} and render
+              // the link in the middle.
+              const text = t('cookie.text');
+              const [before, after] = text.split('{link}');
+              return (
+                <>
+                  {before}
+                  <Link
+                    href="/cookie-policy"
+                    className="text-amber-600 hover:underline font-medium"
+                    target="_blank"
+                    rel="noopener"
+                  >
+                    {t('cookie.link')}
+                  </Link>
+                  {after}
+                </>
+              );
+            })()}
           </p>
           <div className="flex gap-2 shrink-0 flex-wrap">
             <Button variant="outline" size="sm" onClick={openPrefs}>
               <Settings2 className="h-3.5 w-3.5 mr-1" />
-              Manage preferences
+              {t('cookie.manage')}
             </Button>
             <Button variant="outline" size="sm" onClick={rejectOptional}>
-              Essential only
+              {t('cookie.reject')}
             </Button>
             <Button size="sm" onClick={acceptAll}>
-              Accept all
+              {t('cookie.accept')}
             </Button>
           </div>
           <Button
@@ -177,46 +189,45 @@ export function CookieBanner() {
 
         {showPrefs && (
           <div className="mt-4 pt-4 border-t border-border space-y-3">
-            <h3 className="text-sm font-semibold">Cookie preferences</h3>
+            <h3 className="text-sm font-semibold">{t('cookie.prefs.title')}</h3>
             <p className="text-xs text-muted-foreground">
-              Toggle each category on or off. Essential storage is always on (required for the
-              service to function — ePrivacy Art. 5(3) exception).
+              {t('cookie.prefs.subtitle')}
             </p>
 
             <div className="space-y-3">
               <ConsentToggle
-                label="Essential (required)"
-                description="Authentication token, cookie consent record. Always on — required for the Service to function."
+                label={t('cookie.prefs.essential.label')}
+                description={t('cookie.prefs.essential.description')}
                 checked
                 disabled
               />
               <ConsentToggle
-                label="Theme preference"
-                description="Stores your light/dark mode choice."
+                label={t('cookie.prefs.theme.label')}
+                description={t('cookie.prefs.theme.description')}
                 checked={prefs.theme}
                 onCheckedChange={(v) => setPrefs({ ...prefs, theme: v })}
               />
               <ConsentToggle
-                label="Keyboard shortcuts"
-                description="Stores your custom keyboard shortcut assignments."
+                label={t('cookie.prefs.shortcuts.label')}
+                description={t('cookie.prefs.shortcuts.description')}
                 checked={prefs.shortcuts}
                 onCheckedChange={(v) => setPrefs({ ...prefs, shortcuts: v })}
               />
               <ConsentToggle
-                label="Legal consent record"
-                description="Records your GDPR data-transfer consent for document uploads."
+                label={t('cookie.prefs.legalConsent.label')}
+                description={t('cookie.prefs.legalConsent.description')}
                 checked={prefs.legalConsent}
                 onCheckedChange={(v) => setPrefs({ ...prefs, legalConsent: v })}
               />
               <ConsentToggle
-                label="Crash logs"
-                description="Stores recent client-side errors for debugging. No personal data logged."
+                label={t('cookie.prefs.crashLog.label')}
+                description={t('cookie.prefs.crashLog.description')}
                 checked={prefs.crashLog}
                 onCheckedChange={(v) => setPrefs({ ...prefs, crashLog: v })}
               />
               <ConsentToggle
-                label="Analytics (planned)"
-                description="Currently no analytics is active. Will require separate consent when launched."
+                label={t('cookie.prefs.analytics.label')}
+                description={t('cookie.prefs.analytics.description')}
                 checked={prefs.analytics}
                 onCheckedChange={(v) => setPrefs({ ...prefs, analytics: v })}
               />
@@ -224,10 +235,10 @@ export function CookieBanner() {
 
             <div className="flex gap-2 justify-end pt-2">
               <Button variant="outline" size="sm" onClick={rejectOptional}>
-                Reject all optional
+                {t('cookie.prefs.rejectAll')}
               </Button>
               <Button size="sm" onClick={savePreferences}>
-                Save my preferences
+                {t('cookie.prefs.save')}
               </Button>
             </div>
           </div>

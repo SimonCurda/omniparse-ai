@@ -29,6 +29,7 @@ import { ValidationTab } from './validation-tab';
 import { ApprovalsTab } from './approvals-tab';
 import { PendingReviewTab } from './pending-review-tab';
 import { GlassCardProvider } from '@/components/shared/glass-card-provider';
+import { useI18n } from '@/lib/i18n';
 
 interface TabItem {
   key: string;
@@ -37,6 +38,8 @@ interface TabItem {
   minPlan?: string; // minimum plan to show this tab
 }
 
+// Sidebar tab labels are translated at render time via t('dashboard.tab.<key>').
+// The `label` field here is the fallback (used only if a translation key is missing).
 const TAB_ITEMS: TabItem[] = [
   { key: 'upload', label: 'Upload', icon: Upload },
   { key: 'invoices', label: 'Invoices', icon: FileText },
@@ -51,6 +54,7 @@ const TAB_ITEMS: TabItem[] = [
 const PLAN_ORDER = ['free', 'pro', 'plus', 'business', 'enterprise'];
 
 export function DashboardShell() {
+  const { t } = useI18n();
   const { user, logout, invoices, setInvoices, activeDashTab, setActiveDashTab } = useAppStore();
   const { theme, setTheme } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
@@ -375,7 +379,7 @@ export function DashboardShell() {
                 }
               >
                 <item.icon className="h-4 w-4 shrink-0" />
-                <span>{item.label}</span>
+                <span>{t(`dashboard.tab.${item.key}`) !== `dashboard.tab.${item.key}` ? t(`dashboard.tab.${item.key}`) : item.label}</span>
                 {/* Badges */}
                 {item.key === 'validation' && validationBadge && (
                   <span className={"ml-1 text-[10px] font-bold leading-none px-1.5 py-0.5 rounded-full " + validationBadge.color}>

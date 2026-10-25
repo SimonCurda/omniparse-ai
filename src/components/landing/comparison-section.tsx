@@ -9,6 +9,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { useI18n } from '@/lib/i18n';
 
 function CellValue({ value, highlight }: { value: string | boolean; highlight?: boolean }) {
   if (value === true) {
@@ -69,13 +70,14 @@ function MobileFeatureRow({ row }: { row: typeof COMPARISON_DATA[number] }) {
 }
 
 export function ComparisonSection() {
+  const { t } = useI18n();
   return (
     <section id="comparison" className="py-24 px-4 sm:px-6 lg:px-8">
       <div className="max-w-5xl 2xl:max-w-7xl mx-auto">
         <div className="text-center mb-16">
-          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">See How We Compare</h2>
+          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">{t('comparison.title')}</h2>
           <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
-            A transparent look at how OmniParse stacks up against other invoice parsing tools.
+            {t('comparison.subtitle')}
           </p>
         </div>
 
@@ -84,7 +86,7 @@ export function ComparisonSection() {
           {/* Header row */}
           <div className="grid grid-cols-5 bg-muted/50">
             <div className="p-4 text-sm font-medium text-muted-foreground border-b border-border">
-              Feature
+              {t('comparison.column.feature')}
             </div>
             <div className="p-4 text-sm font-semibold text-center text-foreground border-b border-border bg-primary/10">
               {COMPETITORS.omniparse}
@@ -143,7 +145,7 @@ export function ComparisonSection() {
         </div>
 
         <p className="text-center text-xs text-muted-foreground mt-4">
-          Comparison based on publicly available information as of August 2026. Tap any feature name on mobile for a description.
+          {t('comparison.footer')}
         </p>
       </div>
     </section>

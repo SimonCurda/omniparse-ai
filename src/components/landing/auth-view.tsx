@@ -10,8 +10,10 @@ import { ArrowLeft, Check, Eye, EyeOff, Loader2, X } from 'lucide-react';
 import { useAppStore, type UserProfile } from '@/stores/app-store';
 import { toast } from 'sonner';
 import { GlassCardProvider } from '@/components/shared/glass-card-provider';
+import { useI18n } from '@/lib/i18n';
 
 export function AuthView({ mode, onSwitch, onBack }: { mode: 'login' | 'signup'; onSwitch: (m: 'login' | 'signup') => void; onBack: () => void }) {
+  const { t } = useI18n();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -39,34 +41,30 @@ export function AuthView({ mode, onSwitch, onBack }: { mode: 'login' | 'signup';
 
     // Client-side password validation
     if (password.length < 8) {
-      setApiError('Password must be at least 8 characters.');
+      setApiError(t('auth.error.passwordTooShort'));
       return;
     }
 
     if (mode === 'signup' && !name.trim()) {
-      setApiError('Name is required.');
+      setApiError(t('auth.error.nameRequired'));
       return;
     }
 
     // Client-side consent validation (defense-in-depth even though submit is disabled)
     if (mode === 'signup' && !termsAccepted) {
-      setApiError('You must accept the Terms of Service and Privacy Policy.');
+      setApiError(t('auth.error.termsRequired'));
       return;
     }
     if (mode === 'signup' && !ageConfirmed) {
-      setApiError('You must confirm you are at least 18 years old (or have parental/guardian consent where applicable law permits).');
+      setApiError(t('auth.error.ageRequired'));
       return;
     }
     if (mode === 'signup' && !withdrawalAcknowledged) {
-      setApiError(
-        'You must acknowledge that you lose the 14-day right of withdrawal once the service begins.'
-      );
+      setApiError(t('auth.error.withdrawalRequired'));
       return;
     }
     if (mode === 'signup' && !emailOwnershipConfirmed) {
-      setApiError(
-        'You must confirm that the email address you registered with is your own, working email. Password reset links are sent to this address.'
-      );
+      setApiError(t('auth.error.emailOwnershipRequired'));
       return;
     }
 
@@ -92,7 +90,7 @@ export function AuthView({ mode, onSwitch, onBack }: { mode: 'login' | 'signup';
       const data = await res.json();
 
       if (!res.ok) {
-        setApiError(data.error || 'Something went wrong. Please try again.');
+        setApiError(data.error || t('auth.error.generic'));
         return;
       }
 
@@ -122,12 +120,12 @@ export function AuthView({ mode, onSwitch, onBack }: { mode: 'login' | 'signup';
       setView('dashboard');
 
       if (mode === 'signup') {
-        toast.success('Account created successfully');
+        toast.success(t('auth.success.accountCreated'));
       } else {
-        toast.success(`Welcome back, ${data.user.name}`);
+        toast.success(t('auth.success.welcomeBack', { name: data.user.name }));
       }
     } catch {
-      setApiError('Network error. Please check your connection and try again.');
+      setApiError(t('auth.error.network'));
     } finally {
       setLoading(false);
     }
@@ -145,20 +143,20 @@ export function AuthView({ mode, onSwitch, onBack }: { mode: 'login' | 'signup';
             <span className="font-semibold text-lg">OmniParse</span>
           </div>
           <CardTitle className="text-2xl">
-            {mode === 'login' ? 'Sign In' : 'Create Account'}
+            {mode === 'login' ? t('auth.title.signin') : t('auth.title.signup')}
           </CardTitle>
           <CardDescription>
-            Your data is stored securely. AI processes documents in real-time.
+            {t('auth.subtitle')}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             {mode === 'signup' && (
               <div className="space-y-2">
-                <Label htmlFor="name">Full Name</Label>
+                <Label htmlFor="name">{t('auth.label.fullName')}</Label>
                 <Input
                   id="name"
-                  placeholder="John Doe"
+                  placeholder={t('auth.placeholder.name')}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   disabled={loading}
@@ -167,11 +165,11 @@ export function AuthView({ mode, onSwitch, onBack }: { mode: 'login' | 'signup';
               </div>
             )}
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">{t('auth.label.email')}</Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="you@company.com"
+                placeholder={t('auth.placeholder.email')}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={loading}
@@ -179,12 +177,12 @@ export function AuthView({ mode, onSwitch, onBack }: { mode: 'login' | 'signup';
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">{t('auth.label.password')}</Label>
               <div className="relative">
                 <Input
                   id="password"
                   type={showPw ? 'text' : 'password'}
-                  placeholder="........"
+                  placeholder={t('auth.placeholder.password')}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={loading}
@@ -198,7 +196,7 @@ export function AuthView({ mode, onSwitch, onBack }: { mode: 'login' | 'signup';
                   onClick={() => setShowPw(!showPw)}
                   tabIndex={-1}
                   disabled={loading}
-                  aria-label={showPw ? 'Hide password' : 'Show password'}
+                  aria-label={showPw ? t('common.close') : t('common.edit')}
                   aria-pressed={showPw}
                 >
                   {showPw ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
@@ -215,14 +213,14 @@ export function AuthView({ mode, onSwitch, onBack }: { mode: 'login' | 'signup';
                 if (/[^A-Za-z0-9]/.test(password)) score++;
                 return score;
               })();
-              const labels = ['', 'Weak', 'Fair', 'Good', 'Strong'];
+              const labels = ['', t('auth.strength.weak'), t('auth.strength.fair'), t('auth.strength.good'), t('auth.strength.strong')];
               const bgColors = ['', 'bg-red-500', 'bg-amber-500', 'bg-yellow-500', 'bg-emerald-500'];
               const textColors = ['', 'text-red-500', 'text-amber-500', 'text-yellow-500', 'text-emerald-500'];
               const reqs = [
-                { label: 'At least 8 characters', met: password.length >= 8 },
-                { label: 'One uppercase letter', met: /[A-Z]/.test(password) },
-                { label: 'One number', met: /[0-9]/.test(password) },
-                { label: 'One special character', met: /[^A-Za-z0-9]/.test(password) },
+                { label: t('auth.req.minLength'), met: password.length >= 8 },
+                { label: t('auth.req.uppercase'), met: /[A-Z]/.test(password) },
+                { label: t('auth.req.number'), met: /[0-9]/.test(password) },
+                { label: t('auth.req.special'), met: /[^A-Za-z0-9]/.test(password) },
               ];
               return (
                 <div className="space-y-1 mt-1">
@@ -261,7 +259,7 @@ export function AuthView({ mode, onSwitch, onBack }: { mode: 'login' | 'signup';
               </div>
               <div className="relative flex justify-center">
                 <span className="bg-card px-2 text-xs uppercase tracking-wide text-muted-foreground">
-                  or
+                  {t('auth.or')}
                 </span>
               </div>
             </div>
@@ -296,7 +294,7 @@ export function AuthView({ mode, onSwitch, onBack }: { mode: 'login' | 'signup';
               <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true" className="shrink-0">
                 <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.535-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12z" />
               </svg>
-              <span>{mode === 'login' ? 'Sign in with GitHub' : 'Sign up with GitHub'}</span>
+              <span>{mode === 'login' ? t('auth.button.signinGithub') : t('auth.button.signupGithub')}</span>
             </a>
 
             {mode === 'signup' && (
@@ -317,11 +315,33 @@ export function AuthView({ mode, onSwitch, onBack }: { mode: 'login' | 'signup';
                     htmlFor="terms"
                     className="text-xs text-muted-foreground font-normal leading-relaxed cursor-pointer"
                   >
-                    I am at least 18 years old and I agree to the{' '}
-                    <a href="/terms-of-service" target="_blank" rel="noopener" className="text-amber-600 hover:underline">Terms of Service</a>
-                    {' '}and{' '}
-                    <a href="/privacy-policy" target="_blank" rel="noopener" className="text-amber-600 hover:underline">Privacy Policy</a>
-                    . I confirm the email I entered is my own, working email that I can access for password recovery.
+                    {(() => {
+                      // The terms acceptance text contains {termsLink} and
+                      // {privacyLink} placeholders. Split + render as links.
+                      const text = t('auth.terms.accept');
+                      const parts = text.split(/\{(termsLink|privacyLink)\}/);
+                      return (
+                        <>
+                          {parts.map((part, i) => {
+                            if (part === 'termsLink') {
+                              return (
+                                <a key="terms-link" href="/terms-of-service" target="_blank" rel="noopener" className="text-amber-600 hover:underline">
+                                  {t('auth.terms.termsLink')}
+                                </a>
+                              );
+                            }
+                            if (part === 'privacyLink') {
+                              return (
+                                <a key="privacy-link" href="/privacy-policy" target="_blank" rel="noopener" className="text-amber-600 hover:underline">
+                                  {t('auth.terms.privacyLink')}
+                                </a>
+                              );
+                            }
+                            return <span key={i}>{part}</span>;
+                          })}
+                        </>
+                      );
+                    })()}
                   </Label>
                 </div>
                 <div className="flex items-start gap-2">
@@ -336,10 +356,8 @@ export function AuthView({ mode, onSwitch, onBack }: { mode: 'login' | 'signup';
                     htmlFor="withdrawal"
                     className="text-xs text-muted-foreground font-normal leading-relaxed cursor-pointer"
                   >
-                    I understand OmniParse is a digital service that starts immediately. I consent to
-                    losing my 14-day withdrawal right once I use AI features, per § 1837(j) Czech Civil
-                    Code and Art. 16(m) EU Directive 2011/83.{' '}
-                    <a href="/terms-of-service#right-of-withdrawal" target="_blank" rel="noopener" className="text-amber-600 hover:underline">Learn more →</a>
+                    {t('auth.withdrawal.accept')}{' '}
+                    <a href="/terms-of-service#right-of-withdrawal" target="_blank" rel="noopener" className="text-amber-600 hover:underline">{t('auth.withdrawal.learnMore')}</a>
                   </Label>
                 </div>
               </div>
@@ -351,37 +369,37 @@ export function AuthView({ mode, onSwitch, onBack }: { mode: 'login' | 'signup';
 
             <Button type="submit" className="w-full" disabled={submitDisabled}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {mode === 'login' ? 'Sign In' : 'Create Account'}
+              {mode === 'login' ? t('auth.button.signin') : t('auth.button.signup')}
             </Button>
           </form>
           <div className="mt-4 text-center text-sm text-muted-foreground">
             {mode === 'login' ? (
               <>
-                Don&apos;t have an account?{' '}
+                {t('auth.link.noAccountSignup')}{' '}
                 <button
                   className="text-amber-600 hover:underline font-medium"
                   onClick={() => { setApiError(''); onSwitch('signup'); }}
                   disabled={loading}
                 >
-                  Sign up
+                  {t('auth.link.noAccountSignupCta')}
                 </button>
               </>
             ) : (
               <>
-                Already have an account?{' '}
+                {t('auth.link.hasAccountSignin')}{' '}
                 <button
                   className="text-amber-600 hover:underline font-medium"
                   onClick={() => { setApiError(''); onSwitch('login'); }}
                   disabled={loading}
                 >
-                  Sign in
+                  {t('auth.link.hasAccountSigninCta')}
                 </button>
               </>
             )}
           </div>
           <div className="mt-3 text-center">
             <Button variant="ghost" size="sm" onClick={onBack} disabled={loading}>
-              <ArrowLeft className="h-3.5 w-3.5 mr-1" /> Back to home
+              <ArrowLeft className="h-3.5 w-3.5 mr-1" /> {t('auth.button.backHome')}
             </Button>
           </div>
         </CardContent>

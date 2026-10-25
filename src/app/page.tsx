@@ -16,8 +16,10 @@ import { LegalDrawer } from '@/components/landing/legal-drawer';
 import { CookieBanner } from '@/components/landing/cookie-banner';
 import { CursorGlow } from '@/components/landing/cursor-glow';
 import { toast } from 'sonner';
+import { useI18n } from '@/lib/i18n';
 
 export default function Home() {
+  const { t } = useI18n();
   const view = useAppStore((s) => s.view);
   const user = useAppStore((s) => s.user);
   const setUser = useAppStore((s) => s.setUser);
@@ -84,7 +86,7 @@ export default function Home() {
             });
             setInvoices([]);
             setView('dashboard');
-            toast.success(`Welcome, ${data.user.name}`);
+            toast.success(t('auth.success.welcomeBack', { name: data.user.name }));
           } else {
             // Token didn't validate — clear it so the user isn't stuck in
             // a half-logged-in state.
@@ -278,7 +280,7 @@ export default function Home() {
           <div className="w-10 h-10 rounded-lg bg-amber-500 flex items-center justify-center animate-pulse">
             <span className="text-white font-bold text-base">OP</span>
           </div>
-          <p className="text-sm text-muted-foreground">Restoring session…</p>
+          <p className="text-sm text-muted-foreground">{t('dashboard.session.restoring')}</p>
         </div>
       </div>
     );

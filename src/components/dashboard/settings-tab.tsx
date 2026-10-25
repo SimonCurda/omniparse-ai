@@ -22,11 +22,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { CreditCard, Loader2, Download, Trash2, Shield, Eye, EyeOff, Plus, X, Sparkles, Lock, Clock, GripVertical, ArrowUp, ArrowDown, Keyboard, LogOut, Code, Copy, RefreshCw, ExternalLink, PencilRuler, Webhook, Send, Save } from 'lucide-react';
+import { CreditCard, Loader2, Download, Trash2, Shield, Eye, EyeOff, Plus, X, Sparkles, Lock, Clock, GripVertical, ArrowUp, ArrowDown, Keyboard, LogOut, Code, Copy, RefreshCw, ExternalLink, PencilRuler, Webhook, Send, Save, Globe } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAppStore } from '@/stores/app-store';
 import { DEFAULT_SHORTCUTS, saveShortcuts } from '@/lib/shortcuts';
 import { EmailInboxSettings } from './email-inbox-settings';
+import { useI18n } from '@/lib/i18n';
+import { LanguageToggle } from '@/components/landing/language-toggle';
 
 const PLAN_LABELS: Record<string, string> = { free: 'Free', pro: 'Pro', plus: 'Plus', business: 'Business', enterprise: 'Enterprise' };
 const PLAN_LIMITS: Record<string, number> = { free: 15, pro: 500, plus: 2000, business: 10000, enterprise: Infinity };
@@ -66,6 +68,7 @@ function getAuthHeaders(): Record<string, string> | null {
 }
 
 export function SettingsTab() {
+  const { t } = useI18n();
   const { user, invoices, setUser, logout } = useAppStore();
 
   // Custom fields state
@@ -892,17 +895,40 @@ export function SettingsTab() {
         </CardContent>
       </Card>
 
+      {/* Language Card — added in October 2026 i18n expansion */}
+      <Card data-glow data-glow-border-only className="glass-card border-border/50">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Globe className="h-5 w-5 text-amber-500" />
+            {t('settings.language.title')}
+          </CardTitle>
+          <CardDescription>{t('settings.language.description')}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {/* Inline language picker — shows the current language + a dropdown */}
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium">{t('settings.language.title')}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {t('settings.language.note')}
+              </p>
+            </div>
+            <LanguageToggle />
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Billing Card */}
       <Card data-glow data-glow-border-only className="glass-card border-border/50">
         <CardHeader>
-          <CardTitle className="text-lg">Billing</CardTitle>
-          <CardDescription>Manage your subscription, plan and usage</CardDescription>
+          <CardTitle className="text-lg">{t('settings.billing.title')}</CardTitle>
+          <CardDescription>{t('settings.billing.description')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
           {/* Current plan + renewal date */}
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium">Current Plan</p>
+              <p className="text-sm font-medium">{t('settings.billing.currentPlan')}</p>
               <p className="text-sm text-muted-foreground mt-0.5">
                 {plan === 'free'
                   ? `Free plan. ${invoiceCount} of ${planLimit} invoices used this month.`
@@ -910,8 +936,8 @@ export function SettingsTab() {
               </p>
               {plan !== 'free' && user?.stripeCurrentPeriodEnd && (
                 <p className="text-xs text-muted-foreground mt-1">
-                  Next renewal: {new Date(user.stripeCurrentPeriodEnd).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
-                  {user?.billingInterval ? ` · ${user.billingInterval} billing` : ''}
+                  {t('settings.billing.nextRenewal')}: {new Date(user.stripeCurrentPeriodEnd).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+                  {user?.billingInterval ? ` · ${user.billingInterval === 'monthly' ? t('settings.billing.monthlyBilling') : t('settings.billing.annualBilling')}` : ''}
                 </p>
               )}
             </div>
@@ -930,7 +956,7 @@ export function SettingsTab() {
           {/* Usage bar */}
           <div className="rounded-lg bg-muted/50 p-4 space-y-1">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Invoices this period</span>
+              <span className="text-muted-foreground">{t('settings.billing.invoicesThisPeriod')}</span>
               <span className="font-medium">
                 {invoiceCount}/{planLimit === Infinity ? '∞' : planLimit}
               </span>
@@ -949,12 +975,12 @@ export function SettingsTab() {
               {managingBilling ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Opening portal...
+                  {t('settings.billing.openingPortal')}
                 </>
               ) : (
                 <>
                   <CreditCard className="mr-2 h-4 w-4" />
-                  Manage billing
+                  {t('settings.billing.manageBilling')}
                 </>
               )}
             </Button>
@@ -963,7 +989,7 @@ export function SettingsTab() {
           {/* Upgrade picker — only shown for users not on Enterprise */}
           {plan !== 'enterprise' && (
             <div className="border-t border-border pt-4 space-y-3">
-              <p className="text-sm font-medium">Upgrade plan</p>
+              <p className="text-sm font-medium">{t('settings.billing.upgradePlan')}</p>
 
               {/* Plan selector */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -1013,7 +1039,7 @@ export function SettingsTab() {
                       : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
-                  Monthly
+                  {t('pricing.monthly')}
                 </button>
                 <button
                   type="button"
@@ -1024,8 +1050,8 @@ export function SettingsTab() {
                       : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
-                  Annual
-                  <span className="ml-1.5 text-[10px] font-semibold text-emerald-500">Save 20%</span>
+                  {t('pricing.annual')}
+                  <span className="ml-1.5 text-[10px] font-semibold text-emerald-500">{t('pricing.save')}</span>
                 </button>
               </div>
 
@@ -1038,12 +1064,12 @@ export function SettingsTab() {
                 {upgrading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Redirecting...
+                    {t('settings.billing.redirecting')}
                   </>
                 ) : (
                   <>
                     <CreditCard className="mr-2 h-4 w-4" />
-                    Upgrade to {(() => {
+                    {t('settings.billing.upgradeTo')} {(() => {
                       const labels: Record<string, string> = { pro: 'Pro', plus: 'Plus', business: 'Business', enterprise: 'Enterprise' };
                       return labels[selectedPlan] || selectedPlan;
                     })()} ({selectedInterval})
@@ -1051,7 +1077,7 @@ export function SettingsTab() {
                 )}
               </Button>
               <p className="text-xs text-muted-foreground">
-                EU VAT is calculated and collected at checkout via Stripe Tax. Cancel anytime from the customer portal — EU consumers retain their 14-day withdrawal right.
+                {t('settings.billing.euVatNote')}
               </p>
             </div>
           )}

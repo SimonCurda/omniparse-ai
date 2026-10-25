@@ -4,43 +4,37 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { ArrowRight } from 'lucide-react';
 import { HeroVisual } from './hero-visual';
+import { useI18n } from '@/lib/i18n';
 
 // ─── Rotating taglines ────────────────────────────────────────────────────
 // Each phrase completes the sentence "Invoice parsing, ___" and highlights
 // a different value prop. They rotate every 2.8s with a smooth fade+slide.
 // Keep them short (2-5 words), punchy, and confident — this is the first
 // thing visitors see.
-const ROTATING_TAGLINES: string[] = [
-  'powered by AI',
-  'reimagined',
-  'for the next generation',
-  'that detects fraud',
-  'at the speed of thought',
-  'with built-in fraud detection',
-  'without the busywork',
-  'innovating invoice workflows',
-  'in seconds, not hours',
-  'that actually gets it right',
-  'built for finance teams',
-  'with zero setup',
-  'across every currency',
-  'multi-currency native',
-  'CZK, EUR, USD, GBP & more',
+//
+// Taglines are translated via t('hero.tagline.N') so each language has its
+// own idiomatic version. Missing keys fall back to English.
+const TAGLINE_KEYS = [
+  'hero.tagline.1', 'hero.tagline.2', 'hero.tagline.3', 'hero.tagline.4',
+  'hero.tagline.5', 'hero.tagline.6', 'hero.tagline.7', 'hero.tagline.8',
+  'hero.tagline.9', 'hero.tagline.10', 'hero.tagline.11', 'hero.tagline.12',
+  'hero.tagline.13', 'hero.tagline.14', 'hero.tagline.15', 'hero.tagline.16',
 ];
 
 function RotatingHeadline() {
+  const { t } = useI18n();
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setIndex((prev) => (prev + 1) % ROTATING_TAGLINES.length);
+      setIndex((prev) => (prev + 1) % TAGLINE_KEYS.length);
     }, 2800);
     return () => clearInterval(interval);
   }, []);
 
   return (
     <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-tight text-foreground">
-      Invoice parsing,{' '}
+      {t('hero.title.prefix')}{' '}
       <span className="relative inline-block">
         {/* The rotating phrase — keyed by index so it re-mounts and replays
             the CSS animation on each change. */}
@@ -48,7 +42,7 @@ function RotatingHeadline() {
           key={index}
           className="text-primary inline-block animate-headline-fade"
         >
-          {ROTATING_TAGLINES[index]}
+          {t(TAGLINE_KEYS[index])}
         </span>
       </span>
     </h1>
@@ -56,18 +50,26 @@ function RotatingHeadline() {
 }
 
 export function Hero({ onAuth }: { onAuth: (v: 'login' | 'signup') => void }) {
+  const { t } = useI18n();
+
+  // The hero subtitle contains a {strong}...{/strong} pair around "any currency".
+  // We split on those markers and wrap the middle chunk in <strong>.
+  const subtitle = t('hero.subtitle');
+  const strongText = t('hero.strong.anyCurrency');
+  const [before, after] = subtitle.split('{strong}');
+
   return (
     <section className="pt-32 pb-24 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl 2xl:max-w-5xl mx-auto text-center">
         <RotatingHeadline />
         <p className="mt-6 text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-          Upload invoices in <strong className="text-foreground">any currency</strong> — CZK, EUR, USD, GBP and more.
-          Our AI extracts vendor details, amounts, line items, and more — with real-time confidence scores.
-          Chat with your data, generate charts, and export results.
+          {before}
+          <strong className="text-foreground">{strongText}</strong>
+          {after?.replace('{/strong}', '')}
         </p>
         <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
           <Button size="lg" className="text-base px-8" onClick={() => onAuth('signup')}>
-            Get Started <ArrowRight className="ml-2 h-4 w-4" />
+            {t('hero.cta.signup')} <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
           <Button
             size="lg"
@@ -75,16 +77,16 @@ export function Hero({ onAuth }: { onAuth: (v: 'login' | 'signup') => void }) {
             className="text-base px-8"
             onClick={() => onAuth('login')}
           >
-            Sign In
+            {t('hero.cta.signin')}
           </Button>
         </div>
         <p className="mt-4 text-sm text-muted-foreground">
-          Free forever for up to 15 invoices/month. No credit card required.{' '}
+          {t('hero.free.note')}{' '}
           <a
             href="#pricing"
             className="text-primary hover:text-primary/80 underline underline-offset-2 transition-colors"
           >
-            View plans →
+            {t('hero.view.plans')}
           </a>
         </p>
         <HeroVisual />
