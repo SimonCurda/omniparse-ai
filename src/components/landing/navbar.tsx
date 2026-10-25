@@ -5,9 +5,12 @@ import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 import { Menu, X, Sun, Moon } from 'lucide-react';
 import { GdprBanner } from './gdpr-banner';
+import { LanguageToggle } from './language-toggle';
+import { useI18n } from '@/lib/i18n';
 
 export function Navbar({ onAuth }: { onAuth: (v: 'login' | 'signup') => void }) {
   const { theme, setTheme } = useTheme();
+  const { t } = useI18n();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const close = () => setMobileOpen(false);
@@ -28,17 +31,18 @@ export function Navbar({ onAuth }: { onAuth: (v: 'login' | 'signup') => void }) 
           </button>
 
           <div className="hidden md:flex items-center gap-6 text-sm text-muted-foreground">
-            <a href="#features" className="hover:text-foreground transition-colors">Features</a>
-            <a href="#pricing" className="hover:text-foreground transition-colors">Pricing</a>
-          <a href="#comparison" className="hover:text-foreground transition-colors">Compare</a>
+            <a href="#features" className="hover:text-foreground transition-colors">{t('navbar.features')}</a>
+            <a href="#pricing" className="hover:text-foreground transition-colors">{t('navbar.pricing')}</a>
+          <a href="#comparison" className="hover:text-foreground transition-colors">{t('navbar.compare')}</a>
         </div>
 
-        <div className="hidden md:flex items-center gap-3">
+        <div className="hidden md:flex items-center gap-2">
+          <LanguageToggle />
           <Button variant="ghost" size="sm" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} aria-label="Toggle theme">
             {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => onAuth('login')}>Log in</Button>
-          <Button size="sm" onClick={() => onAuth('signup')}>Get Started</Button>
+          <Button variant="ghost" size="sm" onClick={() => onAuth('login')}>{t('navbar.login')}</Button>
+          <Button size="sm" onClick={() => onAuth('signup')}>{t('navbar.signup')}</Button>
         </div>
 
         <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setMobileOpen(!mobileOpen)} aria-label="Toggle navigation menu" aria-expanded={mobileOpen} aria-controls="mobile-nav-menu">
@@ -48,12 +52,15 @@ export function Navbar({ onAuth }: { onAuth: (v: 'login' | 'signup') => void }) 
 
       {mobileOpen && (
         <div id="mobile-nav-menu" className="md:hidden border-t border-border bg-background px-4 pb-4 pt-2 space-y-3">
-          <a href="#features" className="block text-sm text-muted-foreground hover:text-foreground" onClick={close}>Features</a>
-          <a href="#pricing" className="block text-sm text-muted-foreground hover:text-foreground" onClick={close}>Pricing</a>
-          <a href="#comparison" className="block text-sm text-muted-foreground hover:text-foreground" onClick={close}>Compare</a>
+          <a href="#features" className="block text-sm text-muted-foreground hover:text-foreground" onClick={close}>{t('navbar.features')}</a>
+          <a href="#pricing" className="block text-sm text-muted-foreground hover:text-foreground" onClick={close}>{t('navbar.pricing')}</a>
+          <a href="#comparison" className="block text-sm text-muted-foreground hover:text-foreground" onClick={close}>{t('navbar.compare')}</a>
+          <div className="flex items-center gap-2">
+            <LanguageToggle />
+          </div>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" className="flex-1" onClick={() => { onAuth('login'); close(); }}>Log in</Button>
-            <Button size="sm" className="flex-1" onClick={() => { onAuth('signup'); close(); }}>Get Started</Button>
+            <Button variant="outline" size="sm" className="flex-1" onClick={() => { onAuth('login'); close(); }}>{t('navbar.login')}</Button>
+            <Button size="sm" className="flex-1" onClick={() => { onAuth('signup'); close(); }}>{t('navbar.signup')}</Button>
           </div>
         </div>
       )}
