@@ -9,6 +9,12 @@ import { useI18n, LANGUAGES, type Language } from '@/lib/i18n';
 // Pill-style button shown in the navbar. Clicking it opens a small dropdown
 // with the available languages. The active language is shown with a checkmark.
 //
+// VISIBILITY GATE:
+// The toggle is hidden by default (admin FeatureFlag `show_language_toggle`
+// is OFF). Translations are work-in-progress and most browsers have Google
+// Translate built-in, so the toggle is opt-in. The admin flips it ON from
+// the admin panel when translations are ready for prime time.
+//
 // Why a dropdown instead of a binary toggle: future languages can be added
 // to LANGUAGES in translations.ts and they'll automatically appear here —
 // no component change needed.
@@ -16,8 +22,28 @@ import { useI18n, LANGUAGES, type Language } from '@/lib/i18n';
 export function LanguageToggle() {
   const { lang, setLang } = useI18n();
   const [open, setOpen] = useState(false);
+  const [visible, setVisible] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
+  // Fetch the public feature flag on mount. We don't block render — we
+  // start hidden (default OFF) and reveal only once the API confirms the
+  // flag is ON. This avoids flashing the toggle on landing page load.
+  useEffect(() => {
+    fetch('/api/feature-flags/public', { cache: 'no-store' })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data && data.show_language_toggle === true) {
+          setVisible(true);
+        }
+      })
+      .catch(() => {
+        // Network/SSR error — keep hidden (default OFF)
+      });
+  }, []);
+
+  // Hidden by default — admin must opt-in via the admin panel.
+  // IMPORTANT: this return is AFTER all hooks so React's rules-of-hooks
+  // aren't violated.
   // Close on outside click
   useEffect(() => {
     if (!open) return;
@@ -39,6 +65,8 @@ export function LanguageToggle() {
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
   }, [open]);
+
+  if (!visible) return null;
 
   const current = LANGUAGES.find(l => l.code === lang) ?? LANGUAGES[0];
 
