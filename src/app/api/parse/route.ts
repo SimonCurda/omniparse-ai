@@ -420,21 +420,14 @@ function buildVlmPrompt(customFieldsPart: string): string {
   const customSuffix = customFieldsPart ? ',\n  ...customFieldsHere' : '';
   return `You are an invoice parser. Extract ALL visible fields from the document image.
 
-IMPORTANT: The invoice may be in ANY language. Extract the fields regardless of the document language. Map foreign-language labels to their English equivalents:
-- Czech (cs): Dodavatel/Prodávající = vendor, Číslo dokladu/č. faktury/variabilní symbol = invoice number, Datum vystavení = invoice date, Datum splatnosti = due date, Celkem/Celkem uhradit/K úhradě = total, DPH = VAT, Kč = CZK, Sazba DPH = VAT rate, Základ = amount (net), Položka = line item, Bankovní spojení = bank account, IBAN = IBAN, SWIFT/BIC = BIC
-- Slovak (sk): Dodávateľ/Predávajúci = vendor, Číslo faktúry/Variabilný symbol = invoice number, Dátum vystavenia = invoice date, Dátum splatnosti = due date, Celkom/Spolu = total, DPH = VAT, € = EUR
-- German (de): Lieferant/Verkäufer = vendor, Rechnungsnummer = invoice number, Rechnungsdatum = invoice date, Fälligkeitsdatum = due date, Gesamtbetrag/Gesamt = total, MwSt/USt = VAT, € = EUR, IBAN = IBAN, BIC = BIC
-- Polish (pl): Sprzedawca = vendor, Numer faktury = invoice number, Data wystawienia = invoice date, Termin płatności = due date, Razem = total, VAT = VAT, zł = PLN
-- Hungarian (hu): Szállító/Eladó = vendor, Számla száma = invoice number, Kibocsátás dátuma = invoice date, Fizetési határidő = due date, Végösszeg/Összesen = total, ÁFA = VAT, Ft = HUF
-- French (fr): Fournisseur/Vendeur = vendor, Numéro de facture = invoice number, Date de facture = invoice date, Date d'échéance = due date, Total/Montant TTC = total, TVA = VAT
-- Spanish (es): Proveedor/Vendedor = vendor, Número de factura = invoice number, Fecha de factura = invoice date, Fecha de vencimiento = due date, Total/Importe = total, IVA = VAT
-
-LANGUAGE DETECTION — REQUIRED:
-The invoice may be in any European language. Extract the fields regardless of language. Map foreign-language labels to their English equivalents (see above). DO NOT translate the vendor name, line item descriptions, or any free-text field — return them in the original language as printed on the document. Only the JSON keys are in English; the values stay in the document's language.
+IMPORTANT: The invoice may be in ANY language (English, Czech, German, French, Spanish, etc.). Extract the fields regardless of the document language. Map foreign-language labels to their English equivalents:
+- Czech: Dodavatel/Prodávající = vendor, Číslo dokladu/č. faktury = invoice number, Datum vystavení = invoice date, Datum splatnosti = due date, Celkem/Celkem uhradit/K úhradě = total, DPH = VAT, Kč = CZK, Sazba DPH = VAT rate, Základ = amount (net), Položka = line item
+- German: Lieferant/Verkäufer = vendor, Rechnungsnummer = invoice number, Rechnungsdatum = invoice date, Fälligkeitsdatum = due date, Gesamtbetrag/Gesamt = total, MwSt/USt = VAT, € = EUR
+- French: Fournisseur/Vendeur = vendor, Numéro de facture = invoice number, Date de facture = invoice date, Date d'échéance = due date, Total/Montant TTC = total, TVA = VAT
 
 CRITICAL: TOTAL FIELD
 - "total" is the FINAL AMOUNT TO PAY — the grand total including VAT/tax
-- Look for labels like: "Total", "Grand Total", "Amount Due", "Balance Due", "Total TTC", "Celkem", "K úhradě", "Gesamtbetrag", "Total a pagar", "Totale", "Razem", "Végösszeg"
+- Look for labels like: "Total", "Grand Total", "Amount Due", "Balance Due", "Total TTC", "Celkem", "K úhradě", "Gesamtbetrag", "Total a pagar", "Totale"
 - ALWAYS return "total" as a NUMBER (not a string). Example: 1234.56, NOT "1,234.56"
 - If the total is written as "1.234,56" (European), convert to 1234.56
 - If the total is written as "1,234.56" (US), convert to 1234.56
@@ -453,7 +446,7 @@ CRITICAL: Output ONLY the JSON object. Do NOT explain, do NOT analyze, do NOT wr
 
 Output this EXACT JSON schema (fill in the values, use null for missing fields):
 {
-  "vendor": "company name (in original language) or null",
+  "vendor": "company name or null",
   "invoiceNumber": "invoice number string or null",
   "invoiceDate": "YYYY-MM-DD or null",
   "dueDate": "YYYY-MM-DD or null",
@@ -461,7 +454,7 @@ Output this EXACT JSON schema (fill in the values, use null for missing fields):
   "vatAmount": 234.56 or null,
   "total": 1468.12 or null,
   "currency": "USD or EUR or GBP or CZK etc. or null",
-  "lineItems": [{"description": "item (in original language)", "quantity": 1, "unitPrice": 10.00}],
+  "lineItems": [{"description": "item", "quantity": 1, "unitPrice": 10.00}],
   "fieldConfidence": {
     "vendor": 0.95,
     "invoiceNumber": 0.99,
