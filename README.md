@@ -53,20 +53,20 @@ bun run dev
   acceptance at checkout (chargeback defense)
 - Customer lookup by email — no duplicate Stripe customers on re-subscribe
 
-### i18n (English + Czech)
+### i18n (English + Czech + Slovak + German)
 - Lightweight React Context provider (`src/lib/i18n/`)
-- Language toggle in navbar (globe icon, dropdown)
-- Browser-language auto-detection on first visit
+- Language toggle in navbar (globe icon, dropdown with EN/CZ/SK/DE)
+- Browser-language auto-detection on first visit (Czech visitor sees Czech UI)
 - Persisted in localStorage + cookie
 - Translation dictionary in `src/lib/i18n/translations.ts` — to add a new
   language, add the code to `Language` + add a flat key→value map
 
-### Multi-language invoice parsing (CZ/SK/DE/PL/HU/FR/ES/EN + more)
-- Updated Mistral prompt to detect + return `documentLanguage` (ISO 639-1)
+### Multi-language invoice parsing
+- Updated Mistral prompt with full vocabulary for CZ/SK/DE/PL/HU/FR/ES labels
+- The AI handles invoices in any European language, extracting fields
+  correctly (Dodavatel → vendor, Celkem → total, etc.)
 - Vendor names + line item descriptions preserved in the original language
-  (NOT translated)
-- `Invoice.documentLanguage` field in Prisma + migration
-- Filterable + groupable in future analytics
+  (NOT translated to English)
 
 ### EU compliance utilities
 - **SEPA XML export** (`/api/export/sepa`) — ISO 20022 pain.001.001.09

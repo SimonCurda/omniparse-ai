@@ -65,7 +65,15 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   // Sync <html lang> attribute + cookie whenever language changes
   useEffect(() => {
     if (typeof document !== 'undefined') {
-      document.documentElement.lang = lang === 'cz' ? 'cs' : 'en';
+      // Map app language code to HTML lang attribute (ISO 639-1):
+      //   en -> en, cz -> cs, sk -> sk, de -> de
+      const htmlLangMap: Record<Language, string> = {
+        en: 'en',
+        cz: 'cs',
+        sk: 'sk',
+        de: 'de',
+      };
+      document.documentElement.lang = htmlLangMap[lang];
       document.cookie = `${COOKIE_KEY}=${lang};max-age=${COOKIE_MAX_AGE};path=/;SameSite=Lax`;
     }
   }, [lang]);

@@ -189,11 +189,6 @@ model Invoice {
   normalizedCurrency String?
   // PDF metadata for tampering detection
   pdfMetadata  Json?
-  // Document language (ISO 639-1: en, cs, de, pl, sk, hu, fr, es, it, ...)
-  // Detected by the AI at parse time. Used for filtering, analytics, and
-  // for choosing the right prompt template in the future. Null for legacy
-  // invoices parsed before this field existed (treated as 'unknown').
-  documentLanguage String?
   // Processing metrics
   processingTime Float?
   // Custom fields extracted per user template

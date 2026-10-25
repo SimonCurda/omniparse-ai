@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
       select: {
         id: true, vendor: true, invNumber: true, invDate: true, dueDate: true,
         amount: true, vatAmount: true, total: true, currency: true,
-        documentLanguage: true, customFields: true,
+        customFields: true,
       },
     });
 
@@ -56,7 +56,6 @@ export async function POST(req: NextRequest) {
       vatAmount: inv.vatAmount,
       total: inv.total,
       currency: inv.currency,
-      documentLanguage: inv.documentLanguage,
       customFields: inv.customFields as Record<string, unknown> | null,
     }));
 

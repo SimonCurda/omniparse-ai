@@ -430,13 +430,7 @@ IMPORTANT: The invoice may be in ANY language. Extract the fields regardless of 
 - Spanish (es): Proveedor/Vendedor = vendor, Número de factura = invoice number, Fecha de factura = invoice date, Fecha de vencimiento = due date, Total/Importe = total, IVA = VAT
 
 LANGUAGE DETECTION — REQUIRED:
-You MUST detect the primary language of the document (the language used for labels like "Invoice", "Total", "Date"). Use ISO 639-1 codes. Common values:
-- "cs" for Czech, "sk" for Slovak, "de" for German, "pl" for Polish, "hu" for Hungarian
-- "en" for English, "fr" for French, "es" for Spanish, "it" for Italian, "nl" for Dutch
-- "pt" for Portuguese, "ro" for Romanian, "bg" for Bulgarian, "hr" for Croatian, "sl" for Slovenian
-- If you cannot determine the language, use "unknown"
-
-DO NOT translate the vendor name, line item descriptions, or any free-text field. Return them in the original language as printed on the document. Only the JSON keys are in English; the values stay in the document's language.
+The invoice may be in any European language. Extract the fields regardless of language. Map foreign-language labels to their English equivalents (see above). DO NOT translate the vendor name, line item descriptions, or any free-text field — return them in the original language as printed on the document. Only the JSON keys are in English; the values stay in the document's language.
 
 CRITICAL: TOTAL FIELD
 - "total" is the FINAL AMOUNT TO PAY — the grand total including VAT/tax
@@ -459,7 +453,6 @@ CRITICAL: Output ONLY the JSON object. Do NOT explain, do NOT analyze, do NOT wr
 
 Output this EXACT JSON schema (fill in the values, use null for missing fields):
 {
-  "documentLanguage": "cs or en or de or sk or pl or hu or fr or es or unknown",
   "vendor": "company name (in original language) or null",
   "invoiceNumber": "invoice number string or null",
   "invoiceDate": "YYYY-MM-DD or null",
@@ -470,7 +463,6 @@ Output this EXACT JSON schema (fill in the values, use null for missing fields):
   "currency": "USD or EUR or GBP or CZK etc. or null",
   "lineItems": [{"description": "item (in original language)", "quantity": 1, "unitPrice": 10.00}],
   "fieldConfidence": {
-    "documentLanguage": 0.95,
     "vendor": 0.95,
     "invoiceNumber": 0.99,
     "invoiceDate": 0.90,
@@ -1341,14 +1333,6 @@ export async function POST(req: NextRequest) {
     const sanitizedCustomFieldValues = Object.keys(customFieldValues).length > 0 ? stripNullBytes(customFieldValues) as Record<string, unknown> : customFieldValues;
     const sanitizedNormalized = stripNullBytes(normalized) as { vendor?: string; invDate?: string; dueDate?: string; amount?: number | null; total?: number | null; currency?: string };
     const sanitizedFileMetadata = fileMetadata ? stripNullBytes(fileMetadata) : fileMetadata;
-    // Document language — detected by the AI (multi-language parsing).
-    // Sanitize + lowercase so it can be reliably filtered/grouped later.
-    const rawDocumentLanguage = typeof parsed.documentLanguage === 'string'
-      ? (parsed.documentLanguage as string).trim().toLowerCase().slice(0, 10)
-      : '';
-    const sanitizedDocumentLanguage = ['cs','sk','de','pl','hu','fr','es','it','nl','pt','ro','bg','hr','sl','en'].includes(rawDocumentLanguage)
-      ? rawDocumentLanguage
-      : rawDocumentLanguage === 'unknown' ? null : (rawDocumentLanguage || null);
 
     addDebugLog('ai_response_parsed', {
       vendor: sanitizedVendor,
@@ -1371,7 +1355,6 @@ export async function POST(req: NextRequest) {
         vatAmount: typeof parsed.vatAmount === 'number' ? parsed.vatAmount : null,
         total: typeof parsed.total === 'number' ? parsed.total : null,
         currency: sanitizedCurrency,
-        documentLanguage: sanitizedDocumentLanguage,
         status: validationStatus === 'fail' ? 'review' : validationStatus === 'warning' ? 'review' : overallConfidence >= 0.85 ? 'done' : 'review',
         confidence: overallConfidence,
         fieldConfidence: sanitizedFieldConfidence ? JSON.parse(JSON.stringify(sanitizedFieldConfidence)) : Prisma.JsonNull,

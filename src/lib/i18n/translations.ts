@@ -22,11 +22,13 @@
 // is small enough that a single file is fine. Once the dictionary grows
 // past ~500 keys, split into per-language files loaded on demand.
 
-export type Language = 'en' | 'cz';
+export type Language = 'en' | 'cz' | 'sk' | 'de';
 
 export const LANGUAGES: { code: Language; label: string; flag: string }[] = [
   { code: 'en', label: 'English', flag: '🇬🇧' },
   { code: 'cz', label: 'Čeština', flag: '🇨🇿' },
+  { code: 'sk', label: 'Slovenčina', flag: '🇸🇰' },
+  { code: 'de', label: 'Deutsch', flag: '🇩🇪' },
 ];
 
 export const DEFAULT_LANGUAGE: Language = 'en';
@@ -185,6 +187,156 @@ const translations: Record<Language, Record<string, string>> = {
     'common.confirm': 'Potvrdit',
     'common.back': 'Zpět',
   },
+
+  sk: {
+    // ─── Navbar ─────────────────────────────────────────────────────────
+    'navbar.features': 'Funkcie',
+    'navbar.pricing': 'Cenník',
+    'navbar.compare': 'Porovnanie',
+    'navbar.login': 'Prihlásiť sa',
+    'navbar.signup': 'Vyskúšať zdarma',
+    'navbar.language': 'Jazyk',
+
+    // ─── Hero ───────────────────────────────────────────────────────────
+    'hero.badge': 'GDPR · AI Act EU · v súlade s českým právom',
+    'hero.title.line1': 'AI spracovanie faktúr',
+    'hero.title.line2': 'pre EU a celý svet',
+    'hero.subtitle': 'Nahrajte faktúry v akomkoľvek jazyku EU. AI extrahuje dodávateľa, dátumy, čiastky a položky ako štruktúrované JSON. Opýtajte sa AI na svoje dáta. Detekujte falšovanie. Zostaňte na free tieri čo najdlhšie.',
+    'hero.cta.signup': 'Začať zdarma — 15 faktúr / mesiac',
+    'hero.cta.demo': 'Pozrieť sa ako to funguje',
+
+    // ─── Features section ───────────────────────────────────────────────
+    'features.title': 'Všetko, čo potrebujete na spracovanie faktúr',
+    'features.subtitle': 'Postavené od základov pre EU SMB. Free tier, európska rezidencia dát, viac mien, IMAP auto-import.',
+
+    // ─── Pricing section ────────────────────────────────────────────────
+    'pricing.title': 'Vyberte si plán',
+    'pricing.subtitle': 'Začnite zdarma. Prejdite na vyšší plán, až budete potrebovať viac objemu, úpravy alebo funkcie pre tímy.',
+    'pricing.monthly': 'Mesačne',
+    'pricing.annual': 'Ročne',
+    'pricing.save': 'Ušetríte 20 %',
+    'pricing.note': 'Všetky plány zahŕňajú export dát, zmazanie účtu a audit log. V súlade s GDPR, EU AI Act a PIPEDA. Pre Free plán nie je potrebná platobná karta.',
+
+    // ─── Dashboard nav (sidebar tabs) ──────────────────────────────────
+    'dashboard.tab.upload': 'Nahrať',
+    'dashboard.tab.invoices': 'Faktúry',
+    'dashboard.tab.pending': 'Na schválenie',
+    'dashboard.tab.validation': 'Validácia',
+    'dashboard.tab.approvals': 'Schvaľovanie',
+    'dashboard.tab.analytics': 'Analytika',
+    'dashboard.tab.chat': 'AI Chat',
+    'dashboard.tab.settings': 'Nastavenia',
+
+    // ─── Settings — Billing card ───────────────────────────────────────
+    'settings.billing.title': 'Predplatné',
+    'settings.billing.description': 'Spravujte svoje predplatné, plán a využitie',
+    'settings.billing.currentPlan': 'Aktuálny plán',
+    'settings.billing.invoicesThisPeriod': 'Faktúry v tomto období',
+    'settings.billing.manageBilling': 'Spravovať predplatné',
+    'settings.billing.openingPortal': 'Otváram portál...',
+    'settings.billing.upgradePlan': 'Prejsť na vyšší plán',
+    'settings.billing.redirecting': 'Presmerovávam...',
+    'settings.billing.upgradeTo': 'Prejsť na',
+    'settings.billing.euVatNote': 'EÚ DPH je vypočítaná a vybraná pri platbe cez Stripe Tax. Zrušiť môžete kedykoľvek zo zákazníckeho portálu — spotrebitelia v EÚ si zachovávajú právo na odstúpenie do 14 dní.',
+    'settings.billing.nextRenewal': 'Ďalšia obnova',
+    'settings.billing.monthlyBilling': 'mesačné fakturovanie',
+    'settings.billing.annualBilling': 'ročné fakturovanie',
+
+    // ─── Footer ─────────────────────────────────────────────────────────
+    'footer.product': 'Produkt',
+    'footer.legal': 'Právne',
+    'footer.resources': 'Zdroje',
+    'footer.rights': 'Všetky práva vyhradené.',
+
+    // ─── Cookie banner ─────────────────────────────────────────────────
+    'cookie.text': 'Používame cookies pre základné funkcie, analytiku a marketing (s vaším súhlasom). Podrobnosti viz Zásady cookies.',
+    'cookie.accept': 'Prijať všetko',
+    'cookie.reject': 'Odmietnuť nepodstatné',
+    'cookie.manage': 'Spravovať preferencie',
+
+    // ─── Common / generic ──────────────────────────────────────────────
+    'common.loading': 'Načítavam...',
+    'common.cancel': 'Zrušiť',
+    'common.save': 'Uložiť',
+    'common.delete': 'Zmazať',
+    'common.confirm': 'Potvrdiť',
+    'common.back': 'Späť',
+  },
+
+  de: {
+    // ─── Navbar ─────────────────────────────────────────────────────────
+    'navbar.features': 'Funktionen',
+    'navbar.pricing': 'Preise',
+    'navbar.compare': 'Vergleich',
+    'navbar.login': 'Anmelden',
+    'navbar.signup': 'Loslegen',
+    'navbar.language': 'Sprache',
+
+    // ─── Hero ───────────────────────────────────────────────────────────
+    'hero.badge': 'GDPR · EU AI Act · tschechisch-rechtlich konform',
+    'hero.title.line1': 'KI-Rechnungsverarbeitung',
+    'hero.title.line2': 'für die EU und darüber hinaus',
+    'hero.subtitle': 'Laden Sie Rechnungen in jeder EU-Sprache hoch. Die KI extrahiert Lieferant, Daten, Beträge und Positionen als strukturiertes JSON. Fragen Sie die KI zu Ihren Daten. Fälschungserkennung. Bleiben Sie so lange wie möglich auf kostenlosen Tarifen.',
+    'hero.cta.signup': 'Kostenlos starten — 15 Rechnungen/Monat',
+    'hero.cta.demo': 'So funktioniert es',
+
+    // ─── Features section ───────────────────────────────────────────────
+    'features.title': 'Alles, was Sie zur Rechnungsverarbeitung brauchen',
+    'features.subtitle': 'Von Grund auf für EU-KMU entwickelt. Kostenlose Stufe, EU-Datenresidenz, Mehrwährung, IMAP-Auto-Import.',
+
+    // ─── Pricing section ────────────────────────────────────────────────
+    'pricing.title': 'Wählen Sie Ihren Plan',
+    'pricing.subtitle': 'Kostenlos starten. Upgraden, wenn Sie mehr Volumen, Bearbeitung oder Teamfunktionen brauchen.',
+    'pricing.monthly': 'Monatlich',
+    'pricing.annual': 'Jährlich',
+    'pricing.save': '20 % sparen',
+    'pricing.note': 'Alle Pläne umfassen Datenexport, Kontolöschung und Audit-Protokollierung. Konform mit GDPR, EU AI Act und PIPEDA. Für den Free-Plan ist keine Kreditkarte erforderlich.',
+
+    // ─── Dashboard nav (sidebar tabs) ──────────────────────────────────
+    'dashboard.tab.upload': 'Hochladen',
+    'dashboard.tab.invoices': 'Rechnungen',
+    'dashboard.tab.pending': 'Ausstehend',
+    'dashboard.tab.validation': 'Validierung',
+    'dashboard.tab.approvals': 'Freigaben',
+    'dashboard.tab.analytics': 'Analytik',
+    'dashboard.tab.chat': 'KI-Chat',
+    'dashboard.tab.settings': 'Einstellungen',
+
+    // ─── Settings — Billing card ───────────────────────────────────────
+    'settings.billing.title': 'Abrechnung',
+    'settings.billing.description': 'Verwalten Sie Ihr Abonnement, Plan und Nutzung',
+    'settings.billing.currentPlan': 'Aktueller Plan',
+    'settings.billing.invoicesThisPeriod': 'Rechnungen in diesem Zeitraum',
+    'settings.billing.manageBilling': 'Abrechnung verwalten',
+    'settings.billing.openingPortal': 'Portal wird geöffnet...',
+    'settings.billing.upgradePlan': 'Plan upgraden',
+    'settings.billing.redirecting': 'Weiterleitung...',
+    'settings.billing.upgradeTo': 'Upgrade auf',
+    'settings.billing.euVatNote': 'EU-MwSt wird beim Checkout über Stripe Tax berechnet und eingezogen. Jederzeit aus dem Kundenportal kündbar — EU-Verbraucher behalten ihr 14-tägiges Widerrufsrecht.',
+    'settings.billing.nextRenewal': 'Nächste Verlängerung',
+    'settings.billing.monthlyBilling': 'monatliche Abrechnung',
+    'settings.billing.annualBilling': 'jährliche Abrechnung',
+
+    // ─── Footer ─────────────────────────────────────────────────────────
+    'footer.product': 'Produkt',
+    'footer.legal': 'Rechtliches',
+    'footer.resources': 'Ressourcen',
+    'footer.rights': 'Alle Rechte vorbehalten.',
+
+    // ─── Cookie banner ─────────────────────────────────────────────────
+    'cookie.text': 'Wir verwenden Cookies für Grundfunktionen, Analyse und Marketing (mit Ihrer Zustimmung). Siehe unsere Cookie-Richtlinie für Details.',
+    'cookie.accept': 'Alle akzeptieren',
+    'cookie.reject': 'Nicht-notwendige ablehnen',
+    'cookie.manage': 'Einstellungen verwalten',
+
+    // ─── Common / generic ──────────────────────────────────────────────
+    'common.loading': 'Laden...',
+    'common.cancel': 'Abbrechen',
+    'common.save': 'Speichern',
+    'common.delete': 'Löschen',
+    'common.confirm': 'Bestätigen',
+    'common.back': 'Zurück',
+  },
 };
 
 /**
@@ -209,13 +361,16 @@ export function translate(lang: Language, key: string, params?: Record<string, s
 /**
  * Detect the user's preferred language from the browser.
  * Used on first load (before the user has toggled anything).
- * Falls back to 'en' for non-Czech locales.
+ * Falls back to 'en' for any unsupported locale.
  */
 export function detectBrowserLanguage(): Language {
   if (typeof navigator === 'undefined') return DEFAULT_LANGUAGE;
   const langs = navigator.languages ?? [navigator.language];
   for (const l of langs) {
-    if (l.toLowerCase().startsWith('cs') || l.toLowerCase().startsWith('cz')) return 'cz';
+    const lower = l.toLowerCase();
+    if (lower.startsWith('cs') || lower.startsWith('cz')) return 'cz';
+    if (lower.startsWith('sk')) return 'sk';
+    if (lower.startsWith('de')) return 'de';
   }
   return DEFAULT_LANGUAGE;
 }

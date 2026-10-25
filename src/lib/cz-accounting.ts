@@ -38,7 +38,6 @@ export interface InvoiceExportRow {
   vatAmount: number | null;
   total: number | null;
   currency: string;
-  documentLanguage: string | null;
   customFields?: Record<string, unknown> | null;
 }
 
