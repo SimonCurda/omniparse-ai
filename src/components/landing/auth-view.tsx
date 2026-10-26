@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -24,6 +24,34 @@ export function AuthView({ mode, onSwitch, onBack }: { mode: 'login' | 'signup';
   const [ageConfirmed, setAgeConfirmed] = useState(false);
   const [withdrawalAcknowledged, setWithdrawalAcknowledged] = useState(false);
   const [emailOwnershipConfirmed, setEmailOwnershipConfirmed] = useState(false);
+  // "Remember me" — login-only. When ticked, the server signs the JWT
+  // with a 90-day expiry instead of the default 7d. Persisted to
+  // localStorage so the user doesn't have to re-tick it every login.
+  const [rememberMe, setRememberMe] = useState(false);
+
+  // On first mount (login mode only), restore the saved rememberMe preference.
+  // We use the useEffect-with-empty-deps pattern instead of lazy useState
+  // initialiser because localStorage access must be wrapped in try/catch
+  // for SSR-safety, and the lazy initialiser makes that less readable.
+  useEffect(() => {
+    if (mode !== 'login') return;
+    try {
+      const saved = localStorage.getItem('op_remember_me');
+      if (saved === 'true') setRememberMe(true);
+    } catch {
+      // localStorage unavailable (incognito, SSR) — keep default false
+    }
+  }, [mode]);
+
+  // Persist the rememberMe preference whenever it changes (login mode only)
+  useEffect(() => {
+    if (mode !== 'login') return;
+    try {
+      localStorage.setItem('op_remember_me', rememberMe ? 'true' : 'false');
+    } catch {
+      // localStorage unavailable — silently ignore
+    }
+  }, [rememberMe, mode]);
 
   const setUser = useAppStore((s) => s.setUser);
   const setView = useAppStore((s) => s.setView);
@@ -79,6 +107,10 @@ export function AuthView({ mode, onSwitch, onBack }: { mode: 'login' | 'signup';
         body.ageConfirmed = true;
         body.withdrawalAcknowledged = true;
         body.emailOwnershipConfirmed = true;
+      } else {
+        // Login-only: send the rememberMe flag so the server can sign a
+        // long-lived JWT (90d) when the user opted in.
+        body.rememberMe = rememberMe;
       }
 
       const res = await fetch(endpoint, {
@@ -203,6 +235,24 @@ export function AuthView({ mode, onSwitch, onBack }: { mode: 'login' | 'signup';
                 </Button>
               </div>
             </div>
+
+            {mode === 'login' && (
+              <div className="flex items-center gap-2 pt-1">
+                <Checkbox
+                  id="remember-me"
+                  checked={rememberMe}
+                  onCheckedChange={(checked) => setRememberMe(checked === true)}
+                  disabled={loading}
+                  className="mt-0.5"
+                />
+                <Label
+                  htmlFor="remember-me"
+                  className="text-xs text-muted-foreground font-normal leading-relaxed cursor-pointer select-none"
+                >
+                  {t('auth.rememberMe.label')}
+                </Label>
+              </div>
+            )}
 
             {mode === 'signup' && password.length > 0 && (() => {
               const strength = (() => {

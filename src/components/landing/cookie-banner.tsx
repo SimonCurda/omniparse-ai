@@ -87,7 +87,14 @@ function saveConsent(prefs: Omit<ConsentRecord, 'date' | 'version'>): ConsentRec
 function applyConsentToStorage(record: ConsentRecord) {
   try {
     if (!record.theme) localStorage.removeItem('theme');
-    if (!record.shortcuts) localStorage.removeItem('op_shortcuts');
+    // "shortcuts" consent category covers UI preferences stored in
+    // localStorage — includes both custom keyboard shortcuts and the
+    // "Remember me" login preference (whether the user opted into
+    // long-lived sessions).
+    if (!record.shortcuts) {
+      localStorage.removeItem('op_shortcuts');
+      localStorage.removeItem('op_remember_me');
+    }
     if (!record.legalConsent) localStorage.removeItem('op_legal_consent');
     if (!record.crashLog) localStorage.removeItem('op_crash_log');
   } catch {}

@@ -32,12 +32,18 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
   return bcrypt.compare(password, hash);
 }
 
-export function signToken(payload: JWTPayload): string {
+export function signToken(payload: JWTPayload, options?: { expiry?: string }): string {
   // Session timeout is controlled from the admin panel via the
   // setting_session_timeout FeatureFlag. Default: 7d.
   // The timeout is read synchronously from a module-level cache that's
   // refreshed every 30 seconds by the feature-flags module.
-  const timeout = _currentSessionTimeout || '7d';
+  //
+  // The optional `expiry` override is used by the "Remember me" feature:
+  // when a user logs in with the checkbox ticked, the login route passes
+  // `expiry: '90d'` here, bypassing the admin-configured default. This
+  // means even if the admin sets a short session timeout (e.g. 1d), users
+  // who explicitly chose "Remember me" still get a long-lived session.
+  const timeout = options?.expiry ?? _currentSessionTimeout ?? '7d';
   return jwt.sign(payload, JWT_SECRET, { expiresIn: timeout as any });
 }
 

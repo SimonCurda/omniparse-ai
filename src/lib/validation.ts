@@ -5,6 +5,10 @@ import { z } from 'zod';
 export const loginSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
   password: z.string().min(1, 'Password is required'),
+  // Optional "Remember me" flag — when true, the JWT is signed with a 90-day
+  // expiry instead of the default (7d, or whatever the admin configured via
+  // setting_session_timeout FeatureFlag). Defaults to false on the client.
+  rememberMe: z.boolean().optional().default(false),
 });
 
 export const signupSchema = z.object({

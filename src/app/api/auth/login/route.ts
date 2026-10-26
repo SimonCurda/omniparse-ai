@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
     }
-    const { email, password } = parsed.data;
+    const { email, password, rememberMe } = parsed.data;
 
     const user = await db.user.findUnique({ where: { email: email.toLowerCase() } });
     if (!user) {
@@ -44,7 +44,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid email or password.' }, { status: 401 });
     }
 
-    const token = signToken({ userId: user.id, email: user.email });
+    // "Remember me" — when the user ticks the checkbox on the login form,
+    // the JWT is signed with a 90-day expiry instead of the default
+    // (admin-configured, typically 7d). This is a deliberate security
+    // trade-off: long-lived tokens are slightly more risky if intercepted,
+    // but the user explicitly opted in.
+    const token = signToken(
+      { userId: user.id, email: user.email },
+      rememberMe ? { expiry: '90d' } : undefined,
+    );
 
     return NextResponse.json({
       user: {
