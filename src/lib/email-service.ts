@@ -244,3 +244,120 @@ You're receiving this email because you have an OmniParse AI account. Per GDPR A
     return false;
   }
 }
+
+/**
+ * Send a "payment failed" dunning email when Stripe reports an
+ * `invoice.payment_failed` webhook event.
+ *
+ * DEDUPE: the webhook handler only calls this ONCE per Stripe invoice — it
+ * checks the PaymentRecord ledger first (UNIQUE on stripeInvoiceId) so the
+ * user gets one email per failed invoice, not one per Stripe retry (Stripe
+ * retries up to 4 times over ~2 weeks per the default dunning schedule).
+ *
+ * EU consumer angle (Czech CC §1829 + Dir 2011/83/EU): a failed payment isn't
+ * a "performance" the user requested, so the 14-day withdrawal waiver doesn't
+ * apply here. The email is purely informational — "your card was declined,
+ * update it to keep your subscription". We do NOT imply consent or obligation.
+ *
+ * Returns true on success, false on failure (logged — never throws, since the
+ * webhook caller treats this as fire-and-forget).
+ */
+export async function sendDunningEmail(
+  email: string,
+  params: {
+    amount: string;            // pre-formatted, e.g. "$49.00" or "€499.00"
+    invoiceUrl?: string;       // Stripe hosted_invoice_url (view the failed invoice)
+    manageBillingUrl?: string; // our app URL (user logs in → Settings → manage billing)
+  }
+): Promise<boolean> {
+  const client = getResendClient();
+  if (!client) {
+    console.error('[email] RESEND_API_KEY not set — cannot send dunning email');
+    return false;
+  }
+
+  const fromEmail = getFromEmail();
+  const appUrl = getAppUrl();
+  const { amount, invoiceUrl, manageBillingUrl } = params;
+  const ctaUrl = manageBillingUrl || appUrl;
+
+  const subject = 'Action needed: your OmniParse AI payment failed';
+
+  console.warn(`[email] Sending dunning email to ${email} (amount: ${amount})`);
+
+  try {
+    const { data, error } = await client.emails.send({
+      from: fromEmail,
+      to: email,
+      subject,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <title>${subject}</title>
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px; color: #0f172a;">
+          <div style="background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%); padding: 16px 20px; border-radius: 8px; margin-bottom: 24px;">
+            <span style="color: white; font-weight: 700; font-size: 18px;">OmniParse AI</span>
+          </div>
+          <h1 style="font-size: 22px; margin: 0 0 16px;">We couldn't process your payment</h1>
+          <p style="font-size: 15px; line-height: 1.6; color: #475569;">
+            A payment of <strong>${amount}</strong> for your OmniParse AI subscription was
+            declined by your bank or card provider. This usually happens because a card has
+            expired, been replaced, or hit a spending limit.
+          </p>
+          <p style="font-size: 15px; line-height: 1.6; color: #475569;">
+            <strong>Your subscription is still active for now.</strong> Stripe will automatically
+            retry the payment over the next few days. To avoid an interruption to your service,
+            please update your payment method as soon as possible.
+          </p>
+          <p style="text-align: center; margin: 32px 0;">
+            <a href="${ctaUrl}" style="background: #f59e0b; color: white; padding: 12px 28px; border-radius: 6px; text-decoration: none; font-weight: 600; display: inline-block;">
+              Update payment method
+            </a>
+          </p>
+          ${
+            invoiceUrl
+              ? `<p style="font-size: 13px; line-height: 1.6; color: #64748b;">
+                   You can also <a href="${invoiceUrl}" style="color: #f59e0b;">view the failed invoice on Stripe</a> to see the exact amount and retry schedule.
+                 </p>`
+              : ''
+          }
+          <p style="font-size: 13px; line-height: 1.6; color: #64748b;">
+            If you believe this was a mistake, or if you need help, reply to this email.
+          </p>
+          <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 32px 0;">
+          <p style="font-size: 12px; color: #94a3b8; line-height: 1.5;">
+            OmniParse AI — AI-powered invoice intelligence platform.<br>
+            <a href="${appUrl}" style="color: #94a3b8;">${appUrl.replace(/^https?:\/\//, '')}</a>
+          </p>
+        </body>
+        </html>
+      `,
+      text: `${subject}
+
+A payment of ${amount} for your OmniParse AI subscription was declined by your bank or card provider. This usually happens because a card has expired, been replaced, or hit a spending limit.
+
+Your subscription is still active for now. Stripe will automatically retry the payment over the next few days. To avoid an interruption to your service, please update your payment method as soon as possible.
+
+Update payment method: ${ctaUrl}
+${invoiceUrl ? `View the failed invoice on Stripe: ${invoiceUrl}\n` : ''}If you believe this was a mistake, or if you need help, reply to this email.
+`,
+    });
+
+    if (error) {
+      console.error('[email] Resend API error (dunning):', JSON.stringify(error));
+      return false;
+    }
+
+    console.warn(`[email] Dunning email sent to ${email} (id: ${data?.id || 'unknown'})`);
+    return true;
+  } catch (err) {
+    console.error(
+      '[email] Failed to send dunning email:',
+      err instanceof Error ? err.message : String(err)
+    );
+    return false;
+  }
+}

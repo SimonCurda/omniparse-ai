@@ -162,6 +162,15 @@ export async function POST(req: NextRequest) {
       // via OSS (One-Stop Shop) automatically.
       automatic_tax: { enabled: true },
 
+      // ── EU B2B REVERSE-CHARGE — collect the customer's VAT ID ─────────────
+      // CRITICAL for EU billing: if a Czech/German/French BUSINESS buys a
+      // subscription and provides a valid EU VAT ID, Stripe Tax applies the
+      // REVERSE-CHARGE mechanism (no VAT charged; the buyer self-accounts for
+      // VAT in their own MS). Without this field, every EU B2B customer is
+      // incorrectly charged VAT — they'll dispute it and you'll have to refund
+      // + amend OSS returns. Stripe validates the VAT ID against VIES live.
+      tax_id_collection: { enabled: true },
+
       // Allow promo codes (for launch + partnerships)
       allow_promotion_codes: true,
 
