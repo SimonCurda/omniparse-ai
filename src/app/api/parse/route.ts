@@ -20,6 +20,7 @@ import {
 import { analyzeImageForAiArtifacts } from '@/lib/ai-visual-analysis';
 import { geminiVisionCall, geminiChatCall } from '@/lib/gemini';
 import { extractPdfText as extractPdfContent } from '@/lib/pdf-extractor';
+import { buildVlmPrompt } from '@/lib/ai-prompts';
 
 const ALLOWED_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/webp']);
 const MAX_SIZE = 10 * 1024 * 1024;
@@ -414,65 +415,6 @@ function extractFieldsFromProse(text: string): Record<string, unknown> {
   };
 
   return result;
-}
-
-function buildVlmPrompt(customFieldsPart: string): string {
-  const customSuffix = customFieldsPart ? ',\n  ...customFieldsHere' : '';
-  return `You are an invoice parser. Extract ALL visible fields from the document image.
-
-IMPORTANT: The invoice may be in ANY language (English, Czech, German, French, Spanish, etc.). Extract the fields regardless of the document language. Map foreign-language labels to their English equivalents:
-- Czech: Dodavatel/Prodávající = vendor, Číslo dokladu/č. faktury = invoice number, Datum vystavení = invoice date, Datum splatnosti = due date, Celkem/Celkem uhradit/K úhradě = total, DPH = VAT, Kč = CZK, Sazba DPH = VAT rate, Základ = amount (net), Položka = line item
-- German: Lieferant/Verkäufer = vendor, Rechnungsnummer = invoice number, Rechnungsdatum = invoice date, Fälligkeitsdatum = due date, Gesamtbetrag/Gesamt = total, MwSt/USt = VAT, € = EUR
-- French: Fournisseur/Vendeur = vendor, Numéro de facture = invoice number, Date de facture = invoice date, Date d'échéance = due date, Total/Montant TTC = total, TVA = VAT
-
-CRITICAL: TOTAL FIELD
-- "total" is the FINAL AMOUNT TO PAY — the grand total including VAT/tax
-- Look for labels like: "Total", "Grand Total", "Amount Due", "Balance Due", "Total TTC", "Celkem", "K úhradě", "Gesamtbetrag", "Total a pagar", "Totale"
-- ALWAYS return "total" as a NUMBER (not a string). Example: 1234.56, NOT "1,234.56"
-- If the total is written as "1.234,56" (European), convert to 1234.56
-- If the total is written as "1,234.56" (US), convert to 1234.56
-- If you cannot find a total, look for "amount due", "balance", "to pay", "k úhradě", "zu zahlen"
-- If there is NO total visible, compute it: total = amount (net) + vatAmount (tax). Set total to this computed value.
-
-CRITICAL NUMBER PARSING RULES:
-- European number format: "12 705,00" or "12.705,00" means 12705.00 (space/dot = thousands separator, comma = decimal)
-- US number format: "12,705.00" means 12705.00 (comma = thousands separator, dot = decimal)
-- Always convert to standard float: "12 705,00 Kč" → 12705.00
-- "7 000,00" → 7000.00 (NOT 7.00 — the space means thousands, not decimal)
-- If a number has a space followed by 3 digits and then a comma, it's thousands: "15 300,50" → 15300.50
-- ALL numeric fields (amount, vatAmount, total) MUST be returned as numbers, not strings.
-
-CRITICAL: Output ONLY the JSON object. Do NOT explain, do NOT analyze, do NOT write any text before or after the JSON. Do NOT include confidence labels or field names as values — only actual data from the document.
-
-Output this EXACT JSON schema (fill in the values, use null for missing fields):
-{
-  "vendor": "company name or null",
-  "invoiceNumber": "invoice number string or null",
-  "invoiceDate": "YYYY-MM-DD or null",
-  "dueDate": "YYYY-MM-DD or null",
-  "amount": 1234.56 or null,
-  "vatAmount": 234.56 or null,
-  "total": 1468.12 or null,
-  "currency": "USD or EUR or GBP or CZK etc. or null",
-  "lineItems": [{"description": "item", "quantity": 1, "unitPrice": 10.00}],
-  "fieldConfidence": {
-    "vendor": 0.95,
-    "invoiceNumber": 0.99,
-    "invoiceDate": 0.90,
-    "dueDate": 0.90,
-    "amount": 0.98,
-    "vatAmount": 0.95,
-    "total": 0.99,
-    "currency": 1.0
-  },
-  "confidence": 0.93${customSuffix}
-}
-
-IMPORTANT: For each field, estimate your extraction confidence (0.0 to 1.0) in the fieldConfidence object. The overall confidence is the average of all field confidences. Be honest - if a field is unclear or smudged, give it a lower confidence. If you cannot find a field at all, use null and give that field a confidence of 0.
-
-NEVER put confidence labels (like "High", "Low", "Medium") as field values. Only extract actual data from the document.
-
-If a field is not found, use null. Extract all line items if present. Be precise with numbers — parse European number formats correctly (space = thousands separator, comma = decimal separator).${customFieldsPart}`;
 }
 
 function extractPdfMetadata(buffer: Buffer): Record<string, unknown> | null {

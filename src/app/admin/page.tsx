@@ -9,7 +9,7 @@ import {
   Cpu, CheckCircle2, XCircle, Bug, Activity,
   FlaskConical, BookOpen, DatabaseBackup, Scale, Sparkles,
   Link as LinkIcon, Database, Cloud, CreditCard, Cookie, Github, ExternalLink,
-  Plus, X, Save, Globe, EllipsisVertical, Download,
+  Plus, X, Save, Globe, EllipsisVertical, Download, Beaker,
 } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
@@ -22,6 +22,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { ModelTesterTab } from '@/components/admin/model-tester-tab';
 import * as LucideIcons from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -157,7 +158,7 @@ export default function AdminPage() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'high' | 'medium' | 'low' | 'frozen'>('all');
-  const [tab, setTab] = useState<'accounts' | 'hidden' | 'deleted' | 'providers' | 'flags' | 'modelhealth' | 'links'>('accounts');
+  const [tab, setTab] = useState<'accounts' | 'hidden' | 'deleted' | 'providers' | 'flags' | 'modelhealth' | 'modeltester' | 'links'>('accounts');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [providersLoading, setProvidersLoading] = useState(false);
@@ -203,7 +204,7 @@ export default function AdminPage() {
     // /api-test). The API Tester link passes ?tab=<current> so "Back to
     // Admin" can return to the same tab instead of the default 'accounts'.
     const tabParam = urlParams.get('tab');
-    if (tabParam && ['accounts', 'hidden', 'deleted', 'providers', 'flags', 'modelhealth', 'links'].includes(tabParam)) {
+    if (tabParam && ['accounts', 'hidden', 'deleted', 'providers', 'flags', 'modelhealth', 'modeltester', 'links'].includes(tabParam)) {
       setTab(tabParam as typeof tab);
     }
   }, []);
@@ -882,6 +883,10 @@ export default function AdminPage() {
             <button onClick={() => setTab('modelhealth')}
               className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${tab === 'modelhealth' ? 'border-amber-500 text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
               <Activity className="h-4 w-4 inline mr-1.5" /> Model Health
+            </button>
+            <button onClick={() => setTab('modeltester')}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${tab === 'modeltester' ? 'border-amber-500 text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
+              <Beaker className="h-4 w-4 inline mr-1.5" /> Model Tester
             </button>
             <button onClick={() => setTab('links')}
               className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${tab === 'links' ? 'border-amber-500 text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
@@ -1564,6 +1569,19 @@ export default function AdminPage() {
               )}
             </div>
           </div>
+        )}
+
+        {/* === MODEL TESTER TAB === */}
+        {tab === 'modeltester' && (
+          <ModelTesterTab
+            secret={secret}
+            accounts={accounts.map((a) => ({
+              id: a.id,
+              email: a.email,
+              name: a.name,
+              invoiceCount: a.stats?.invoices ?? 0,
+            }))}
+          />
         )}
 
         {/* === LINKS TAB === */}
