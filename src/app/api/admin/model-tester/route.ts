@@ -5,6 +5,7 @@ import {
   callSpecificModel,
   getProviderKeyCounts,
   extractJsonBlock,
+  extractChatResponse,
   type TesterProvider,
 } from '@/lib/model-tester';
 import { resizeForVisionAI } from '@/lib/image-resize';
@@ -237,28 +238,29 @@ export async function POST(req: NextRequest) {
       const isPdf = mime === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
       const isImage = mime.startsWith('image/');
 
-      let visionBuffer: Buffer;
-      let visionMime: string;
-      let pdfRenderSource: 'canvas' | 'embedded-jpeg' | null = null;
+      let visionBuffer: Buffer | null = null;
+      let visionMime: string | null = null;
+      let pdfRenderSource: 'canvas' | 'embedded-jpeg' | 'text' | null = null;
+      // Digital-PDF text path: set when the PDF has no renderable image and
+      // we mirror production Path B (extracted text → text-model prompt).
+      let textOnlyPrompt: string | null = null;
 
       if (isPdf) {
         // Primary: render the first page to PNG via @napi-rs/canvas.
         // This is the only path that produces a faithful page render for
         // digital (text-based) PDFs — needs the native canvas binary, which
-        // is declared in next.config.ts serverExternalPackages so Vercel
-        // deploys it with the serverless function.
+        // is declared in next.config.ts serverExternalPackages +
+        // outputFileTracingIncludes so Vercel deploys it with the function.
         const png = await renderPdfFirstPageToPng(buffer);
         if (png) {
           visionBuffer = png;
           visionMime = 'image/png';
           pdfRenderSource = 'canvas';
         } else {
-          // Fallback: canvas unavailable OR rendering failed. Try extracting
-          // embedded JPEG streams directly from the PDF — this is the same
-          // Path 3 logic as production (pdf-extractor.ts) and works for
-          // SCANNED PDFs (which store page images as DCTDecode/JPEG) with
-          // zero native deps. Digital (text) PDFs won't have embedded JPEGs
-          // and will surface a clear error below.
+          // Fallback 1: canvas unavailable OR rendering failed. Try extracting
+          // embedded JPEG streams directly from the PDF — same Path 3 logic as
+          // production (pdf-extractor.ts), zero native deps. Works for
+          // SCANNED PDFs (which store page images as DCTDecode/JPEG).
           const extracted = await extractPdfText(buffer);
           if (extracted.source === 'image' && extracted.images && extracted.images.length > 0) {
             // extractPdfText sorts images largest-first — the largest is
@@ -266,15 +268,29 @@ export async function POST(req: NextRequest) {
             visionBuffer = extracted.images[0];
             visionMime = 'image/jpeg';
             pdfRenderSource = 'embedded-jpeg';
+          } else if (extracted.text && extracted.text.trim().length >= 50) {
+            // Fallback 2 — MIRRORS PRODUCTION PATH B (api/parse route):
+            // text-based (digital) PDFs go to the TEXT prompt, not vision.
+            // Production sends VLM_PROMPT + '--- EXTRACTED PDF TEXT ---' +
+            // normalized text through geminiChatCall with the system message
+            // 'You are an invoice parser. Extract all fields and return ONLY
+            // valid JSON.' The tester replicates that exactly, so testing a
+            // digital PDF exercises the same request the production text
+            // cascade would build.
+            const normalizedText = extracted.text
+              .replace(/(\d)\s(\d{3}),(\d{2})/g, '$1$2.$3')
+              .replace(/(\d)\.(\d{3}),(\d{2})/g, '$1$2.$3')
+              .replace(/(\d),(\d{2})\b/g, '$1.$2');
+            textOnlyPrompt =
+              buildVlmPrompt('') + '\n\n--- EXTRACTED PDF TEXT ---\n' + normalizedText;
+            pdfRenderSource = 'text';
           } else {
-            const reason = extracted.text
-              ? 'the PDF is text-based (digital), not a scanned image — canvas rendering is required to produce an image for the vision model'
-              : extracted.errors && extracted.errors.length
-                ? `image extraction also failed (${extracted.errors.join('; ')})`
-                : 'no embedded JPEG images were found in the PDF';
+            const reason = extracted.errors && extracted.errors.length
+              ? `image extraction failed (${extracted.errors.join('; ')}) and no usable text was found`
+              : 'no embedded JPEG images and no extractable text were found in the PDF';
             return NextResponse.json(
               {
-                error: `PDF first-page rendering unavailable on this deployment and ${reason}. Either upload an image (JPG/PNG/WebP) instead, or ensure @napi-rs/canvas is in serverExternalPackages and deployed.`,
+                error: `PDF first-page rendering unavailable on this deployment and ${reason}. Either upload an image (JPG/PNG/WebP) instead, or ensure @napi-rs/canvas is deployed (serverExternalPackages + outputFileTracingIncludes).`,
               },
               { status: 400 },
             );
@@ -291,31 +307,56 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const dataUri = `data:${visionMime};base64,${visionBuffer.toString('base64')}`;
       const prompt = buildVlmPrompt(''); // production prompt, no custom fields
 
       const isVision = isVisionModelId(provider, model);
-      // The image is always attached (OpenAI-compatible image_url) — vision
-      // models consume it; text-only models will either tolerate or reject
-      // it, which is exactly what the admin wants to learn from the test.
-      const messages = [
-        {
-          role: 'user' as const,
-          content: [
-            { type: 'text' as const, text: prompt },
-            { type: 'image_url' as const, image_url: { url: dataUri } },
-          ],
-        },
-      ];
+      // Vision path: image is always attached (OpenAI-compatible image_url) —
+      // vision models consume it; text-only models will either tolerate or
+      // reject it, which is exactly what the admin wants to learn from the test.
+      // Digital-PDF text path: production Path B shape — system message +
+      // prompt with embedded invoice text, no image parts.
+      const messages: Array<
+        | { role: 'user'; content: string }
+        | { role: 'system'; content: string }
+        | {
+            role: 'user';
+            content: Array<
+              | { type: 'text'; text: string }
+              | { type: 'image_url'; image_url: { url: string } }
+            >;
+          }
+      > = textOnlyPrompt
+        ? [
+            {
+              role: 'system',
+              content:
+                'You are an invoice parser. Extract all fields and return ONLY valid JSON.',
+            },
+            { role: 'user', content: textOnlyPrompt },
+          ]
+        : [
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: prompt },
+                {
+                  type: 'image_url',
+                  image_url: { url: `data:${visionMime};base64,${visionBuffer!.toString('base64')}` },
+                },
+              ],
+            },
+          ];
 
       const result = await callSpecificModel({
         provider,
         model,
         messages,
-        temperature: 0.1, // production vision temperature
+        temperature: 0.1, // production vision + text extraction temperature
         maxTokens: 4096,
         jsonMode: true,
-        isVisionModel: isVision,
+        // Vision models reject response_format; the text-only path targets
+        // text models (production json_mode behaviour for the text cascade).
+        isVisionModel: isVision && !textOnlyPrompt,
       });
 
       const { parsed, error: parseError } = result.ok
@@ -330,8 +371,9 @@ export async function POST(req: NextRequest) {
         latencyMs: result.latencyMs,
         keyIndexUsed: result.keyIndexUsed,
         retriedWithoutJsonMode: result.retriedWithoutJsonMode,
-        inputImageBytes: visionBuffer.length,
+        inputImageBytes: visionBuffer ? visionBuffer.length : 0,
         inputImageMime: visionMime,
+        inputTextChars: textOnlyPrompt ? textOnlyPrompt.length : 0,
         pdfRenderSource,
         rawText: result.text,
         parsed,
@@ -439,9 +481,13 @@ export async function POST(req: NextRequest) {
       jsonMode: chatJsonMode,
     });
 
-    const { parsed, error: parseError } = result.ok
-      ? extractJsonBlock(result.text)
-      : { parsed: null, error: undefined as string | undefined };
+    // Extract display text + artifact from the response. Handles BOTH the
+    // clean JSON envelope ({text, artifact} — json_mode models) and the
+    // markdown-with-embedded-```json-artifact shape (Mistral chat without
+    // json_mode), mirroring what production's repair chain achieves.
+    const { displayText, artifact, parseError } = result.ok
+      ? extractChatResponse(result.text)
+      : { displayText: '', artifact: null, parseError: null };
 
     return NextResponse.json({
       mode: 'chat',
@@ -453,8 +499,9 @@ export async function POST(req: NextRequest) {
       retriedWithoutJsonMode: result.retriedWithoutJsonMode,
       contextInvoiceCount,
       rawText: result.text,
-      parsed,
-      parseError: parseError ?? null,
+      displayText,
+      artifact,
+      parseError,
       error: result.error ?? null,
     });
   } catch (err) {

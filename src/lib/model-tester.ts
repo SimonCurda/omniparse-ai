@@ -487,3 +487,111 @@ export function extractJsonBlock(text: string): { parsed: unknown | null; error?
     return { parsed: null, error: err instanceof Error ? err.message : String(err) };
   }
 }
+
+// ─── Chat response extraction (tester version of the production cleanup) ───
+//
+// Production chat responses are supposed to be a JSON envelope:
+//   {"text": "...", "artifact": {"type": "chart-bar", "title": ..., "data": ...}}
+// With json_mode active (Groq/OpenRouter) models mostly comply. WITHOUT
+// json_mode (Mistral chat — and any model that silently rejected it) models
+// often return free markdown text with the artifact embedded as a fenced
+// ```json code block inside the text instead.
+//
+// extractChatResponse handles BOTH shapes:
+//   1. Envelope:  extractJsonBlock finds {text, artifact} → use both.
+//   2. Embedded:  scan the markdown for fenced ```json blocks; if one parses
+//                 to an artifact-shaped object, treat it as the artifact and
+//                 strip the block from the displayed text (so the admin sees
+//                 the rendered chart/table instead of a wall of JSON).
+//
+// The raw text is always available to the caller (rawText) — this only
+// decides what gets DISPLAYED by default.
+
+export interface ChatExtractResult {
+  /** Text to display in the chat bubble (artifact JSON stripped out). */
+  displayText: string;
+  /** The artifact object if one was found (envelope or fenced block). */
+  artifact: unknown | null;
+  /** Set when no JSON at all could be extracted (informational only). */
+  parseError: string | null;
+}
+
+function isArtifactShaped(v: unknown): boolean {
+  if (typeof v !== 'object' || v === null) return false;
+  const o = v as Record<string, unknown>;
+  return (
+    typeof o.type === 'string' &&
+    typeof o.data === 'object' &&
+    o.data !== null
+  );
+}
+
+export function extractChatResponse(text: string): ChatExtractResult {
+  if (!text) return { displayText: '', artifact: null, parseError: 'empty response' };
+
+  let displayText = text.trim();
+  let artifact: unknown = null;
+  let parseError: string | null = null;
+
+  // ── 1. Envelope extraction ({text, artifact}) ─────────────────────────
+  const { parsed, error } = extractJsonBlock(displayText);
+  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+    const obj = parsed as Record<string, unknown>;
+    const looksLikeEnvelope = 'artifact' in obj || typeof obj.text === 'string';
+    if (looksLikeEnvelope) {
+      if (obj.artifact != null) artifact = obj.artifact;
+      // Only replace the display text when the envelope actually carries a
+      // usable text field — otherwise keep the raw markdown.
+      if (typeof obj.text === 'string' && obj.text.trim()) {
+        displayText = obj.text.trim();
+      }
+    }
+  } else if (error) {
+    parseError = error;
+  }
+
+  // ── 2. Fenced ```json artifact block scan ─────────────────────────────
+  // Handles the no-json_mode failure mode: artifact embedded in markdown.
+  // Also cleans the envelope case where the model returned {artifact: ...}
+  // with NO text — the raw fallback still contains the fenced JSON block,
+  // which should be stripped once the artifact has been captured.
+  if (/```(?:json)?\s*\n/.test(displayText)) {
+    const fenceRegex = /```(?:json)?\s*\n([\s\S]*?)```/g;
+    const blocksToRemove: string[] = [];
+    let m: RegExpExecArray | null;
+    while ((m = fenceRegex.exec(displayText)) !== null) {
+      let inner: unknown;
+      try {
+        inner = JSON.parse(m[1].trim());
+      } catch {
+        continue; // not JSON — leave the block alone (could be code sample)
+      }
+      let candidate: unknown = inner;
+      // Accept both the bare artifact and a {"artifact": {...}} wrapper.
+      if (
+        typeof inner === 'object' && inner !== null &&
+        'artifact' in (inner as Record<string, unknown>)
+      ) {
+        candidate = (inner as Record<string, unknown>).artifact;
+      }
+      if (isArtifactShaped(candidate)) {
+        if (artifact == null) artifact = candidate;
+        blocksToRemove.push(m[0]);
+      }
+    }
+    for (const block of blocksToRemove) {
+      displayText = displayText.replace(block, '');
+    }
+    // Remove orphaned headings that referenced the stripped block
+    // (e.g. "### **Artifact: Suspicious Invoices Summary**"). Only true
+    // headings (#…) or standalone bold lines — NOT regular sentences that
+    // merely start with the word "Artifact".
+    displayText = displayText
+      .replace(/^[ \t]{0,3}#{1,6}[ \t]+[^\n]*artifact[^\n]*\n?/gim, '')
+      .replace(/^[ \t]{0,3}\*\*[ \t]*Artifact[^\n]*\*\*[ \t]*\n?/gim, '');
+    // Collapse the 3+ consecutive blank lines the removals leave behind.
+    displayText = displayText.replace(/\n{3,}/g, '\n\n').trim();
+  }
+
+  return { displayText, artifact, parseError };
+}

@@ -92,13 +92,15 @@ interface ParseResult extends ResultMeta {
   parsed: Extraction | null;
   parseError: string | null;
   inputImageBytes: number;
-  inputImageMime: string;
-  pdfRenderSource?: 'canvas' | 'embedded-jpeg' | null;
+  inputImageMime: string | null;
+  inputTextChars: number;
+  pdfRenderSource?: 'canvas' | 'embedded-jpeg' | 'text' | null;
 }
 
 interface ChatResult extends ResultMeta {
   rawText: string;
-  parsed: { text?: string; artifact?: unknown } | null;
+  displayText: string;
+  artifact: unknown | null;
   parseError: string | null;
   contextInvoiceCount: number;
 }
@@ -121,7 +123,7 @@ const PROVIDERS: Array<{ id: Provider; label: string }> = [
 // ── Meta chips — status row shown under every test result ──────────────────
 // Defined at module level (not inside the component) to satisfy
 // react-hooks/static-components.
-function MetaChips({ meta }: { meta: ResultMeta & { contextInvoiceCount?: number; pdfRenderSource?: 'canvas' | 'embedded-jpeg' | null } }) {
+function MetaChips({ meta }: { meta: ResultMeta & { contextInvoiceCount?: number; pdfRenderSource?: 'canvas' | 'embedded-jpeg' | 'text' | null } }) {
   return (
     <div className="flex flex-wrap gap-1.5 mt-2">
       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${meta.ok ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-red-500/10 text-red-600 dark:text-red-400'}`}>
@@ -153,7 +155,12 @@ function MetaChips({ meta }: { meta: ResultMeta & { contextInvoiceCount?: number
       )}
       {meta.pdfRenderSource && (
         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-muted text-muted-foreground">
-          PDF: {meta.pdfRenderSource === 'canvas' ? 'canvas render' : 'embedded JPEG'}
+          PDF:{' '}
+          {meta.pdfRenderSource === 'canvas'
+            ? 'canvas render'
+            : meta.pdfRenderSource === 'embedded-jpeg'
+              ? 'embedded JPEG'
+              : 'text extraction (production Path B)'}
         </span>
       )}
       {typeof meta.contextInvoiceCount === 'number' && meta.contextInvoiceCount > 0 && (
@@ -439,14 +446,16 @@ export function ModelTesterTab({ secret, accounts }: { secret: string; accounts:
         return;
       }
       const result = data as ChatResult;
-      const replyText = result.parsed?.text || result.rawText || '(empty response)';
+      // displayText: envelope text, or markdown with the artifact JSON block
+      // stripped out (extractChatResponse handles both shapes server-side).
+      const replyText = result.displayText || result.rawText || '(empty response)';
       setChatMessages((prev) => [
         ...prev,
         {
           role: 'assistant',
           text: result.ok ? replyText : `⚠️ Model call failed (HTTP ${result.statusCode}): ${result.error || ''}`,
           meta: result,
-          artifact: result.parsed?.artifact ?? null,
+          artifact: result.artifact ?? null,
           raw: result.rawText,
         },
       ]);
