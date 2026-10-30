@@ -33,6 +33,10 @@ import {
   Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
 } from '@/components/ui/command';
 import { cn } from '@/lib/utils';
+import {
+  ArtifactRenderer,
+  isRenderableArtifact,
+} from '@/components/shared/artifact-renderer';
 import { toast } from 'sonner';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -789,14 +793,27 @@ export function ModelTesterTab({ secret, accounts }: { secret: string; accounts:
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.text}</ReactMarkdown>
                       </div>
                       {m.artifact != null && (
-                        <details className="mt-2">
-                          <summary className="text-[11px] text-muted-foreground cursor-pointer select-none">
-                            artifact JSON
-                          </summary>
-                          <pre className="mt-1 rounded border border-border bg-muted/30 p-2 text-[10px] font-mono whitespace-pre-wrap break-all max-h-48 overflow-y-auto">
-                            {JSON.stringify(m.artifact, null, 2)}
-                          </pre>
-                        </details>
+                        <>
+                          {/* Render the artifact visually (chart/table/summary)
+                              when the model emitted a valid artifact shape.
+                              Falls through to just-the-JSON when malformed. */}
+                          {isRenderableArtifact(m.artifact) && (
+                            <ArtifactRenderer artifact={m.artifact} />
+                          )}
+                          {/* Keep the raw JSON collapsible — useful for
+                              inspecting exactly what the model produced,
+                              especially for unsupported artifact types. */}
+                          <details className="mt-2">
+                            <summary className="text-[11px] text-muted-foreground cursor-pointer select-none">
+                              {isRenderableArtifact(m.artifact)
+                                ? 'artifact JSON'
+                                : 'malformed artifact — raw JSON'}
+                            </summary>
+                            <pre className="mt-1 rounded border border-border bg-muted/30 p-2 text-[10px] font-mono whitespace-pre-wrap break-all max-h-48 overflow-y-auto">
+                              {JSON.stringify(m.artifact, null, 2)}
+                            </pre>
+                          </details>
+                        </>
                       )}
                       {m.meta && <MetaChips meta={m.meta} />}
                       {m.raw && i === chatMessages.length - 1 && (
