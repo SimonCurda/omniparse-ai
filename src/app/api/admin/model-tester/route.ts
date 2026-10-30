@@ -380,13 +380,34 @@ export async function POST(req: NextRequest) {
     // Production chat temperatures: Mistral text legs use 0.1, Groq/OpenRouter use 0.7.
     const temperature = provider === 'mistral' ? 0.1 : 0.7;
 
+    // Production json-mode behaviour for chat — MUST mirror gemini.ts /
+    // openrouter.ts, otherwise the tester reports failures that production
+    // would never hit (or vice versa):
+    //
+    //   • Mistral chat NEVER uses json_mode in production. geminiChatCall
+    //     builds the Mistral request body without `response_format` because
+    //     the chatbot system prompt is conversational, not a strict JSON
+    //     schema. Forcing json_object on it makes Mistral's validator reject
+    //     the request with HTTP 422 — especially once a real account's
+    //     invoice context is appended (the "how many invoices do I have"
+    //     422 with 82 invoices in context). So Mistral chat = no json_mode.
+    //
+    //   • Groq & OpenRouter chat DO use json_mode in production — the
+    //     chatbot prompt is written to make them emit a JSON envelope
+    //     ({text, artifact}). model-tester.ts still retries once without
+    //     json_mode on any 400/422, matching the production fallback.
+    //
+    //   • Gemini chat is left without json_mode — the chatbot prompt was
+    //     never tuned for Gemini's `responseMimeType: application/json`.
+    const chatJsonMode = provider === 'groq' || provider === 'openrouter';
+
     const result = await callSpecificModel({
       provider,
       model,
       messages,
       temperature,
       maxTokens: 4096,
-      jsonMode: true,
+      jsonMode: chatJsonMode,
     });
 
     const { parsed, error: parseError } = result.ok

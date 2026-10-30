@@ -144,22 +144,24 @@ async function openAICompatAttempt(
 
   let res = await doFetch(body);
 
-  // JSON-mode rejection → retry once without response_format (production
-  // behaviour for 400 "json_validate_failed" / "does not support feature" and 422).
+  // JSON-mode rejection → retry once without response_format.
+  //
+  // Intentionally MORE lenient than production (gemini.ts / openrouter.ts
+  // match specific error keywords before retrying). The tester retries on
+  // ANY 400/422 with json_mode active, because:
+  //   1. The cost of one extra call is trivial in a testing tool.
+  //   2. Provider error wording varies wildly (Mistral's 422 on a long
+  //      chatbot context doesn't always contain 'response_format' or
+  //      'json_validate_failed'), so a keyword list always lags reality.
+  //   3. It surfaces model quirks to the admin instead of failing silently.
+  //
+  // If the retry also fails, that second error is what gets surfaced
+  // (it's the "real" error without the json_mode complication).
   let retried = false;
   if (!res.ok && (res.status === 400 || res.status === 422) && jsonModeActive) {
-    const errText = await res.text().catch(() => '');
-    const lower = errText.toLowerCase();
-    if (
-      lower.includes('json_validate_failed') ||
-      lower.includes('structured-outputs') ||
-      lower.includes('response_format') ||
-      lower.includes('invalid_request_body')
-    ) {
-      const { response_format: _omit, ...rest } = body;
-      res = await doFetch(rest);
-      retried = true;
-    }
+    const { response_format: _omit, ...rest } = body;
+    res = await doFetch(rest);
+    retried = true;
   }
 
   if (res.ok) {

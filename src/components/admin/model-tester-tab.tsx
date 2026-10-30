@@ -15,16 +15,24 @@
 // Data flows through /api/admin/model-tester (CRON_SECRET auth, same as the
 // rest of the admin panel).
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useId } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
   Upload, Send, Loader2, CheckCircle2, XCircle, Clock, Key,
   Eraser, FileText, MessageSquare, Eye, EyeOff, TriangleAlert,
+  Check, ChevronDown,
 } from 'lucide-react';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import {
+  Popover, PopoverContent, PopoverTrigger,
+} from '@/components/ui/popover';
+import {
+  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
+} from '@/components/ui/command';
+import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -144,6 +152,124 @@ function MetaChips({ meta }: { meta: ResultMeta & { contextInvoiceCount?: number
         </span>
       )}
     </div>
+  );
+}
+
+// ── ModelCombobox — searchable model picker ─────────────────────────────────
+// Popover + cmdk combobox. The plain Select had no way to filter by typing,
+// which was painful for providers with 20+ catalog entries (OpenRouter).
+// This component lives at module level (not inside ModelTesterTab) so React's
+// static-elements lint rule stays happy.
+function ModelCombobox({
+  value,
+  onChange,
+  models,
+  placeholder = 'Select a model',
+}: {
+  value: string;
+  onChange: (id: string) => void;
+  models: CatalogEntry[];
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  // Stable id so the trigger's aria-controls points at the listbox.
+  const listId = useId();
+
+  // Same sort as the old Select: production models first, then alphabetical.
+  const sorted = [...models].sort(
+    (a, b) => Number(b.inProduction) - Number(a.inProduction) || a.id.localeCompare(b.id),
+  );
+  const q = query.trim().toLowerCase();
+  const filtered = q ? sorted.filter((m) => m.id.toLowerCase().includes(q)) : sorted;
+  const selected = sorted.find((m) => m.id === value) || null;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          role="combobox"
+          aria-expanded={open}
+          aria-controls={listId}
+          className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg border border-border bg-background text-sm hover:bg-muted/30 transition-colors"
+        >
+          <span className="flex items-center gap-2 min-w-0">
+            {selected ? (
+              <>
+                <span className="font-mono truncate">{selected.id}</span>
+                {selected.inProduction && (
+                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shrink-0">
+                    prod
+                  </span>
+                )}
+                {selected.vision && (
+                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-blue-500/10 text-blue-600 dark:text-blue-400 shrink-0">
+                    vision
+                  </span>
+                )}
+              </>
+            ) : (
+              <span className="text-muted-foreground">{placeholder}</span>
+            )}
+          </span>
+          <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        className="p-0 min-w-72"
+        // Match the trigger width so the dropdown never shrinks narrower than it.
+        style={{ width: 'var(--radix-popover-trigger-width)' }}
+        align="start"
+      >
+        <Command shouldFilter={false}>
+          <CommandInput
+            placeholder="Search models…"
+            value={query}
+            onValueChange={setQuery}
+          />
+          <CommandList id={listId}>
+            <CommandEmpty>
+              {q ? <>No model matches &ldquo;{query}&rdquo;.</> : 'No models available.'}
+            </CommandEmpty>
+            <CommandGroup>
+              {filtered.map((m) => (
+                <CommandItem
+                  key={m.id}
+                  value={m.id}
+                  onSelect={() => {
+                    onChange(m.id);
+                    setOpen(false);
+                    setQuery('');
+                  }}
+                  className="text-xs"
+                >
+                  <Check
+                    className={cn(
+                      'h-3.5 w-3.5 shrink-0',
+                      value === m.id ? 'opacity-100' : 'opacity-0',
+                    )}
+                  />
+                  <span className="flex items-center gap-2 min-w-0">
+                    <span className="font-mono truncate">{m.id}</span>
+                    {m.inProduction && (
+                      <span className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shrink-0">
+                        prod
+                      </span>
+                    )}
+                    {m.vision && (
+                      <span className="px-1.5 py-0.5 rounded text-[10px] bg-blue-500/10 text-blue-600 dark:text-blue-400 shrink-0">
+                        vision
+                      </span>
+                    )}
+                  </span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -411,32 +537,12 @@ export function ModelTesterTab({ secret, accounts }: { secret: string; accounts:
               No models listed for this provider (or no key configured) — use a custom model ID.
             </div>
           ) : (
-            <Select value={model} onValueChange={setModel}>
-              <SelectTrigger className="w-full text-sm">
-                <SelectValue placeholder="Select a model" />
-              </SelectTrigger>
-              <SelectContent className="max-h-72">
-                {[...modelList]
-                  .sort((a, b) => Number(b.inProduction) - Number(a.inProduction) || a.id.localeCompare(b.id))
-                  .map((m) => (
-                    <SelectItem key={m.id} value={m.id} className="text-xs">
-                      <span className="flex items-center gap-2">
-                        <span className="font-mono">{m.id}</span>
-                        {m.inProduction && (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                            prod
-                          </span>
-                        )}
-                        {m.vision && (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] bg-blue-500/10 text-blue-600 dark:text-blue-400">
-                            vision
-                          </span>
-                        )}
-                      </span>
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
+            <ModelCombobox
+              value={model}
+              onChange={setModel}
+              models={modelList}
+              placeholder="Select a model"
+            />
           )}
         </div>
 
