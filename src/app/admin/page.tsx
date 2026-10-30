@@ -21,6 +21,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { ThemeToggle } from '@/components/theme-toggle';
 import * as LucideIcons from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -819,10 +820,13 @@ export default function AdminPage() {
             <div className="w-8 h-8 rounded-lg bg-amber-500 flex items-center justify-center"><Shield className="h-4 w-4 text-white" /></div>
             <span className="font-semibold text-sm">OmniParse Admin</span>
           </div>
-          <button onClick={fetchAccounts} disabled={loading}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs hover:bg-muted/50 disabled:opacity-50">
-            {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} Refresh
-          </button>
+          <div className="flex items-center gap-1.5">
+            <ThemeToggle />
+            <button onClick={fetchAccounts} disabled={loading}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs hover:bg-muted/50 disabled:opacity-50">
+              {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} Refresh
+            </button>
+          </div>
         </div>
       </header>
 
