@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: false,
-  serverExternalPackages: ['bcryptjs', 'jsonwebtoken', 'stripe', 'pdfjs-dist'],
+  serverExternalPackages: ['bcryptjs', 'jsonwebtoken', 'stripe', 'pdfjs-dist', '@napi-rs/canvas'],
   // ignoreBuildErrors = true so pre-existing TS errors from the rebase don't
   // block production builds. New code should still be type-clean.
   typescript: { ignoreBuildErrors: true },

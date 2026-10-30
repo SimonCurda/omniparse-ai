@@ -89,6 +89,7 @@ interface ParseResult extends ResultMeta {
   parseError: string | null;
   inputImageBytes: number;
   inputImageMime: string;
+  pdfRenderSource?: 'canvas' | 'embedded-jpeg' | null;
 }
 
 interface ChatResult extends ResultMeta {
@@ -116,7 +117,7 @@ const PROVIDERS: Array<{ id: Provider; label: string }> = [
 // ── Meta chips — status row shown under every test result ──────────────────
 // Defined at module level (not inside the component) to satisfy
 // react-hooks/static-components.
-function MetaChips({ meta }: { meta: ResultMeta & { contextInvoiceCount?: number } }) {
+function MetaChips({ meta }: { meta: ResultMeta & { contextInvoiceCount?: number; pdfRenderSource?: 'canvas' | 'embedded-jpeg' | null } }) {
   return (
     <div className="flex flex-wrap gap-1.5 mt-2">
       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${meta.ok ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-red-500/10 text-red-600 dark:text-red-400'}`}>
@@ -143,7 +144,12 @@ function MetaChips({ meta }: { meta: ResultMeta & { contextInvoiceCount?: number
       )}
       {meta.retriedWithoutJsonMode && (
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-amber-500/10 text-amber-600 dark:text-amber-400">
-          <TriangleAlert className="h-3 w-3" />JSON mode rejected — retried without
+          <TriangleAlert className="h-3 w-3" />Retried without response_format/usage_options
+        </span>
+      )}
+      {meta.pdfRenderSource && (
+        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-muted text-muted-foreground">
+          PDF: {meta.pdfRenderSource === 'canvas' ? 'canvas render' : 'embedded JPEG'}
         </span>
       )}
       {typeof meta.contextInvoiceCount === 'number' && meta.contextInvoiceCount > 0 && (

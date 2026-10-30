@@ -9,6 +9,7 @@ import {
 } from '@/lib/model-tester';
 import { resizeForVisionAI } from '@/lib/image-resize';
 import { renderPdfFirstPageToPng } from '@/lib/pdf-to-image';
+import { extractPdfText } from '@/lib/pdf-extractor';
 
 // ─── Admin Model Tester ─────────────────────────────────────────────────────
 // GET  /api/admin/model-tester?key=CRON_SECRET
@@ -238,20 +239,47 @@ export async function POST(req: NextRequest) {
 
       let visionBuffer: Buffer;
       let visionMime: string;
+      let pdfRenderSource: 'canvas' | 'embedded-jpeg' | null = null;
 
       if (isPdf) {
+        // Primary: render the first page to PNG via @napi-rs/canvas.
+        // This is the only path that produces a faithful page render for
+        // digital (text-based) PDFs — needs the native canvas binary, which
+        // is declared in next.config.ts serverExternalPackages so Vercel
+        // deploys it with the serverless function.
         const png = await renderPdfFirstPageToPng(buffer);
-        if (!png) {
-          return NextResponse.json(
-            {
-              error:
-                'PDF first-page rendering is unavailable on this deployment — upload an image (JPG/PNG/WebP) instead.',
-            },
-            { status: 400 },
-          );
+        if (png) {
+          visionBuffer = png;
+          visionMime = 'image/png';
+          pdfRenderSource = 'canvas';
+        } else {
+          // Fallback: canvas unavailable OR rendering failed. Try extracting
+          // embedded JPEG streams directly from the PDF — this is the same
+          // Path 3 logic as production (pdf-extractor.ts) and works for
+          // SCANNED PDFs (which store page images as DCTDecode/JPEG) with
+          // zero native deps. Digital (text) PDFs won't have embedded JPEGs
+          // and will surface a clear error below.
+          const extracted = await extractPdfText(buffer);
+          if (extracted.source === 'image' && extracted.images && extracted.images.length > 0) {
+            // extractPdfText sorts images largest-first — the largest is
+            // almost always the full-page scan.
+            visionBuffer = extracted.images[0];
+            visionMime = 'image/jpeg';
+            pdfRenderSource = 'embedded-jpeg';
+          } else {
+            const reason = extracted.text
+              ? 'the PDF is text-based (digital), not a scanned image — canvas rendering is required to produce an image for the vision model'
+              : extracted.errors && extracted.errors.length
+                ? `image extraction also failed (${extracted.errors.join('; ')})`
+                : 'no embedded JPEG images were found in the PDF';
+            return NextResponse.json(
+              {
+                error: `PDF first-page rendering unavailable on this deployment and ${reason}. Either upload an image (JPG/PNG/WebP) instead, or ensure @napi-rs/canvas is in serverExternalPackages and deployed.`,
+              },
+              { status: 400 },
+            );
+          }
         }
-        visionBuffer = png;
-        visionMime = 'image/png';
       } else if (isImage) {
         const resized = await resizeForVisionAI(buffer, mime);
         visionBuffer = resized.buffer;
@@ -304,6 +332,7 @@ export async function POST(req: NextRequest) {
         retriedWithoutJsonMode: result.retriedWithoutJsonMode,
         inputImageBytes: visionBuffer.length,
         inputImageMime: visionMime,
+        pdfRenderSource,
         rawText: result.text,
         parsed,
         parseError: parseError ?? null,

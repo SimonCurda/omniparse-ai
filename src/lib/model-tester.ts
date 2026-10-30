@@ -144,24 +144,32 @@ async function openAICompatAttempt(
 
   let res = await doFetch(body);
 
-  // JSON-mode rejection → retry once without response_format.
+  // 400/422 → retry once with non-essential fields stripped.
   //
-  // Intentionally MORE lenient than production (gemini.ts / openrouter.ts
-  // match specific error keywords before retrying). The tester retries on
-  // ANY 400/422 with json_mode active, because:
-  //   1. The cost of one extra call is trivial in a testing tool.
-  //   2. Provider error wording varies wildly (Mistral's 422 on a long
-  //      chatbot context doesn't always contain 'response_format' or
-  //      'json_validate_failed'), so a keyword list always lags reality.
-  //   3. It surfaces model quirks to the admin instead of failing silently.
+  // The tester strips BOTH `response_format` AND `usage_options` on retry,
+  // because either can cause a 422 and we can't always tell which from the
+  // error wording:
   //
-  // If the retry also fails, that second error is what gets surfaced
-  // (it's the "real" error without the json_mode complication).
+  //   • response_format (json_mode) — some models don't support it.
+  //   • usage_options ({ enable_training: false }) — the GDPR training
+  //     opt-out. PAID-tier Mistral keys accept it; FREE-tier keys reject it
+  //     with 422 "extra_forbidden" (the AI Act notice already documents
+  //     this: "on free tier, Mistral may ignore or reject this parameter").
+  //     The opt-out provides no actual protection when the API rejects it,
+  //     so retrying without it is strictly better than failing.
+  //
+  // The retry only fires if at least one of those fields is actually in the
+  // body (otherwise we'd just be re-sending the identical request). The
+  // cost of one extra call is trivial in a testing tool. If the retry also
+  // fails, that second error is what gets surfaced (it's the "real" error
+  // without the optional-field complication).
   let retried = false;
-  if (!res.ok && (res.status === 400 || res.status === 422) && jsonModeActive) {
-    const { response_format: _omit, ...rest } = body;
-    res = await doFetch(rest);
-    retried = true;
+  if (!res.ok && (res.status === 400 || res.status === 422)) {
+    const { response_format: _rf, usage_options: _uo, ...rest } = body;
+    if (_rf !== undefined || _uo !== undefined) {
+      res = await doFetch(rest);
+      retried = true;
+    }
   }
 
   if (res.ok) {
