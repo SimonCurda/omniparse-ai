@@ -21,7 +21,7 @@ import remarkGfm from 'remark-gfm';
 import {
   Upload, Send, Loader2, CheckCircle2, XCircle, Clock, Key,
   Eraser, FileText, MessageSquare, Eye, EyeOff, TriangleAlert,
-  Check, ChevronDown,
+  Check, ChevronDown, Wrench,
 } from 'lucide-react';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -91,6 +91,8 @@ interface ParseResult extends ResultMeta {
   rawText: string;
   parsed: Extraction | null;
   parseError: string | null;
+  /** Repair stages the server had to apply for `parsed` to exist. */
+  jsonRepairs?: string[] | null;
   inputImageBytes: number;
   inputImageMime: string | null;
   inputTextChars: number;
@@ -102,13 +104,16 @@ interface ChatResult extends ResultMeta {
   displayText: string;
   artifact: unknown | null;
   parseError: string | null;
+  /** True when the artifact was salvaged from the response body (fence /
+   *  pseudo-envelope / inline JSON) instead of a clean JSON envelope. */
+  artifactSalvaged?: boolean;
   contextInvoiceCount: number;
 }
 
 interface ChatBubble {
   role: 'user' | 'assistant';
   text: string;
-  meta?: ResultMeta & { contextInvoiceCount?: number };
+  meta?: ResultMeta & { contextInvoiceCount?: number; artifactSalvaged?: boolean };
   artifact?: unknown;
   raw?: string;
 }
@@ -123,7 +128,7 @@ const PROVIDERS: Array<{ id: Provider; label: string }> = [
 // ── Meta chips — status row shown under every test result ──────────────────
 // Defined at module level (not inside the component) to satisfy
 // react-hooks/static-components.
-function MetaChips({ meta }: { meta: ResultMeta & { contextInvoiceCount?: number; pdfRenderSource?: 'canvas' | 'embedded-jpeg' | 'text' | null } }) {
+function MetaChips({ meta }: { meta: ResultMeta & { contextInvoiceCount?: number; pdfRenderSource?: 'canvas' | 'embedded-jpeg' | 'text' | null; jsonRepairs?: string[] | null; artifactSalvaged?: boolean } }) {
   return (
     <div className="flex flex-wrap gap-1.5 mt-2">
       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${meta.ok ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-red-500/10 text-red-600 dark:text-red-400'}`}>
@@ -161,6 +166,24 @@ function MetaChips({ meta }: { meta: ResultMeta & { contextInvoiceCount?: number
             : meta.pdfRenderSource === 'embedded-jpeg'
               ? 'embedded JPEG'
               : 'text extraction (production Path B)'}
+        </span>
+      )}
+      {meta.jsonRepairs && meta.jsonRepairs.length > 0 && (
+        <span
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400"
+          title="The model emitted almost-valid JSON — the server repair chain fixed it. This model needs that repair before raw use in strict-JSON integrations."
+        >
+          <Wrench className="h-3 w-3" />
+          JSON repaired ({meta.jsonRepairs.join('; ')})
+        </span>
+      )}
+      {meta.artifactSalvaged && (
+        <span
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400"
+          title="The artifact was recovered from the response body (embedded fence / pseudo-JSON envelope) instead of a clean {text, artifact} envelope — this model doesn't emit clean envelopes on its own."
+        >
+          <Wrench className="h-3 w-3" />
+          Artifact salvaged from text
         </span>
       )}
       {typeof meta.contextInvoiceCount === 'number' && meta.contextInvoiceCount > 0 && (

@@ -359,9 +359,13 @@ export async function POST(req: NextRequest) {
         isVisionModel: isVision && !textOnlyPrompt,
       });
 
-      const { parsed, error: parseError } = result.ok
+      const { parsed, error: parseError, repairs } = result.ok
         ? extractJsonBlock(result.text)
-        : { parsed: null, error: undefined as string | undefined };
+        : {
+            parsed: null,
+            error: undefined as string | undefined,
+            repairs: undefined as string[] | undefined,
+          };
 
       return NextResponse.json({
         mode: 'parse',
@@ -378,6 +382,11 @@ export async function POST(req: NextRequest) {
         rawText: result.text,
         parsed,
         parseError: parseError ?? null,
+        // Which JSON repairs had to be applied for `parsed` to exist — the
+        // UI shows an amber "JSON repaired" chip so the admin knows this
+        // model emits almost-valid JSON (e.g. "3500.00 + 1500.00" in a
+        // number value) and can't be trusted raw in strict integrations.
+        jsonRepairs: repairs ?? null,
         error: result.error ?? null,
       });
     }
@@ -481,13 +490,16 @@ export async function POST(req: NextRequest) {
       jsonMode: chatJsonMode,
     });
 
-    // Extract display text + artifact from the response. Handles BOTH the
-    // clean JSON envelope ({text, artifact} — json_mode models) and the
-    // markdown-with-embedded-```json-artifact shape (Mistral chat without
-    // json_mode), mirroring what production's repair chain achieves.
-    const { displayText, artifact, parseError } = result.ok
+    // Extract display text + artifact from the response. Handles ALL the
+    // shapes the models produce, mirroring production's repair chain:
+    //   1. Clean JSON envelope ({text, artifact}) — json_mode models.
+    //   2. Markdown + CLOSED ```json fence holding the artifact.
+    //   3. Pseudo-envelope: raw markdown in "text" + bare "artifact" key in
+    //      an UNCLOSED fence (ministral-14b) — hunted with a balanced-brace
+    //      scan and salvaged, same as production chat Strategies 2–5.
+    const { displayText, artifact, parseError, artifactSalvaged } = result.ok
       ? extractChatResponse(result.text)
-      : { displayText: '', artifact: null, parseError: null };
+      : { displayText: '', artifact: null, parseError: null, artifactSalvaged: false };
 
     return NextResponse.json({
       mode: 'chat',
@@ -502,6 +514,11 @@ export async function POST(req: NextRequest) {
       displayText,
       artifact,
       parseError,
+      // True when the artifact was recovered from the response body (fence /
+      // pseudo-envelope / inline) instead of a clean envelope — the UI shows
+      // an amber chip so the admin knows this model doesn't emit clean
+      // envelopes on its own.
+      artifactSalvaged,
       error: result.error ?? null,
     });
   } catch (err) {

@@ -453,16 +453,149 @@ export async function callSpecificModel(params: DirectCallParams): Promise<Direc
   }
 }
 
-// ─── Light JSON extraction (tester version of the production cleanup) ──────
+// ─── JSON repair chain ──────────────────────────────────────────────────────
 //
-// The production parse route has an extensive repair chain (fences, thinking
-// leaks, number normalization). The tester only needs a LIGHT version: enough
-// to show the extracted fields side-by-side with the raw response, so the
-// admin can see both "what the model returned raw" and "the fields it
-// contains". Production-quality repair is intentionally NOT duplicated —
-// the raw text is always shown alongside.
+// Models occasionally emit ALMOST-valid JSON. Real failure modes seen with
+// ministral-14b in the tester:
+//
+//   1. Arithmetic written into a number value:
+//        "amount": 3500.00 + 1500.00,
+//      JSON.parse fails with "Expected ',' or '}' after property value".
+//   2. Trailing commas before }/] (json-mode models).
+//   3. Smart quotes (“ ” ‘ ’) in keys/values.
+//   4. Truncated output (max_tokens hit mid-object) → unbalanced braces.
+//
+// The tester REPAIRS these instead of giving up, and reports which repairs
+// were needed (surfaced as a "JSON repaired" chip in the UI). That tells the
+// admin the model needs a repair chain before it can be trusted with strict
+// JSON integrations — exactly the kind of insight the tester exists for.
 
-export function extractJsonBlock(text: string): { parsed: unknown | null; error?: string } {
+/** Left-to-right evaluation of a +/- chain on decimal numbers ("3500.00 + 1500.00" → 5000). */
+function evalArithmeticChain(expr: string): number | null {
+  const tokens = expr.match(/\d+(?:\.\d+)?|[+\-]/g);
+  if (!tokens || tokens.length < 3 || tokens.length % 2 === 0) return null;
+  let acc = parseFloat(tokens[0]);
+  if (Number.isNaN(acc)) return null;
+  for (let i = 1; i < tokens.length; i += 2) {
+    const num = parseFloat(tokens[i + 1]);
+    if (Number.isNaN(num)) return null;
+    if (tokens[i] === '+') acc += num;
+    else if (tokens[i] === '-') acc -= num;
+    else return null;
+  }
+  return acc;
+}
+
+/**
+ * Replace arithmetic chains in NUMBER VALUE positions with their result.
+ * Anchored to value positions (after ':' / '[' / ',' / whitespace and before
+ * a value terminator ',' / '}' / ']') so arithmetic inside STRING values
+ * ("total 3500 + 1500") is never touched.
+ */
+function repairArithmeticValues(s: string): string {
+  const ARITH = /(?<=[:\[,\s])(\d+(?:\.\d+)?(?:\s*[+\-]\s*\d+(?:\.\d+)?)+)(?=\s*[,}\]])/g;
+  return s.replace(ARITH, (expr) => {
+    const val = evalArithmeticChain(expr);
+    if (val == null) return expr;
+    return String(parseFloat(val.toFixed(6))); // trim float artifacts (0.1+0.2)
+  });
+}
+
+function repairTrailingCommas(s: string): string {
+  return s.replace(/,(\s*[}\]])/g, '$1');
+}
+
+function repairSmartQuotes(s: string): string {
+  return s.replace(/\u201C|\u201D/g, '"').replace(/\u2018|\u2019/g, "'");
+}
+
+/**
+ * Close a truncated JSON document. A proper character scan (NOT regex)
+ * tracks the open brace/bracket stack and string state — braces inside
+ * strings must be ignored — then appends the missing closers. No-op for
+ * already-balanced input.
+ */
+function repairTruncation(s: string): string {
+  const stack: string[] = [];
+  let inString = false;
+  let escaped = false;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (inString) {
+      if (ch === '\\') escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') inString = true;
+    else if (ch === '{' || ch === '[') stack.push(ch);
+    else if (ch === '}' || ch === ']') stack.pop();
+  }
+  let out = s;
+  if (inString) {
+    if (out.endsWith('\\')) out = out.slice(0, -1); // dangling escape
+    out += '"';
+  }
+  while (stack.length > 0) out += stack.pop() === '{' ? '}' : ']';
+  return out;
+}
+
+const REPAIR_STAGES: Array<{ name: string; apply: (s: string) => string }> = [
+  { name: 'arithmetic evaluated', apply: repairArithmeticValues },
+  { name: 'trailing commas removed', apply: repairTrailingCommas },
+  { name: 'smart quotes normalized', apply: repairSmartQuotes },
+  { name: 'truncation auto-closed', apply: repairTruncation },
+];
+
+/**
+ * Parse JSON, escalating through the repair chain only as far as needed.
+ * When nothing works, returns the parse error of the LAST attempted (fully
+ * repaired) string plus the names of every repair that was applied.
+ */
+export function parseJsonWithRepair(raw: string): {
+  parsed: unknown | null;
+  error?: string;
+  repairs?: string[];
+} {
+  try {
+    return { parsed: JSON.parse(raw) };
+  } catch {
+    // fall through to the repair chain
+  }
+  let current = raw;
+  const applied: string[] = [];
+  let lastError = 'invalid JSON';
+  for (const stage of REPAIR_STAGES) {
+    const next = stage.apply(current);
+    if (next === current) continue; // stage had nothing to do
+    current = next;
+    applied.push(stage.name);
+    try {
+      return { parsed: JSON.parse(current), repairs: applied };
+    } catch (err) {
+      lastError = err instanceof Error ? err.message : String(err);
+    }
+  }
+  return { parsed: null, error: lastError, repairs: applied };
+}
+
+// ─── Light JSON extraction + repair (tester version of production cleanup) ──
+//
+// The tester shows the extracted fields side-by-side with the raw response,
+// so the admin sees both "what the model returned raw" and "the fields it
+// contains". When the model's JSON is ALMOST valid (arithmetic in values,
+// trailing commas, truncation), the repair chain above fixes it instead of
+// giving up — and reports what it had to fix.
+
+export function extractJsonBlock(text: string): {
+  parsed: unknown | null;
+  error?: string;
+  /** Repair stages that had to be applied for the parse to succeed. */
+  repairs?: string[];
+} {
   if (!text) return { parsed: null, error: 'empty response' };
   let cleaned = text.trim();
 
@@ -476,16 +609,18 @@ export function extractJsonBlock(text: string): { parsed: unknown | null; error?
   // Slice from the first { to the last } — models sometimes prepend prose
   const first = cleaned.indexOf('{');
   const last = cleaned.lastIndexOf('}');
-  if (first === -1 || last === -1 || last <= first) {
+  if (first === -1) {
     return { parsed: null, error: 'no JSON object found in response' };
   }
-  cleaned = cleaned.slice(first, last + 1);
-
-  try {
-    return { parsed: JSON.parse(cleaned) };
-  } catch (err) {
-    return { parsed: null, error: err instanceof Error ? err.message : String(err) };
+  if (last > first) {
+    cleaned = cleaned.slice(first, last + 1);
+  } else {
+    // Truncated output with no closing brace at all — start at the first {
+    // and let the repair chain's truncation auto-close do the rest.
+    cleaned = cleaned.slice(first);
   }
+
+  return parseJsonWithRepair(cleaned);
 }
 
 // ─── Chat response extraction (tester version of the production cleanup) ───
@@ -494,15 +629,19 @@ export function extractJsonBlock(text: string): { parsed: unknown | null; error?
 //   {"text": "...", "artifact": {"type": "chart-bar", "title": ..., "data": ...}}
 // With json_mode active (Groq/OpenRouter) models mostly comply. WITHOUT
 // json_mode (Mistral chat — and any model that silently rejected it) models
-// often return free markdown text with the artifact embedded as a fenced
-// ```json code block inside the text instead.
+// produce one of these degraded shapes:
 //
-// extractChatResponse handles BOTH shapes:
-//   1. Envelope:  extractJsonBlock finds {text, artifact} → use both.
-//   2. Embedded:  scan the markdown for fenced ```json blocks; if one parses
-//                 to an artifact-shaped object, treat it as the artifact and
-//                 strip the block from the displayed text (so the admin sees
-//                 the rendered chart/table instead of a wall of JSON).
+//   1. Clean envelope (json_mode)               → extractJsonBlock → done.
+//   2. Markdown + CLOSED ```json fence holding  → step 2 strips the fence
+//      the artifact (or {"artifact": …})          and captures the artifact.
+//   3. Pseudo-envelope (ministral-14b): the whole response LOOKS like the
+//      envelope, but "text" holds RAW markdown (unescaped newlines/quotes →
+//      step 1 parse fails) and "artifact" sits in an UNCLOSED ```json fence
+//      as a bare key → step 3 hunts the "artifact" key with a balanced-brace
+//      scan (production chat Strategies 2–5 do the same) and salvages the
+//      prose between "text": " and the cut point.
+//   4. Raw artifact object inlined in prose     → step 3's second probe
+//      ({"type": "table", …})                      (production Strategy 5).
 //
 // The raw text is always available to the caller (rawText) — this only
 // decides what gets DISPLAYED by default.
@@ -510,10 +649,17 @@ export function extractJsonBlock(text: string): { parsed: unknown | null; error?
 export interface ChatExtractResult {
   /** Text to display in the chat bubble (artifact JSON stripped out). */
   displayText: string;
-  /** The artifact object if one was found (envelope or fenced block). */
+  /** The artifact object if one was found (envelope, fenced block, or salvaged). */
   artifact: unknown | null;
   /** Set when no JSON at all could be extracted (informational only). */
   parseError: string | null;
+  /**
+   * True when the artifact was recovered from the response BODY (embedded
+   * fence / pseudo-JSON envelope / inline JSON) rather than a clean JSON
+   * envelope — surfaced as an amber chip so the admin knows this model
+   * doesn't emit clean envelopes on its own.
+   */
+  artifactSalvaged: boolean;
 }
 
 function isArtifactShaped(v: unknown): boolean {
@@ -526,12 +672,133 @@ function isArtifactShaped(v: unknown): boolean {
   );
 }
 
+/**
+ * String-aware brace-balanced scan of the object starting at openIdx.
+ * Braces inside strings are ignored (a regex-only scan would miscount on
+ * values like "amount (CZK}"). Returns the scanned slice and whether the
+ * object actually closed before end-of-text.
+ */
+function scanBalancedObject(
+  text: string,
+  openIdx: number,
+): { slice: string; balanced: boolean } | null {
+  if (text[openIdx] !== '{') return null;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let i = openIdx; i < text.length; i++) {
+    const ch = text[i];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (inString) {
+      if (ch === '\\') escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') inString = true;
+    else if (ch === '{') depth++;
+    else if (ch === '}') {
+      depth--;
+      if (depth === 0) return { slice: text.slice(openIdx, i + 1), balanced: true };
+    }
+  }
+  return { slice: text.slice(openIdx), balanced: false }; // truncated
+}
+
+// Probe 1: the envelope's "artifact" key written bare (inside an unclosed
+// fence or a pseudo-envelope). Probe 2: a raw artifact object inlined in
+// prose ({"type": "table", …}) — the same shape production chat Strategy 5
+// hunts.
+const ARTIFACT_KEY_RE = /"artifact"\s*:\s*\{/g;
+const ARTIFACT_TYPE_RE = /\{\s*"type"\s*:\s*"(?:chart-bar|chart-line|chart-pie|table|summary)"/g;
+
+/**
+ * Hunt an artifact object embedded anywhere in free text. Returns the parsed
+ * artifact plus the index where the embedded block starts (the display text
+ * is cut there), or null when nothing artifact-shaped parses.
+ */
+function huntArtifactObject(text: string): { artifact: unknown; startIdx: number } | null {
+  for (const probe of [ARTIFACT_KEY_RE, ARTIFACT_TYPE_RE]) {
+    probe.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = probe.exec(text)) !== null) {
+      // Probe 1's match ends with the artifact object's opening brace;
+      // probe 2's match starts with it.
+      const openIdx = m[0].endsWith('{') ? m.index + m[0].length - 1 : m.index;
+      const scanned = scanBalancedObject(text, openIdx);
+      if (scanned) {
+        const { parsed } = parseJsonWithRepair(scanned.slice);
+        if (isArtifactShaped(parsed)) {
+          return { artifact: parsed, startIdx: m.index };
+        }
+      }
+    }
+  }
+  return null;
+}
+
+// Lead-in sentences models write right before inlining an artifact —
+// production chat strips the same patterns.
+const ARTIFACT_LEADIN_RE =
+  /^(?:let's|here is|here's|i'll|now i|i will)\s+(?:prepare|generate|create|build|show|format|present)\s+(?:the\s+)?(?:artifact|table|chart|summary)[.!:?\s]*$/gim;
+
+/**
+ * Recover the chat prose from everything before an embedded artifact.
+ *
+ * Pseudo-envelope case: { … "text": "PROSE… <fence/separator> "artifact": {…
+ *   → PROSE = raw slice between the opening quote after "text": and the
+ *     cut point (the model wrote raw markdown with literal newlines/quotes,
+ *     so the envelope itself was unparseable).
+ *
+ * Prose case: markdown with the artifact inlined/fenced somewhere
+ *   → everything before the cut, minus fence / --- separator / lead-in
+ *     remnants.
+ */
+function salvageTextBeforeArtifact(text: string, cutIdx: number): string {
+  let prefix = text.slice(0, cutIdx).trimEnd();
+
+  // The (usually unclosed) ```json fence that wrapped the artifact
+  prefix = prefix.replace(/[ \t]*```(?:json)?[ \t]*$/i, '').trimEnd();
+  // Horizontal-rule separator the model added before the artifact block
+  prefix = prefix.replace(/[ \t]*(?:-{3,}|[=*]{3,})[ \t]*$/, '').trimEnd();
+  // Remnants of a properly-closed text value in a pseudo-envelope
+  prefix = prefix.replace(/["',]+[ \t]*$/, '');
+
+  // Pseudo-envelope opener: { … "text": "PROSE — keep only PROSE (plus any
+  // short lead-in sentence before the opening brace).
+  const textKey = prefix.match(/"text"\s*:\s*"/);
+  if (textKey && textKey.index !== undefined) {
+    const beforeKey = prefix.slice(0, textKey.index).trim();
+    const leadIn = beforeKey.endsWith('{') ? beforeKey.slice(0, -1).trim() : '';
+    if (beforeKey === '{' || (leadIn && leadIn.length <= 80)) {
+      let prose = prefix.slice(textKey.index + textKey[0].length);
+      // When the model DID escape the string properly (but broke the JSON
+      // elsewhere), unescape \n/\" — otherwise keep the raw markdown as-is.
+      try {
+        prose = JSON.parse(`"${prose}"`);
+      } catch {
+        // raw markdown with literal newlines/quotes — keep as-is
+      }
+      prefix = leadIn ? `${leadIn}\n\n${prose}` : prose;
+    }
+  }
+
+  // Inline-artifact lead-in sentences ("Let's prepare the artifact.")
+  prefix = prefix.replace(ARTIFACT_LEADIN_RE, '').trim();
+  return prefix;
+}
+
 export function extractChatResponse(text: string): ChatExtractResult {
-  if (!text) return { displayText: '', artifact: null, parseError: 'empty response' };
+  if (!text) {
+    return { displayText: '', artifact: null, parseError: 'empty response', artifactSalvaged: false };
+  }
 
   let displayText = text.trim();
   let artifact: unknown = null;
   let parseError: string | null = null;
+  let artifactSalvaged = false;
 
   // ── 1. Envelope extraction ({text, artifact}) ─────────────────────────
   const { parsed, error } = extractJsonBlock(displayText);
@@ -550,7 +817,7 @@ export function extractChatResponse(text: string): ChatExtractResult {
     parseError = error;
   }
 
-  // ── 2. Fenced ```json artifact block scan ─────────────────────────────
+  // ── 2. Fenced ```json artifact block scan (CLOSED fences) ─────────────
   // Handles the no-json_mode failure mode: artifact embedded in markdown.
   // Also cleans the envelope case where the model returned {artifact: ...}
   // with NO text — the raw fallback still contains the fenced JSON block,
@@ -582,16 +849,41 @@ export function extractChatResponse(text: string): ChatExtractResult {
     for (const block of blocksToRemove) {
       displayText = displayText.replace(block, '');
     }
-    // Remove orphaned headings that referenced the stripped block
-    // (e.g. "### **Artifact: Suspicious Invoices Summary**"). Only true
-    // headings (#…) or standalone bold lines — NOT regular sentences that
-    // merely start with the word "Artifact".
+  }
+
+  // ── 3. Artifact key-hunt — unclosed fences & pseudo-JSON envelopes ────
+  // The ministral-14b failure mode: the whole response is a pseudo-envelope
+  // whose "text" value is raw markdown (step 1's parse fails on the literal
+  // newlines/quotes) and whose "artifact" key sits in an UNCLOSED ```json
+  // fence (step 2 needs a closing fence). Hunt the key with a balanced-brace
+  // scan instead, then salvage the prose from before it.
+  if (artifact == null) {
+    const hunted = huntArtifactObject(displayText);
+    if (hunted) {
+      artifact = hunted.artifact;
+      artifactSalvaged = true;
+      displayText = salvageTextBeforeArtifact(displayText, hunted.startIdx);
+    }
+  }
+
+  // ── 4. Final cleanup ───────────────────────────────────────────────────
+  // Remove orphaned headings that referenced a stripped artifact block
+  // (e.g. "### **Artifact: Suspicious Invoices Summary**"). Only true
+  // headings (#…) or standalone bold lines — NOT regular sentences that
+  // merely start with the word "Artifact".
+  if (artifact != null) {
     displayText = displayText
       .replace(/^[ \t]{0,3}#{1,6}[ \t]+[^\n]*artifact[^\n]*\n?/gim, '')
       .replace(/^[ \t]{0,3}\*\*[ \t]*Artifact[^\n]*\*\*[ \t]*\n?/gim, '');
-    // Collapse the 3+ consecutive blank lines the removals leave behind.
-    displayText = displayText.replace(/\n{3,}/g, '\n\n').trim();
+  }
+  // Collapse the 3+ consecutive blank lines the removals leave behind.
+  displayText = displayText.replace(/\n{3,}/g, '\n\n').trim();
+
+  // Envelope/salvage produced an artifact but no usable text — mirror
+  // production's "Here you go." placeholder so the bubble isn't empty.
+  if (!displayText && artifact != null) {
+    displayText = 'Here you go.';
   }
 
-  return { displayText, artifact, parseError };
+  return { displayText, artifact, parseError, artifactSalvaged };
 }
